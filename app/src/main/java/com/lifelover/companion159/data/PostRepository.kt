@@ -1,6 +1,7 @@
 package com.lifelover.companion159.data
 
-import com.lifelover.companion159.net.RetrofitInstance
+import com.lifelover.companion159.data.model.Post
+import com.lifelover.companion159.network.RetrofitInstance
 
 /**
  * Repository pattern centralizes data access

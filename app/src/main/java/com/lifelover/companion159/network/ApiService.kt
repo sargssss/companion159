@@ -1,6 +1,6 @@
-package com.lifelover.companion159.net
+package com.lifelover.companion159.network
 
-import com.lifelover.companion159.data.Post
+import com.lifelover.companion159.data.model.Post
 import retrofit2.http.GET
 import retrofit2.http.Path
 

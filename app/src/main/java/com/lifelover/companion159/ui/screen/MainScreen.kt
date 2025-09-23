@@ -12,7 +12,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.lifelover.companion159.data.MainViewModel
-import com.lifelover.companion159.data.Post
+import com.lifelover.companion159.data.model.Post
 import com.lifelover.companion159.ui.UiState
 import androidx.compose.runtime.Composable
 import androidx.navigation.NavHostController

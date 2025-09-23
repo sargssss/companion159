@@ -1,4 +1,4 @@
-package com.lifelover.companion159.data
+package com.lifelover.companion159.data.model
 
 import kotlinx.serialization.Serializable
 

@@ -1,4 +1,4 @@
-package com.lifelover.companion159.net
+package com.lifelover.companion159.network
 
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient

@@ -1,6 +1,6 @@
 package com.lifelover.companion159.ui
 
-import com.lifelover.companion159.data.Post
+import com.lifelover.companion159.data.model.Post
 
 /**
  * Data class representing the current state of our UI

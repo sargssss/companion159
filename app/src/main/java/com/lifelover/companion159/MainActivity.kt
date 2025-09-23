@@ -46,9 +46,7 @@ fun MyApp() {
     var selectedItem by remember { mutableStateOf(0) }
 
     Scaffold(
-        modifier = Modifier.fillMaxSize(),
-
-        topBar = { MyToolbar() }
+        modifier = Modifier.fillMaxSize()
     ) { innerPadding ->
         AppNavHost(
             modifier = Modifier.padding(innerPadding)
@@ -83,7 +81,7 @@ fun AppNavHost(
 @Composable
 fun MyToolbar() {
     TopAppBar(
-        title = { Text("My Toolbar") },
+        title = { Text("Toolbar") },
         navigationIcon = { /* ... */ },
         actions = { /* ... */ }
     )
