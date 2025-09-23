@@ -39,7 +39,7 @@ fun CrewScreen(
  *
  * @param post The post data to display
  */
-@Composable
+/*@Composable
 fun PostItem(post: Post) {
     /**
      * Card provides Material 3 card styling
@@ -76,4 +76,4 @@ fun PostItem(post: Post) {
             )
         }
     }
-}
+}*/
