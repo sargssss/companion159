@@ -10,7 +10,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.lifelover.companion159.data.MainViewModel
+import com.lifelover.companion159.viewmodel.MainViewModel
 import com.lifelover.companion159.data.model.Post
 import com.lifelover.companion159.ui.UiState
 

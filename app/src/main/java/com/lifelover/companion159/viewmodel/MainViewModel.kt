@@ -1,7 +1,8 @@
-package com.lifelover.companion159.data
+package com.lifelover.companion159.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.lifelover.companion159.data.repository.PostRepository
 import com.lifelover.companion159.ui.UiState
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow

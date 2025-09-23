@@ -1,4 +1,4 @@
-package com.lifelover.companion159.data
+package com.lifelover.companion159.data.repository
 
 import com.lifelover.companion159.data.model.Post
 import com.lifelover.companion159.network.RetrofitInstance

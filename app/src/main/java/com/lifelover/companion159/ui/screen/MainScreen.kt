@@ -11,7 +11,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.lifelover.companion159.data.MainViewModel
+import com.lifelover.companion159.viewmodel.MainViewModel
 import com.lifelover.companion159.data.model.Post
 import com.lifelover.companion159.ui.UiState
 import androidx.compose.runtime.Composable
@@ -20,24 +20,11 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 
-/**
- * Main screen composable function
- *
- * @Composable annotation marks this as a Compose function
- * Compose functions describe UI rather than create UI widgets
- *
- * viewModel() automatically creates and provides the ViewModel
- * It handles lifecycle and survives configuration changes
- */
 @Composable
 fun MainScreen(
     modifier: Modifier = Modifier,
     navController: NavHostController
 ) {
-    /**
-     * Column arranges children vertically
-     * Similar to LinearLayout with vertical orientation
-     */
     Column(
         modifier = modifier
             .fillMaxSize()      // Take up all available space
