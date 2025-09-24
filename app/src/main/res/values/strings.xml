@@ -1,3 +1,19 @@
 <resources>
     <string name="app_name">Companion159</string>
+    <string name="drones">Борти</string>
+    <string name="ammo">Боєкомплект</string>
+    <string name="tool">Обладнання</string>
+    <string name="food">Провізія</string>
+    <string name="add">Додати</string>
+    <string name="back">Назад</string>
+    <string name="empty_list">Список порожній</string>
+    <string name="push_plus_to_add">Натисніть + щоб додати перший елемент</string>
+    <string name="in_stock">В наявності</string>
+    <string name="go_to">Перейти</string>
+    <string name="delete">Видалити</string>
+    <string name="decrease_quantity">Зменшити кількість</string>
+    <string name="increase_quantity">Збільшити кількість</string>
+    <string name="naming">Найменування</string>
+    <string name="enter_title">Введіть назву...</string>
+    <string name="cancel">Скасувати</string>
 </resources>

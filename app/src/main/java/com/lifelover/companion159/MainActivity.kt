@@ -1,13 +1,11 @@
 package com.lifelover.companion159
 
-import android.annotation.SuppressLint
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -19,29 +17,20 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
-import com.lifelover.companion159.ui.screen.MainScreen
-import androidx.navigation.compose.NavHost
-import androidx.navigation.compose.composable
-import androidx.navigation.compose.rememberNavController
-import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
-import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.res.vectorResource
+import androidx.compose.ui.res.stringResource
 
 data class InventoryItem(
     val id: Long = System.currentTimeMillis(),
@@ -49,11 +38,11 @@ data class InventoryItem(
     var quantity: MutableIntState = mutableIntStateOf(1)
 )
 
-enum class InventoryType(val title: String, val icon: Int) {
-    SHIPS("Борти", R.drawable.drone),//Icons.Default.DirectionsBoat
-    AMMUNITION("Боєкомплект", R.drawable.bomb),//Icons.Default.Inventory2
-    EQUIPMENT("Обладнання", R.drawable.tool),//Icons.Default.Build
-    PROVISIONS("Провізія", R.drawable.food)//Icons.Default.Restaurant
+enum class InventoryType(val title: Int, val icon: Int) {
+    SHIPS(R.string.drones, R.drawable.drone),
+    AMMUNITION(R.string.ammo, R.drawable.bomb),
+    EQUIPMENT(R.string.tool, R.drawable.tool),
+    PROVISIONS(R.string.food, R.drawable.food)
 }
 
 class MainActivity : ComponentActivity() {
@@ -66,7 +55,6 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             Companion159Theme {
-                //MyApp()
                 InventoryApp()
             }
         }
@@ -109,7 +97,7 @@ fun MainMenuScreen(
         TopAppBar(
             title = {
                 Text(
-                    text = "Інвентарізація",
+                    text = stringResource(id = R.string.in_stock),
                     fontWeight = FontWeight.Bold
                 )
             }
@@ -122,13 +110,6 @@ fun MainMenuScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Text(
-                text = "Оберіть категорію:",
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Medium,
-                modifier = Modifier.padding(bottom = 16.dp)
-            )
-
             InventoryType.values().forEach { inventoryType ->
                 InventoryMenuButton(
                     inventoryType = inventoryType,
@@ -165,14 +146,14 @@ fun InventoryMenuButton(
                 tint = MaterialTheme.colorScheme.primary
             )
             Text(
-                text = inventoryType.title,
+                text = stringResource(inventoryType.title),
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Medium,
                 modifier = Modifier.weight(1f)
             )
             Icon(
-                imageVector = Icons.Default.ArrowForward,
-                contentDescription = "Перейти",
+                painter = painterResource(id = R.drawable.arrow_right),
+                contentDescription = stringResource(id = R.string.go_to),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
@@ -193,23 +174,26 @@ fun InventoryScreen(
         TopAppBar(
             title = {
                 Text(
-                    text = inventoryType.title,
+                    text = stringResource(inventoryType.title),
                     fontWeight = FontWeight.Bold
                 )
             },
             navigationIcon = {
                 IconButton(onClick = onBackPressed) {
                     Icon(
-                        imageVector = Icons.Default.ArrowBack,
-                        contentDescription = "Назад"
+                        painter = painterResource(id = R.drawable.arrow_left),
+                        contentDescription = stringResource(id = R.string.back)
                     )
                 }
             },
             actions = {
                 IconButton(onClick = { showDialog = true }) {
                     Icon(
-                        imageVector = Icons.Default.Add,
-                        contentDescription = "Додати ${inventoryType.title.lowercase()}"
+                        painter = painterResource(id = R.drawable.plus_circle),
+                        contentDescription = stringResource(
+                            id = R.string.add,
+                            stringResource(inventoryType.title).lowercase()
+                        )
                     )
                 }
             }
@@ -227,17 +211,18 @@ fun InventoryScreen(
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     Icon(
-                        painter = painterResource(inventoryType.icon),                        contentDescription = null,
-                        modifier = Modifier.size(64.dp),
+                        painter = painterResource(inventoryType.icon),
+                        contentDescription = null,
+                        modifier = Modifier.size(32.dp),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Text(
-                        text = "Список порожній",
+                        text = stringResource(id = R.string.empty_list),
                         style = MaterialTheme.typography.titleMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Text(
-                        text = "Натисніть + щоб додати перший елемент",
+                        text = stringResource(id = R.string.push_plus_to_add),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         textAlign = TextAlign.Center
@@ -303,8 +288,8 @@ fun InventoryItemCard(
                 )
                 IconButton(onClick = onDelete) {
                     Icon(
-                        imageVector = Icons.Default.Delete,
-                        contentDescription = "Видалити",
+                        painter = painterResource(id = R.drawable.trash),
+                        contentDescription = stringResource(id = R.string.delete),
                         tint = MaterialTheme.colorScheme.error
                     )
                 }
@@ -327,8 +312,9 @@ fun InventoryItemCard(
                     enabled = item.quantity.value > 0
                 ) {
                     Icon(
-                        imageVector = Icons.Default.Refresh,
-                        contentDescription = "Зменшити кількість"
+                        modifier = Modifier.size(32.dp),
+                        painter = painterResource(R.drawable.minus_circle),
+                        contentDescription = stringResource(id = R.string.decrease_quantity)
                     )
                 }
 
@@ -341,7 +327,7 @@ fun InventoryItemCard(
                             }
                         }
                     },
-                    modifier = Modifier.width(80.dp),
+                    modifier = Modifier.width(80.dp).height(48.dp),
                     singleLine = true,
                     textStyle = MaterialTheme.typography.bodyLarge.copy(
                         fontWeight = FontWeight.Bold,
@@ -355,8 +341,9 @@ fun InventoryItemCard(
                     }
                 ) {
                     Icon(
-                        imageVector = Icons.Default.Add,
-                        contentDescription = "Збільшити кількість"
+                        modifier = Modifier.size(32.dp),
+                        painter = painterResource(R.drawable.plus_circle),
+                        contentDescription = stringResource(id = R.string.increase_quantity)
                     )
                 }
             }
@@ -394,7 +381,9 @@ fun AddItemDialog(
                         tint = MaterialTheme.colorScheme.primary
                     )
                     Text(
-                        text = "Додати ${inventoryType.title.lowercase()}",
+                        text = stringResource(
+                            id = R.string.add
+                        ),
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold
                     )
@@ -403,10 +392,10 @@ fun AddItemDialog(
                 OutlinedTextField(
                     value = itemName,
                     onValueChange = { itemName = it },
-                    label = { Text("Найменування") },
+                    label = { Text(stringResource(id = R.string.naming)) },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
-                    placeholder = { Text("Введіть назву...") }
+                    placeholder = { Text(stringResource(id = R.string.enter_title)) }
                 )
 
                 Row(
@@ -415,7 +404,7 @@ fun AddItemDialog(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     TextButton(onClick = onDismiss) {
-                        Text("Скасувати")
+                        Text(stringResource(id = R.string.cancel))
                     }
 
                     Spacer(modifier = Modifier.width(8.dp))
@@ -428,41 +417,10 @@ fun AddItemDialog(
                         },
                         enabled = itemName.isNotBlank()
                     ) {
-                        Text("Додати")
+                        Text(stringResource(id = R.string.add))
                     }
                 }
             }
         }
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun MyToolbar() {
-    TopAppBar(
-        title = { Text("Toolbar") },
-        navigationIcon = { /* ... */ },
-        actions = { /* ... */ }
-    )
-}
-
-@Composable
-fun PostScreenView(modifier: Modifier) {
-    PostScreen(modifier = modifier)
-}
-
-@Composable
-fun Greeting(name: String, modifier: Modifier = Modifier) {
-    Text(
-        text = "Hello $name!",
-        modifier = modifier
-    )
-}
-
-@Preview(showBackground = true)
-@Composable
-fun GreetingPreview() {
-    Companion159Theme {
-        Greeting("Android")
     }
 }
