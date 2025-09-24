@@ -34,13 +34,14 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
-
-
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.vectorResource
 
 data class InventoryItem(
     val id: Long = System.currentTimeMillis(),
@@ -48,11 +49,11 @@ data class InventoryItem(
     var quantity: MutableIntState = mutableIntStateOf(1)
 )
 
-enum class InventoryType(val title: String, val icon: androidx.compose.ui.graphics.vector.ImageVector) {
-    SHIPS("Борти", Icons.Default.MailOutline),//Icons.Default.DirectionsBoat
-    AMMUNITION("Боєкомплект", Icons.Default.Info),//Icons.Default.Inventory2
-    EQUIPMENT("Обладнання", Icons.Default.Build),//Icons.Default.Build
-    PROVISIONS("Провізія", Icons.Default.ShoppingCart)//Icons.Default.Restaurant
+enum class InventoryType(val title: String, val icon: Int) {
+    SHIPS("Борти", R.drawable.drone),//Icons.Default.DirectionsBoat
+    AMMUNITION("Боєкомплект", R.drawable.bomb),//Icons.Default.Inventory2
+    EQUIPMENT("Обладнання", R.drawable.tool),//Icons.Default.Build
+    PROVISIONS("Провізія", R.drawable.food)//Icons.Default.Restaurant
 }
 
 class MainActivity : ComponentActivity() {
@@ -78,7 +79,7 @@ fun InventoryApp() {
 
     // State for each inventory type
     val inventoryStates = remember {
-        InventoryType.values().associateWith {
+        InventoryType.entries.associateWith {
             mutableStateListOf<InventoryItem>()
         }
     }
@@ -158,7 +159,7 @@ fun InventoryMenuButton(
             horizontalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             Icon(
-                imageVector = inventoryType.icon,
+                painter = painterResource(inventoryType.icon),
                 contentDescription = null,
                 modifier = Modifier.size(32.dp),
                 tint = MaterialTheme.colorScheme.primary
@@ -226,8 +227,7 @@ fun InventoryScreen(
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     Icon(
-                        imageVector = inventoryType.icon,
-                        contentDescription = null,
+                        painter = painterResource(inventoryType.icon),                        contentDescription = null,
                         modifier = Modifier.size(64.dp),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -327,7 +327,7 @@ fun InventoryItemCard(
                     enabled = item.quantity.value > 0
                 ) {
                     Icon(
-                        imageVector = Icons.Default.Delete,
+                        imageVector = Icons.Default.Refresh,
                         contentDescription = "Зменшити кількість"
                     )
                 }
@@ -388,7 +388,8 @@ fun AddItemDialog(
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Icon(
-                        imageVector = inventoryType.icon,
+                        modifier = Modifier.size(32.dp),
+                        painter = painterResource(inventoryType.icon),
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.primary
                     )
