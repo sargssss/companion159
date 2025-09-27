@@ -2,21 +2,19 @@ package com.lifelover.companion159.di
 
 import android.content.Context
 import androidx.room.Room
-import com.lifelover.companion159.data.SyncPreferences
 import com.lifelover.companion159.data.repository.LocalInventoryRepository
 import com.lifelover.companion159.data.repository.LocalInventoryRepositoryImpl
+import com.lifelover.companion159.data.repository.InventoryRepository
+import com.lifelover.companion159.data.repository.InventoryRepositoryImpl
 import com.lifelover.companion159.data.local.dao.InventoryDao
 import com.lifelover.companion159.data.local.database.InventoryDatabase
-import com.lifelover.companion159.data.remote.api.InventoryApiService
-import com.lifelover.companion159.network.NetworkMonitor
+import com.lifelover.companion159.domain.usecases.*
 import dagger.Binds
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
-import retrofit2.Retrofit
-import retrofit2.converter.gson.GsonConverterFactory
 import javax.inject.Singleton
 
 @Module
@@ -26,6 +24,12 @@ abstract class RepositoryModule {
     abstract fun bindLocalInventoryRepository(
         localInventoryRepositoryImpl: LocalInventoryRepositoryImpl
     ): LocalInventoryRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindInventoryRepository(
+        inventoryRepositoryImpl: InventoryRepositoryImpl
+    ): InventoryRepository
 }
 
 @Module
@@ -52,29 +56,20 @@ object DatabaseModule {
 
 @Module
 @InstallIn(SingletonComponent::class)
-object NetworkModule {
+object UseCaseModule {
 
     @Provides
-    @Singleton
-    fun provideRetrofit(): Retrofit {
-        return Retrofit.Builder()
-            .baseUrl("https://your-api-base-url.com/api/") // Replace with your API URL
-            .addConverterFactory(GsonConverterFactory.create())
-            .build()
-    }
+    fun provideGetItems(repository: InventoryRepository) = GetInventoryItemsUseCase(repository)
 
     @Provides
-    @Singleton
-    fun provideInventoryApiService(retrofit: Retrofit): InventoryApiService =
-        retrofit.create(InventoryApiService::class.java)
+    fun provideAddItem(repository: InventoryRepository) = AddInventoryItemUseCase(repository)
 
     @Provides
-    @Singleton
-    fun provideNetworkMonitor(@ApplicationContext context: Context): NetworkMonitor =
-        NetworkMonitor(context)
+    fun provideUpdateItem(repository: InventoryRepository) = UpdateInventoryItemUseCase(repository)
 
     @Provides
-    @Singleton
-    fun provideSyncPreferences(@ApplicationContext context: Context): SyncPreferences =
-        SyncPreferences(context)
+    fun provideDeleteItem(repository: InventoryRepository) = DeleteInventoryItemUseCase(repository)
+
+    @Provides
+    fun provideSync(repository: InventoryRepository) = SyncInventoryUseCase(repository)
 }

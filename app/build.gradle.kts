@@ -5,6 +5,7 @@ plugins {
     alias(libs.plugins.ksp)
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.hilt.android)
+    id("kotlin-kapt")
 }
 
 android {
@@ -36,6 +37,9 @@ android {
     }
     kotlinOptions {
         jvmTarget = "11"
+        freeCompilerArgs += listOf(
+            "-opt-in=kotlin.RequiresOptIn"
+        )
     }
     buildFeatures {
         compose = true
@@ -43,6 +47,10 @@ android {
     hilt {
         enableAggregatingTask = false
     }
+}
+
+kapt {
+    correctErrorTypes = true
 }
 
 dependencies {
@@ -88,14 +96,14 @@ dependencies {
     implementation(libs.hilt.navigation.compose)
     ksp(libs.hilt.compiler)
 
-    var supabase_version = "3.2.2"
+    /*var supabase_version = "3.2.2"
     var ktor_version = "3.2.2"
     implementation("io.github.jan-tennert.supabase:postgrest-kt:${supabase_version}")
     implementation("io.github.jan-tennert.supabase:storage-kt:${supabase_version}")
     implementation("io.github.jan-tennert.supabase:auth-kt:${supabase_version}")
     implementation("io.ktor:ktor-client-android:${ktor_version}")
     implementation("io.ktor:ktor-client-core:${ktor_version}")
-    implementation("io.ktor:ktor-utils:${ktor_version}")
+    implementation("io.ktor:ktor-utils:${ktor_version}")*/
 
     // Testing
     testImplementation(libs.junit)

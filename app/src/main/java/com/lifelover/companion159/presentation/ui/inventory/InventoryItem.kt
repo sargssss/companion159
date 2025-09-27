@@ -57,13 +57,11 @@ fun InventoryItemCard(
             ) {
                 IconButton(
                     onClick = {
-                        if (item.quantity.value > 0) {
-                            val newQuantity = item.quantity.value - 1
-                            item.quantity.value = newQuantity
-                            onQuantityChange(newQuantity)
+                        if (item.quantity > 0) {
+                            onQuantityChange(item.quantity - 1) // Видаляємо .value
                         }
                     },
-                    enabled = item.quantity.value > 0
+                    enabled = item.quantity > 0
                 ) {
                     Icon(
                         modifier = Modifier.size(32.dp),
@@ -73,11 +71,10 @@ fun InventoryItemCard(
                 }
 
                 OutlinedTextField(
-                    value = item.quantity.value.toString(),
+                    value = item.quantity.toString(), // Видаляємо .value
                     onValueChange = { value ->
                         value.toIntOrNull()?.let { newQuantity ->
                             if (newQuantity >= 0) {
-                                item.quantity.value = newQuantity
                                 onQuantityChange(newQuantity)
                             }
                         }
@@ -92,9 +89,7 @@ fun InventoryItemCard(
 
                 IconButton(
                     onClick = {
-                        val newQuantity = item.quantity.value + 1
-                        item.quantity.value = newQuantity
-                        onQuantityChange(newQuantity)
+                        onQuantityChange(item.quantity + 1) // Видаляємо .value
                     }
                 ) {
                     Icon(

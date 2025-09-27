@@ -17,9 +17,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.lifelover.companion159.R
-import com.lifelover.companion159.domain.models.InventoryCategory
-import com.lifelover.companion159.domain.models.iconRes
-import com.lifelover.companion159.domain.models.titleRes
+import com.lifelover.companion159.data.local.entities.InventoryCategory
+import com.lifelover.companion159.data.local.entities.iconRes
+import com.lifelover.companion159.data.local.entities.titleRes
 import com.lifelover.companion159.presentation.viewmodels.InventoryViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)

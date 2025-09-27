@@ -10,9 +10,9 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.lifelover.companion159.R
-import com.lifelover.companion159.domain.models.InventoryCategory
-import com.lifelover.companion159.domain.models.iconRes
-import com.lifelover.companion159.domain.models.titleRes
+import com.lifelover.companion159.data.local.entities.InventoryCategory
+import com.lifelover.companion159.data.local.entities.iconRes
+import com.lifelover.companion159.data.local.entities.titleRes
 
 @Composable
 fun InventoryMenuButton(

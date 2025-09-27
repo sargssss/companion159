@@ -3,6 +3,7 @@ package com.lifelover.companion159.presentation.ui.components
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Face
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -29,7 +30,7 @@ fun SyncStatusIndicator(
         when (status) {
             SyncStatus.SYNCED -> {
                 Icon(
-                    imageVector = Icons.Default.CloudDone,
+                    imageVector = Icons.Default.Face,
                     contentDescription = "Синхронізовано",
                     modifier = Modifier.size(16.dp),
                     tint = MaterialTheme.colorScheme.primary
@@ -43,7 +44,7 @@ fun SyncStatusIndicator(
 
             SyncStatus.NOT_SYNCED -> {
                 Icon(
-                    imageVector = Icons.Default.Cloud,
+                    imageVector = Icons.Default.Face,
                     contentDescription = "Не синхронізовано",
                     modifier = Modifier.size(16.dp),
                     tint = MaterialTheme.colorScheme.error
@@ -68,7 +69,7 @@ fun SyncStatusIndicator(
 
             SyncStatus.OFFLINE -> {
                 Icon(
-                    imageVector = Icons.Default.CloudOff,
+                    imageVector = Icons.Default.Face,
                     contentDescription = "Offline",
                     modifier = Modifier.size(16.dp),
                     tint = MaterialTheme.colorScheme.outline

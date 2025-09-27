@@ -1,6 +1,6 @@
 package com.lifelover.companion159.presentation.ui.navigation
 
-import com.lifelover.companion159.domain.models.InventoryCategory
+import com.lifelover.companion159.data.local.entities.InventoryCategory
 import kotlinx.serialization.Serializable
 
 sealed interface NavigationDestination {

@@ -26,6 +26,20 @@ enum class InventoryCategory {
     SHIPS, AMMUNITION, EQUIPMENT, PROVISIONS
 }
 
+fun InventoryCategory.titleRes(): Int = when (this) {
+    InventoryCategory.SHIPS -> com.lifelover.companion159.R.string.drones
+    InventoryCategory.AMMUNITION -> com.lifelover.companion159.R.string.ammo
+    InventoryCategory.EQUIPMENT -> com.lifelover.companion159.R.string.tool
+    InventoryCategory.PROVISIONS -> com.lifelover.companion159.R.string.food
+}
+
+fun InventoryCategory.iconRes(): Int = when (this) {
+    InventoryCategory.SHIPS -> com.lifelover.companion159.R.drawable.drone
+    InventoryCategory.AMMUNITION -> com.lifelover.companion159.R.drawable.bomb
+    InventoryCategory.EQUIPMENT -> com.lifelover.companion159.R.drawable.tool
+    InventoryCategory.PROVISIONS -> com.lifelover.companion159.R.drawable.food
+}
+
 class Converters {
     @TypeConverter
     fun fromCategory(category: InventoryCategory): String = category.name

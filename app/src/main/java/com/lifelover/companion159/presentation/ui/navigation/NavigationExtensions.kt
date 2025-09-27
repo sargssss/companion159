@@ -1,7 +1,7 @@
 package com.lifelover.companion159.presentation.ui.navigation
 
 import androidx.navigation.NavController
-import com.lifelover.companion159.domain.models.InventoryCategory
+import com.lifelover.companion159.data.local.entities.InventoryCategory
 
 fun NavController.navigateToMainMenu() {
     navigate(NavigationDestination.MainMenu) {
