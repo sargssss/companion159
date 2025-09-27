@@ -37,7 +37,7 @@ class NetworkMonitor(private val context: Context) {
 
         connectivityManager.registerNetworkCallback(request, callback)
 
-        // Відправити поточний стан
+        // Send current state
         trySend(isOnline)
 
         awaitClose {

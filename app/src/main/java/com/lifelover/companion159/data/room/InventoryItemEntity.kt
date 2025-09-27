@@ -31,8 +31,7 @@ class Converters {
     fun fromCategory(category: InventoryCategory): String = category.name
 
     @TypeConverter
-    fun toCategory(category: String): InventoryCategory =
-        InventoryCategory.valueOf(category)
+    fun toCategory(category: String): InventoryCategory = InventoryCategory.valueOf(category)
 
     @TypeConverter
     fun fromDate(date: Date?): Long? = date?.time

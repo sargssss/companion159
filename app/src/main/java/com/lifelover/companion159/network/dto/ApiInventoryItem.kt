@@ -21,7 +21,7 @@ data class SyncResponse(
     val timestamp: String
 )
 
-// Extension functions для API конвертації
+// Extension functions for API conversion
 fun InventoryItemEntity.toApiModel(): ApiInventoryItem {
     return ApiInventoryItem(
         id = serverId ?: "",
@@ -29,13 +29,13 @@ fun InventoryItemEntity.toApiModel(): ApiInventoryItem {
         quantity = quantity,
         category = category.name.lowercase(),
         lastModified = formatDateForApi(lastModified),
-        userId = "current_user" // Замініть на реальний userId
+        userId = "current_user" // Replace with real userId
     )
 }
 
 fun ApiInventoryItem.toEntity(): InventoryItemEntity {
     return InventoryItemEntity(
-        id = 0, // Room згенерує новий local ID
+        id = 0, // Room will generate new local ID
         name = name,
         quantity = quantity,
         category = InventoryCategory.valueOf(category.uppercase()),

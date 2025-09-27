@@ -1,22 +1,8 @@
 package com.lifelover.companion159.ui.inventory
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
+import androidx.compose.foundation.layout.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
@@ -24,13 +10,13 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import com.lifelover.companion159.InventoryItem
+import com.lifelover.companion159.data.InventoryItem
 import com.lifelover.companion159.R
-
 
 @Composable
 fun InventoryItemCard(
     item: InventoryItem,
+    onQuantityChange: (Int) -> Unit,
     onDelete: () -> Unit
 ) {
     Card(
@@ -72,10 +58,12 @@ fun InventoryItemCard(
                 IconButton(
                     onClick = {
                         if (item.quantity.value > 0) {
-                            item.quantity.value = item.quantity.value - 1
+                            val newQuantity = item.quantity.value - 1
+                            item.quantity.value = newQuantity
+                            onQuantityChange(newQuantity)
                         }
                     },
-                    enabled = item.quantity.value >= 0
+                    enabled = item.quantity.value > 0
                 ) {
                     Icon(
                         modifier = Modifier.size(32.dp),
@@ -90,10 +78,11 @@ fun InventoryItemCard(
                         value.toIntOrNull()?.let { newQuantity ->
                             if (newQuantity >= 0) {
                                 item.quantity.value = newQuantity
+                                onQuantityChange(newQuantity)
                             }
                         }
                     },
-                    modifier = Modifier.width(80.dp).height(48.dp),
+                    modifier = Modifier.width(80.dp),
                     singleLine = true,
                     textStyle = MaterialTheme.typography.bodyLarge.copy(
                         fontWeight = FontWeight.Bold,
@@ -103,7 +92,9 @@ fun InventoryItemCard(
 
                 IconButton(
                     onClick = {
-                        item.quantity.value = item.quantity.value + 1
+                        val newQuantity = item.quantity.value + 1
+                        item.quantity.value = newQuantity
+                        onQuantityChange(newQuantity)
                     }
                 ) {
                     Icon(

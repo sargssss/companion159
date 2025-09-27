@@ -1,6 +1,7 @@
 package com.lifelover.companion159
 
 import androidx.navigation.NavController
+import com.lifelover.companion159.data.ui.InventoryType
 
 fun NavController.navigateToMainMenu() {
     navigate(MainMenu)

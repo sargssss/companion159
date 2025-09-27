@@ -14,8 +14,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
-import com.lifelover.companion159.InventoryType
 import com.lifelover.companion159.R
+import com.lifelover.companion159.data.ui.InventoryType
 import com.lifelover.companion159.ui.inventory.InventoryMenuButton
 
 @OptIn(ExperimentalMaterial3Api::class)

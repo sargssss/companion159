@@ -1,0 +1,51 @@
+package com.lifelover.companion159.data.repository
+
+import com.lifelover.companion159.data.ui.toRoomCategory
+import com.lifelover.companion159.data.InventoryItem
+import com.lifelover.companion159.data.room.InventoryDao
+import com.lifelover.companion159.data.toDomainModel
+import com.lifelover.companion159.data.toEntity
+import com.lifelover.companion159.data.ui.InventoryType
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
+import javax.inject.Inject
+import javax.inject.Singleton
+
+interface LocalInventoryRepository {
+    fun getItemsByCategory(category: InventoryType): Flow<List<InventoryItem>>
+    suspend fun addItem(item: InventoryItem): Long
+    suspend fun updateItem(item: InventoryItem)
+    suspend fun deleteItem(id: Long)
+    suspend fun getItemCount(category: InventoryType): Int
+}
+
+@Singleton
+class LocalInventoryRepositoryImpl @Inject constructor(
+    private val dao: InventoryDao
+) : LocalInventoryRepository {
+
+    override fun getItemsByCategory(category: InventoryType): Flow<List<InventoryItem>> {
+        return dao.getItemsByCategory(category.toRoomCategory())
+            .map { entities ->
+                entities.map { it.toDomainModel() }
+            }
+    }
+
+    override suspend fun addItem(item: InventoryItem): Long {
+        val entity = item.toEntity()
+        return dao.insertItem(entity)
+    }
+
+    override suspend fun updateItem(item: InventoryItem) {
+        val entity = item.toEntity().copy(id = item.id)
+        dao.updateItem(entity)
+    }
+
+    override suspend fun deleteItem(id: Long) {
+        dao.softDeleteItem(id)
+    }
+
+    override suspend fun getItemCount(category: InventoryType): Int {
+        return dao.getItemCount(category.toRoomCategory())
+    }
+}

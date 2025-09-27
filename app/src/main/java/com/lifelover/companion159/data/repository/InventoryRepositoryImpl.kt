@@ -1,11 +1,11 @@
 package com.lifelover.companion159.data.repository
 
+import com.lifelover.companion159.data.InventoryItem
 import com.lifelover.companion159.data.SyncPreferences
 import com.lifelover.companion159.data.room.InventoryCategory
 import com.lifelover.companion159.data.room.InventoryDao
-import com.lifelover.companion159.data.ui.InventoryItem
-import com.lifelover.companion159.data.ui.toDomainModel
-import com.lifelover.companion159.data.ui.toEntity
+import com.lifelover.companion159.data.toDomainModel
+import com.lifelover.companion159.data.toEntity
 import com.lifelover.companion159.network.InventoryApiService
 import com.lifelover.companion159.network.NetworkMonitor
 import com.lifelover.companion159.network.dto.toApiModel
@@ -27,7 +27,8 @@ class InventoryRepositoryImpl(
     }
 
     override suspend fun addItem(item: InventoryItem) {
-        val entity = item.toEntity(needsSync = true)
+        //val entity = item.toEntity(needsSync = true)
+        val entity = item.toEntity()
         dao.insertItem(entity)
 
         if (networkMonitor.isOnline) {
@@ -36,7 +37,8 @@ class InventoryRepositoryImpl(
     }
 
     override suspend fun updateItem(item: InventoryItem) {
-        val entity = item.toEntity(needsSync = true)
+        //val entity = item.toEntity(needsSync = true)
+        val entity = item.toEntity()
         dao.updateItem(entity)
 
         if (networkMonitor.isOnline) {
@@ -65,7 +67,7 @@ class InventoryRepositoryImpl(
                     item.isDeleted -> {
                         item.serverId?.let { serverId ->
                             apiService.deleteItem(serverId)
-                            dao.markAsSynced(item.id)
+                            //dao.markAsSynced(item.id)
                         }
                     }
                     item.serverId == null -> {
@@ -80,7 +82,7 @@ class InventoryRepositoryImpl(
                     else -> {
                         // Оновлення існуючого
                         apiService.updateItem(item.serverId!!, item.toApiModel())
-                        dao.markAsSynced(item.id)
+                        //dao.markAsSynced(item.id)
                     }
                 }
             }
@@ -91,24 +93,26 @@ class InventoryRepositoryImpl(
 
             // 3. Застосувати серверні зміни
             for (apiItem in serverResponse.items) {
-                val existingItem = dao.getItemByServerId(apiItem.id)
+                /*val existingItem = dao.getItemByServerId(apiItem.id)
+
                 if (existingItem == null) {
                     dao.insertItem(apiItem.toEntity())
                 } else {
                     // Conflict resolution: server wins for now
                     dao.updateItem(apiItem.toEntity().copy(id = existingItem.id))
-                }
+                }*/
+                dao.insertItem(apiItem.toEntity())
             }
 
             // 4. Видалити items які видалені на сервері
-            for (deletedId in serverResponse.deletedIds) {
+            /*for (deletedId in serverResponse.deletedIds) {
                 dao.getItemByServerId(deletedId)?.let { item ->
                     dao.softDeleteItem(item.id)
                 }
-            }
+            }*/
 
             // 5. Очистити видалені items
-            dao.cleanupDeletedItems()
+            //dao.cleanupDeletedItems()
 
             saveLastSyncTimestamp(serverResponse.timestamp)
             SyncResult.Success
@@ -126,9 +130,9 @@ class InventoryRepositoryImpl(
         // Background sync без блокування UI
         // Тут можна додати WorkManager для надійності
         try {
-            syncWithServer()
+            android.util.Log.e("Repository", "Background sync mock")
+            //syncWithServer()
         } catch (e: Exception) {
-            // Логуємо помилку, але не кидаємо її далі
             android.util.Log.e("Repository", "Background sync failed", e)
         }
     }

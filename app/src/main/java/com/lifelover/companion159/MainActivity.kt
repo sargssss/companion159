@@ -5,8 +5,6 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.MutableIntState
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
@@ -14,42 +12,13 @@ import androidx.navigation.toRoute
 import com.lifelover.companion159.ui.inventory.InventoryScreen
 import com.lifelover.companion159.ui.main.MainMenuScreen
 import com.lifelover.companion159.ui.theme.Companion159Theme
-import kotlinx.serialization.Serializable
+import dagger.hilt.android.AndroidEntryPoint
 
-data class InventoryItem(
-    val id: Long = System.currentTimeMillis(),
-    val name: String,
-    var quantity: MutableIntState = mutableIntStateOf(1)
-)
-
-@Serializable
-enum class InventoryType {
-    SHIPS,
-    AMMUNITION,
-    EQUIPMENT,
-    PROVISIONS
-}
-
-fun InventoryType.titleRes(): Int = when (this) {
-    InventoryType.SHIPS -> R.string.drones
-    InventoryType.AMMUNITION -> R.string.ammo
-    InventoryType.EQUIPMENT -> R.string.tool
-    InventoryType.PROVISIONS -> R.string.food
-}
-
-fun InventoryType.iconRes(): Int = when (this) {
-    InventoryType.SHIPS -> R.drawable.drone
-    InventoryType.AMMUNITION -> R.drawable.bomb
-    InventoryType.EQUIPMENT -> R.drawable.tool
-    InventoryType.PROVISIONS -> R.drawable.food
-}
-
+@AndroidEntryPoint
 class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
-
         super.onCreate(savedInstanceState)
-
         enableEdgeToEdge()
 
         setContent {
@@ -75,8 +44,7 @@ class MainActivity : ComponentActivity() {
                     }
                 )
             }
-            composable<DestInventoryDetail> {
-                    backStackEntry ->
+            composable<DestInventoryDetail> { backStackEntry ->
                 val args = backStackEntry.toRoute<DestInventoryDetail>()
                 InventoryScreen(
                     inventoryType = args.type,

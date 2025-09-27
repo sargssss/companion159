@@ -11,7 +11,8 @@ class SyncPreferences(context: Context) {
     )
 
     fun getLastSyncTimestamp(): String {
-        return prefs.getString("last_sync_timestamp", "1970-01-01T00:00:00.000Z") ?: "1970-01-01T00:00:00.000Z"
+        return prefs.getString("last_sync_timestamp", "1970-01-01T00:00:00.000Z")
+            ?: "1970-01-01T00:00:00.000Z"
     }
 
     fun saveLastSyncTimestamp(timestamp: String) {

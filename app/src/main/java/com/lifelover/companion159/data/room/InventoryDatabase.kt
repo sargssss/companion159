@@ -24,8 +24,10 @@ abstract class InventoryDatabase : RoomDatabase() {
                 val instance = Room.databaseBuilder(
                     context.applicationContext,
                     InventoryDatabase::class.java,
-                    "inventory_database"
-                ).build()
+                    "companion159_inventory_database"
+                )
+                    .fallbackToDestructiveMigration() // For development only
+                    .build()
                 INSTANCE = instance
                 instance
             }

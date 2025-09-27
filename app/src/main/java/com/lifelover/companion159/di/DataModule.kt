@@ -3,11 +3,13 @@ package com.lifelover.companion159.di
 import android.content.Context
 import androidx.room.Room
 import com.lifelover.companion159.data.SyncPreferences
-import com.lifelover.companion159.data.repository.InventoryRepository
-import com.lifelover.companion159.data.repository.InventoryRepositoryImpl
+import com.lifelover.companion159.data.repository.LocalInventoryRepository
+import com.lifelover.companion159.data.repository.LocalInventoryRepositoryImpl
+import com.lifelover.companion159.data.room.InventoryDao
 import com.lifelover.companion159.data.room.InventoryDatabase
 import com.lifelover.companion159.network.InventoryApiService
 import com.lifelover.companion159.network.NetworkMonitor
+import dagger.Binds
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -19,7 +21,16 @@ import javax.inject.Singleton
 
 @Module
 @InstallIn(SingletonComponent::class)
-object DataModule {
+abstract class RepositoryModule {
+    @Binds
+    abstract fun bindLocalInventoryRepository(
+        localInventoryRepositoryImpl: LocalInventoryRepositoryImpl
+    ): LocalInventoryRepository
+}
+
+@Module
+@InstallIn(SingletonComponent::class)
+object DatabaseModule {
 
     @Provides
     @Singleton
@@ -27,18 +38,27 @@ object DataModule {
         return Room.databaseBuilder(
             context.applicationContext,
             InventoryDatabase::class.java,
-            "inventory_database"
-        ).build()
+            "companion159_inventory_database"
+        )
+            .fallbackToDestructiveMigration()
+            .build()
     }
 
     @Provides
-    fun provideInventoryDao(database: InventoryDatabase) = database.inventoryDao()
+    fun provideInventoryDao(database: InventoryDatabase): InventoryDao {
+        return database.inventoryDao()
+    }
+}
+
+@Module
+@InstallIn(SingletonComponent::class)
+object NetworkModule {
 
     @Provides
     @Singleton
     fun provideRetrofit(): Retrofit {
         return Retrofit.Builder()
-            .baseUrl("https://your-api-base-url.com/api/") // Замініть на ваш URL
+            .baseUrl("https://your-api-base-url.com/api/") // Replace with your API URL
             .addConverterFactory(GsonConverterFactory.create())
             .build()
     }
@@ -57,13 +77,4 @@ object DataModule {
     @Singleton
     fun provideSyncPreferences(@ApplicationContext context: Context): SyncPreferences =
         SyncPreferences(context)
-
-    @Provides
-    @Singleton
-    fun provideInventoryRepository(
-        dao: com.lifelover.companion159.data.room.InventoryDao,
-        apiService: InventoryApiService,
-        networkMonitor: NetworkMonitor,
-        syncPreferences: SyncPreferences
-    ): InventoryRepository = InventoryRepositoryImpl(dao, apiService, networkMonitor, syncPreferences)
 }
