@@ -6,6 +6,7 @@ import com.lifelover.companion159.data.room.InventoryCategory
 import com.lifelover.companion159.data.room.InventoryDao
 import com.lifelover.companion159.data.toDomainModel
 import com.lifelover.companion159.data.toEntity
+import com.lifelover.companion159.data.toEntityForInsert
 import com.lifelover.companion159.network.InventoryApiService
 import com.lifelover.companion159.network.NetworkMonitor
 import com.lifelover.companion159.network.dto.toApiModel
@@ -28,7 +29,7 @@ class InventoryRepositoryImpl(
 
     override suspend fun addItem(item: InventoryItem) {
         //val entity = item.toEntity(needsSync = true)
-        val entity = item.toEntity()
+        val entity = item.toEntityForInsert()
         dao.insertItem(entity)
 
         if (networkMonitor.isOnline) {
@@ -60,7 +61,6 @@ class InventoryRepositoryImpl(
         }
 
         return try {
-            // 1. Відправити локальні зміни на сервер
             val unsyncedItems = dao.getItemsNeedingSync()
             for (item in unsyncedItems) {
                 when {
@@ -71,7 +71,6 @@ class InventoryRepositoryImpl(
                         }
                     }
                     item.serverId == null -> {
-                        // Новий item
                         val apiItem = apiService.createItem(item.toApiModel())
                         dao.updateItem(item.copy(
                             serverId = apiItem.id,
@@ -80,18 +79,15 @@ class InventoryRepositoryImpl(
                         ))
                     }
                     else -> {
-                        // Оновлення існуючого
                         apiService.updateItem(item.serverId!!, item.toApiModel())
                         //dao.markAsSynced(item.id)
                     }
                 }
             }
 
-            // 2. Отримати зміни з сервера
             val lastSyncTime = getLastSyncTimestamp()
             val serverResponse = apiService.getUpdates(lastSyncTime)
 
-            // 3. Застосувати серверні зміни
             for (apiItem in serverResponse.items) {
                 /*val existingItem = dao.getItemByServerId(apiItem.id)
 
@@ -111,7 +107,6 @@ class InventoryRepositoryImpl(
                 }
             }*/
 
-            // 5. Очистити видалені items
             //dao.cleanupDeletedItems()
 
             saveLastSyncTimestamp(serverResponse.timestamp)

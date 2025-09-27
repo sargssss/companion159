@@ -29,6 +29,16 @@ fun InventoryItemEntity.toDomainModel(): InventoryItem {
     )
 }
 
+fun InventoryItem.toEntityForInsert(): InventoryItemEntity {
+    return InventoryItemEntity(
+        name = name,
+        quantity = quantity.value,
+        category = category.toRoomCategory(),
+        serverId = null,
+        lastModified = Date(),
+        needsSync = true
+    )
+}
 fun InventoryItem.toEntity(): InventoryItemEntity {
     return InventoryItemEntity(
         id = id,

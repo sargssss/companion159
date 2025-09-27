@@ -8,7 +8,8 @@ import java.util.Date
 
 @Entity(tableName = "inventory_items")
 data class InventoryItemEntity(
-    @PrimaryKey val id: Long = 0,
+    @PrimaryKey(autoGenerate = true)
+    val id: Long = 0,
     val name: String,
     val quantity: Int,
     val category: InventoryCategory,
