@@ -8,8 +8,10 @@ import android.net.NetworkRequest
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
 
 class NetworkMonitor(private val context: Context) {
+
     private val connectivityManager =
         context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
 
@@ -20,7 +22,7 @@ class NetworkMonitor(private val context: Context) {
             return capabilities?.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) == true
         }
 
-    fun observeNetworkState(): Flow<Boolean> = callbackFlow {
+    val isOnlineFlow: Flow<Boolean> = callbackFlow {
         val callback = object : ConnectivityManager.NetworkCallback() {
             override fun onAvailable(network: Network) {
                 trySend(true)
@@ -37,11 +39,11 @@ class NetworkMonitor(private val context: Context) {
 
         connectivityManager.registerNetworkCallback(request, callback)
 
-        // Send current state
+        // Відправляємо поточний стан
         trySend(isOnline)
 
         awaitClose {
             connectivityManager.unregisterNetworkCallback(callback)
         }
-    }
+    }.distinctUntilChanged()
 }

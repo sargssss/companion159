@@ -1,7 +1,7 @@
 package com.lifelover.companion159.data.ui
 
 import com.lifelover.companion159.R
-import com.lifelover.companion159.data.room.InventoryCategory
+import com.lifelover.companion159.data.local.entities.InventoryCategory
 import kotlinx.serialization.Serializable
 
 @Serializable

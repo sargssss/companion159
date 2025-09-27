@@ -1,7 +1,7 @@
 package com.lifelover.companion159.data.repository
 
-import com.lifelover.companion159.data.InventoryItem
-import com.lifelover.companion159.data.room.InventoryCategory
+import com.lifelover.companion159.domain.models.InventoryItem
+import com.lifelover.companion159.data.local.entities.InventoryCategory
 import kotlinx.coroutines.flow.Flow
 
 interface InventoryRepository {

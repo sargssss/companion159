@@ -1,10 +1,10 @@
 package com.lifelover.companion159.data.repository
 
 import com.lifelover.companion159.data.ui.toRoomCategory
-import com.lifelover.companion159.data.InventoryItem
-import com.lifelover.companion159.data.room.InventoryDao
-import com.lifelover.companion159.data.toDomainModel
-import com.lifelover.companion159.data.toEntity
+import com.lifelover.companion159.domain.models.InventoryItem
+import com.lifelover.companion159.data.local.dao.InventoryDao
+import com.lifelover.companion159.domain.models.toDomainModel
+import com.lifelover.companion159.domain.models.toEntity
 import com.lifelover.companion159.data.ui.InventoryType
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map

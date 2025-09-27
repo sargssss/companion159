@@ -5,9 +5,9 @@ import androidx.room.Room
 import com.lifelover.companion159.data.SyncPreferences
 import com.lifelover.companion159.data.repository.LocalInventoryRepository
 import com.lifelover.companion159.data.repository.LocalInventoryRepositoryImpl
-import com.lifelover.companion159.data.room.InventoryDao
-import com.lifelover.companion159.data.room.InventoryDatabase
-import com.lifelover.companion159.network.InventoryApiService
+import com.lifelover.companion159.data.local.dao.InventoryDao
+import com.lifelover.companion159.data.local.database.InventoryDatabase
+import com.lifelover.companion159.data.remote.api.InventoryApiService
 import com.lifelover.companion159.network.NetworkMonitor
 import dagger.Binds
 import dagger.Module

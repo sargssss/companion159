@@ -88,6 +88,15 @@ dependencies {
     implementation(libs.hilt.navigation.compose)
     ksp(libs.hilt.compiler)
 
+    var supabase_version = "3.2.2"
+    var ktor_version = "3.2.2"
+    implementation("io.github.jan-tennert.supabase:postgrest-kt:${supabase_version}")
+    implementation("io.github.jan-tennert.supabase:storage-kt:${supabase_version}")
+    implementation("io.github.jan-tennert.supabase:auth-kt:${supabase_version}")
+    implementation("io.ktor:ktor-client-android:${ktor_version}")
+    implementation("io.ktor:ktor-client-core:${ktor_version}")
+    implementation("io.ktor:ktor-utils:${ktor_version}")
+
     // Testing
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
