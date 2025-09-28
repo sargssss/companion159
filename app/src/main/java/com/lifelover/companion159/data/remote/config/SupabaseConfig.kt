@@ -10,5 +10,8 @@ object SupabaseConfig {
     const val TABLE_USERS = "profiles"
 
     val isConfigured: Boolean
-        get() = SUPABASE_URL.isNotBlank() && SUPABASE_ANON_KEY.isNotBlank()
+        get() = SUPABASE_URL.isNotBlank() &&
+                SUPABASE_ANON_KEY.isNotBlank() &&
+                SUPABASE_URL != "\"\"" &&
+                SUPABASE_ANON_KEY != "\"\""
 }

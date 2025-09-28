@@ -2,15 +2,12 @@ package com.lifelover.companion159.di
 
 import android.content.Context
 import androidx.room.Room
-import com.lifelover.companion159.data.sync.SyncService
 import com.lifelover.companion159.data.repository.LocalInventoryRepository
 import com.lifelover.companion159.data.repository.LocalInventoryRepositoryImpl
 import com.lifelover.companion159.data.repository.InventoryRepository
 import com.lifelover.companion159.data.repository.InventoryRepositoryImpl
 import com.lifelover.companion159.data.local.dao.InventoryDao
 import com.lifelover.companion159.data.local.database.InventoryDatabase
-import com.lifelover.companion159.data.remote.auth.SupabaseAuthService
-import com.lifelover.companion159.data.remote.repository.SupabaseInventoryRepository
 import com.lifelover.companion159.domain.usecases.*
 import dagger.Binds
 import dagger.Module
@@ -57,7 +54,6 @@ object DatabaseModule {
     }
 }
 
-
 @Module
 @InstallIn(SingletonComponent::class)
 object UseCaseModule {
@@ -76,15 +72,4 @@ object UseCaseModule {
 
     @Provides
     fun provideSync(repository: InventoryRepository) = SyncInventoryUseCase(repository)
-
-    // Додайте цей метод для SyncService
-    @Provides
-    @Singleton
-    fun provideSyncService(
-        localDao: InventoryDao,
-        remoteRepository: SupabaseInventoryRepository,
-        authService: SupabaseAuthService
-    ): SyncService {
-        return SyncService(localDao, remoteRepository, authService)
-    }
 }
