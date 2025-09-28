@@ -1,3 +1,6 @@
+import java.io.FileInputStream
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -5,7 +8,7 @@ plugins {
     alias(libs.plugins.ksp)
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.hilt.android)
-    id("kotlin-kapt")
+    //id("kotlin-kapt")
 }
 
 android {
@@ -20,6 +23,17 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        val localProperties = Properties()
+        val localPropertiesFile = rootProject.file("local.properties")
+        if (localPropertiesFile.exists()) {
+            localProperties.load(FileInputStream(localPropertiesFile))
+        }
+
+        buildConfigField("String", "SUPABASE_URL",
+            "\"${localProperties.getProperty("SUPABASE_URL", "")}\"")
+        buildConfigField("String", "SUPABASE_ANON_KEY",
+            "\"${localProperties.getProperty("SUPABASE_ANON_KEY", "")}\"")
     }
 
     buildTypes {
@@ -43,14 +57,12 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
+
     hilt {
         enableAggregatingTask = false
     }
-}
-
-kapt {
-    correctErrorTypes = true
 }
 
 dependencies {
@@ -96,14 +108,18 @@ dependencies {
     implementation(libs.hilt.navigation.compose)
     ksp(libs.hilt.compiler)
 
-    /*var supabase_version = "3.2.2"
-    var ktor_version = "3.2.2"
-    implementation("io.github.jan-tennert.supabase:postgrest-kt:${supabase_version}")
-    implementation("io.github.jan-tennert.supabase:storage-kt:${supabase_version}")
-    implementation("io.github.jan-tennert.supabase:auth-kt:${supabase_version}")
-    implementation("io.ktor:ktor-client-android:${ktor_version}")
-    implementation("io.ktor:ktor-client-core:${ktor_version}")
-    implementation("io.ktor:ktor-utils:${ktor_version}")*/
+    // Supabase
+    val supabaseVersion = "3.0.2"
+    val ktorVersion = "3.0.1"
+    implementation("io.github.jan-tennert.supabase:postgrest-kt:$supabaseVersion")
+    implementation("io.github.jan-tennert.supabase:auth-kt:$supabaseVersion")
+    implementation("io.github.jan-tennert.supabase:storage-kt:$supabaseVersion")
+    implementation("io.github.jan-tennert.supabase:realtime-kt:$supabaseVersion")
+    implementation("io.ktor:ktor-client-android:$ktorVersion")
+    implementation("io.ktor:ktor-client-core:$ktorVersion")
+    implementation("io.ktor:ktor-utils:$ktorVersion")
+    implementation("io.ktor:ktor-client-content-negotiation:$ktorVersion")
+    implementation("io.ktor:ktor-serialization-kotlinx-json:$ktorVersion")
 
     // Testing
     testImplementation(libs.junit)

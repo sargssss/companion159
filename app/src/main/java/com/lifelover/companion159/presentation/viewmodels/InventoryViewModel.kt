@@ -2,8 +2,9 @@ package com.lifelover.companion159.presentation.viewmodels
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.lifelover.companion159.data.sync.SyncService
 import com.lifelover.companion159.data.local.entities.InventoryCategory
-import com.lifelover.companion159.data.repository.SyncResult
+import com.lifelover.companion159.data.sync.SyncStatus
 import com.lifelover.companion159.domain.models.InventoryItem
 import com.lifelover.companion159.domain.usecases.*
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -15,6 +16,8 @@ data class InventoryState(
     val items: List<InventoryItem> = emptyList(),
     val isLoading: Boolean = false,
     val isSyncing: Boolean = false,
+    val syncStatus: SyncStatus = SyncStatus.IDLE,
+    val lastSyncTime: Long? = null,
     val error: String? = null,
     val message: String? = null
 )
@@ -25,11 +28,33 @@ class InventoryViewModel @Inject constructor(
     private val addItem: AddInventoryItemUseCase,
     private val updateItem: UpdateInventoryItemUseCase,
     private val deleteItem: DeleteInventoryItemUseCase,
-    private val sync: SyncInventoryUseCase
+    private val sync: SyncInventoryUseCase,
+    private val syncService: SyncService
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(InventoryState())
     val state = _state.asStateFlow()
+
+    init {
+        observeSyncStatus()
+    }
+
+    private fun observeSyncStatus() {
+        viewModelScope.launch {
+            syncService.syncStatus.collect { status ->
+                _state.update { it.copy(
+                    syncStatus = status,
+                    isSyncing = status == SyncStatus.SYNCING
+                )}
+            }
+        }
+
+        viewModelScope.launch {
+            syncService.lastSyncTime.collect { time ->
+                _state.update { it.copy(lastSyncTime = time) }
+            }
+        }
+    }
 
     fun loadItems(category: InventoryCategory) {
         viewModelScope.launch {
@@ -83,27 +108,13 @@ class InventoryViewModel @Inject constructor(
 
     fun syncData() {
         viewModelScope.launch {
-            _state.value = _state.value.copy(isSyncing = true)
-            when (val result = sync()) {
-                is SyncResult.Success -> {
-                    _state.value = _state.value.copy(
-                        isSyncing = false,
-                        message = "Sync completed"
-                    )
+            syncService.performSync()
+                .onSuccess {
+                    _state.value = _state.value.copy(message = "Синхронізація успішна")
                 }
-                is SyncResult.Error -> {
-                    _state.value = _state.value.copy(
-                        isSyncing = false,
-                        error = result.message
-                    )
+                .onFailure { error ->
+                    _state.value = _state.value.copy(error = error.message)
                 }
-                is SyncResult.NetworkError -> {
-                    _state.value = _state.value.copy(
-                        isSyncing = false,
-                        error = "No internet connection"
-                    )
-                }
-            }
         }
     }
 
