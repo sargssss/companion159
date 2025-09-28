@@ -33,7 +33,7 @@ class InventoryViewModel @Inject constructor(
     private val deleteItem: DeleteInventoryItemUseCase,
     private val sync: SyncInventoryUseCase,
     private val syncService: SyncService,
-    private val repository: InventoryRepositoryImpl // Додаємо для спеціальних методів
+    private val repository: InventoryRepositoryImpl
 ) : ViewModel() {
 
     companion object {
@@ -76,19 +76,22 @@ class InventoryViewModel @Inject constructor(
         }
     }
 
+    // Updated to include quantity parameter
     fun addNewItem(name: String, quantity: Int, category: InventoryCategory) {
-        if (name.isBlank()) return
+        if (name.isBlank() || quantity <= 0) return
 
         viewModelScope.launch {
             try {
+                Log.d(TAG, "Creating new item: $name with quantity: $quantity")
                 val item = InventoryItem(
+                    id = 0, // New item always has ID = 0
                     name = name.trim(),
                     category = category,
-                    quantity = quantity
+                    quantity = quantity // Use specified quantity
                 )
                 addItem(item)
-                Log.d(TAG, "Added new item: $name")
-                _state.value = _state.value.copy(message = "Елемент додано")
+                Log.d(TAG, "New item created: $name")
+                _state.value = _state.value.copy(message = "Item added")
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to add item", e)
                 _state.value = _state.value.copy(error = e.message)
@@ -96,23 +99,23 @@ class InventoryViewModel @Inject constructor(
         }
     }
 
-    /**
-     * ВИПРАВЛЕНО: Використовуємо спеціальний метод для оновлення тільки кількості
-     */
+    // Optimistic quantity update - does not block UI
     fun updateQuantity(item: InventoryItem, newQuantity: Int) {
         if (newQuantity < 0) return
 
+        // Launch update without waiting for completion
         viewModelScope.launch {
             try {
-                Log.d(TAG, "Updating quantity for item: ${item.name}, ID: ${item.id}, new quantity: $newQuantity")
+                Log.d(TAG, "Optimistic quantity update: ${item.name}, ID: ${item.id}, new quantity: $newQuantity")
 
-                // КЛЮЧОВЕ ВИПРАВЛЕННЯ: Використовуємо спеціальний метод
+                // Key: Do not wait for sync completion - UI remains responsive
                 repository.updateItemQuantity(item.id, newQuantity)
-                Log.d(TAG, "✓ Quantity updated successfully")
+
+                Log.d(TAG, "Quantity update initiated (non-blocking)")
 
             } catch (e: Exception) {
-                Log.e(TAG, "Failed to update item quantity", e)
-                _state.value = _state.value.copy(error = "Помилка оновлення кількості: ${e.message}")
+                Log.e(TAG, "Failed to update quantity", e)
+                _state.value = _state.value.copy(error = "Error updating quantity: ${e.message}")
             }
         }
     }
@@ -127,59 +130,65 @@ class InventoryViewModel @Inject constructor(
         _state.value = _state.value.copy(editingItem = null)
     }
 
-    /**
-     * ВИПРАВЛЕНО: Оновлення повного елементу з правильною обробкою ID
-     */
+    // Optimistic full item update
     fun updateFullItem(item: InventoryItem, newName: String, newQuantity: Int) {
         if (newName.isBlank() || newQuantity < 0) return
 
         viewModelScope.launch {
             try {
-                Log.d(TAG, "Updating full item: ${item.name} -> name: $newName, quantity: $newQuantity")
+                Log.d(TAG, "Optimistic full update: ${item.name} -> name: $newName, quantity: $newQuantity")
 
-                // КЛЮЧОВЕ ВИПРАВЛЕННЯ: Створюємо оновлений item зі збереженням оригінального ID
+                // Create updated item preserving original ID
                 val updatedItem = item.copy(
                     name = newName.trim(),
-                    quantity = newQuantity,
-                    lastModified = java.util.Date()
-                    // ID залишається той самий!
+                    quantity = newQuantity
                 )
 
-                // Використовуємо стандартний updateItem для повного оновлення
+                // Key: Do not wait for sync completion
                 updateItem(updatedItem)
                 stopEditingItem()
-                _state.value = _state.value.copy(message = "Елемент оновлено")
+                _state.value = _state.value.copy(message = "Item updated")
 
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to update full item", e)
-                _state.value = _state.value.copy(error = "Помилка оновлення: ${e.message}")
+                _state.value = _state.value.copy(error = "Update error: ${e.message}")
             }
         }
     }
 
+    // Optimistic deletion
     fun deleteItemById(id: Long) {
         viewModelScope.launch {
             try {
-                Log.d(TAG, "Deleting item with ID: $id")
+                Log.d(TAG, "Optimistic delete for item ID: $id")
+
+                // Key: Do not wait for sync completion
                 deleteItem(id)
-                _state.value = _state.value.copy(message = "Елемент видалено")
+                _state.value = _state.value.copy(message = "Item deleted")
 
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to delete item", e)
-                _state.value = _state.value.copy(error = "Помилка видалення: ${e.message}")
+                _state.value = _state.value.copy(error = "Delete error: ${e.message}")
             }
         }
     }
 
+    // Manual synchronization when user explicitly requests sync
     fun syncData() {
         viewModelScope.launch {
-            syncService.performSync()
-                .onSuccess {
-                    _state.value = _state.value.copy(message = "Синхронізація успішна")
-                }
-                .onFailure { error ->
-                    _state.value = _state.value.copy(error = "Помилка синхронізації: ${error.message}")
-                }
+            try {
+                Log.d(TAG, "Manual sync requested")
+                syncService.performSync()
+                    .onSuccess {
+                        _state.value = _state.value.copy(message = "Sync successful")
+                    }
+                    .onFailure { error ->
+                        _state.value = _state.value.copy(error = "Sync error: ${error.message}")
+                    }
+            } catch (e: Exception) {
+                Log.e(TAG, "Manual sync failed", e)
+                _state.value = _state.value.copy(error = "Sync error: ${e.message}")
+            }
         }
     }
 
