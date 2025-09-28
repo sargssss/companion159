@@ -76,7 +76,7 @@ class InventoryViewModel @Inject constructor(
         }
     }
 
-    fun addNewItem(name: String, category: InventoryCategory) {
+    fun addNewItem(name: String, quantity: Int, category: InventoryCategory) {
         if (name.isBlank()) return
 
         viewModelScope.launch {
@@ -84,7 +84,7 @@ class InventoryViewModel @Inject constructor(
                 val item = InventoryItem(
                     name = name.trim(),
                     category = category,
-                    quantity = 1
+                    quantity = quantity
                 )
                 addItem(item)
                 Log.d(TAG, "Added new item: $name")

@@ -20,6 +20,7 @@ import com.lifelover.companion159.R
 import com.lifelover.companion159.data.local.entities.InventoryCategory
 import com.lifelover.companion159.data.local.entities.iconRes
 import com.lifelover.companion159.data.local.entities.titleRes
+import com.lifelover.companion159.domain.models.InventoryItem
 import com.lifelover.companion159.presentation.viewmodels.InventoryViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -31,6 +32,7 @@ fun InventoryScreen(
 ) {
     val state by viewModel.state.collectAsState()
     var showAddDialog by remember { mutableStateOf(false) }
+    var itemToDelete by remember { mutableStateOf<InventoryItem?>(null) }
 
     // Load items when screen opens
     LaunchedEffect(inventoryCategory) {
@@ -48,6 +50,17 @@ fun InventoryScreen(
         LaunchedEffect(error) {
             viewModel.clearError()
         }
+    }
+
+    itemToDelete?.let { item ->
+        DeleteConfirmationDialog(
+            item = item,
+            onDismiss = { itemToDelete = null },
+            onConfirm = {
+                viewModel.deleteItemById(item.id)
+                itemToDelete = null
+            }
+        )
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
@@ -100,7 +113,7 @@ fun InventoryScreen(
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     items(state.items, key = { it.id }) { item ->
                         InventoryItemCard(
@@ -108,9 +121,10 @@ fun InventoryScreen(
                             onQuantityChange = { newQuantity ->
                                 viewModel.updateQuantity(item, newQuantity)
                             },
-                            onDelete = {
+                            onDelete = { itemToDelete = item },
+                            /*onDelete = {
                                 viewModel.deleteItemById(item.id)
-                            },
+                            },*/
                             onEdit = {
                                 viewModel.startEditingItem(item)
                             },
@@ -122,24 +136,26 @@ fun InventoryScreen(
         }
     }
 
-    // Add item dialog
+    // Universal dialog for both add and edit
     if (showAddDialog) {
-        AddItemDialog(
+        InventoryItemDialog(
             inventoryType = inventoryCategory,
+            editingItem = null, // null for create mode
             onDismiss = { showAddDialog = false },
-            onAdd = { name ->
-                viewModel.addNewItem(name, inventoryCategory)
+            onSave = { name: String, quantity: Int ->
+                viewModel.addNewItem(name, quantity, inventoryCategory)
                 showAddDialog = false
             }
         )
     }
 
-    // Edit item dialog
+    // Edit item dialog using the same universal dialog
     state.editingItem?.let { item ->
-        EditItemDialog(
-            item = item,
+        InventoryItemDialog(
+            inventoryType = inventoryCategory,
+            editingItem = item, // pass item for edit mode
             onDismiss = { viewModel.stopEditingItem() },
-            onUpdate = { newName, newQuantity ->
+            onSave = { newName: String, newQuantity: Int ->
                 viewModel.updateFullItem(item, newName, newQuantity)
             }
         )
@@ -157,27 +173,41 @@ private fun EmptyState(
     ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            verticalArrangement = Arrangement.spacedBy(20.dp),
+            modifier = Modifier.padding(48.dp)
         ) {
             Icon(
                 painter = painterResource(category.iconRes()),
                 contentDescription = null,
-                modifier = Modifier.size(64.dp),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                modifier = Modifier.size(80.dp),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
             )
+
             Text(
                 text = stringResource(id = R.string.empty_list),
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                style = MaterialTheme.typography.headlineSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontWeight = FontWeight.Medium
             )
+
             Text(
                 text = stringResource(id = R.string.push_plus_to_add),
-                style = MaterialTheme.typography.bodyMedium,
+                style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center
             )
-            Button(onClick = onAddClick) {
-                Text("Додати перший елемент")
+
+            Button(
+                onClick = onAddClick,
+                modifier = Modifier.padding(top = 8.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Add,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Add first item")
             }
         }
     }
