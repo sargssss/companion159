@@ -8,7 +8,11 @@ import com.lifelover.companion159.domain.models.InventoryItem
 import com.lifelover.companion159.domain.models.toDomainModel
 import com.lifelover.companion159.domain.models.toEntity
 import com.lifelover.companion159.network.NetworkMonitor
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.launch
 import java.util.Date
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -23,6 +27,9 @@ class InventoryRepositoryImpl @Inject constructor(
     companion object {
         private const val TAG = "InventoryRepository"
     }
+
+    // Фоновий scope для синхронізації
+    private val backgroundScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
     override fun getItemsByCategory(category: InventoryCategory): Flow<List<InventoryItem>> {
         return localDao.getItemsByCategory(category)
@@ -44,7 +51,8 @@ class InventoryRepositoryImpl @Inject constructor(
         val insertedId = localDao.insertItem(entity)
         Log.d(TAG, "✅ NEW item created with local ID: $insertedId")
 
-        triggerAutoSyncIfNeeded()
+        // Синхронізація в фоні - НЕ блокує UI
+        triggerBackgroundSync()
     }
 
     // ТІЛЬКИ для оновлення ІСНУЮЧИХ записів
@@ -52,56 +60,74 @@ class InventoryRepositoryImpl @Inject constructor(
         Log.d(TAG, "📝 UPDATING existing item with ID: ${item.id}, name: ${item.name}")
 
         // Перевіряємо, чи існує запис
-        val exists = localDao.itemExists(item.id) > 0
-        if (!exists) {
+        val existingItem = localDao.getItemById(item.id)
+        if (existingItem == null) {
             Log.e(TAG, "❌ Item with ID ${item.id} does NOT exist, cannot update")
             throw IllegalArgumentException("Item with ID ${item.id} does not exist")
         }
 
-        // КЛЮЧОВЕ: Оновлюємо ІСНУЮЧИЙ запис по ID, НЕ створюємо новий!
+        // МИТТЄВО оновлюємо локально (UI відразу бачить зміни)
         val updatedRows = localDao.updateItem(
             id = item.id,
-            name = item.name,
+            name = item.name.trim(),
             quantity = item.quantity,
             category = item.category
         )
 
-        Log.d(TAG, "✅ EXISTING item updated successfully (rows: $updatedRows)")
-        triggerAutoSyncIfNeeded()
+        if (updatedRows > 0) {
+            Log.d(TAG, "✅ EXISTING item updated locally (rows: $updatedRows)")
+        } else {
+            Log.w(TAG, "⚠️ No rows updated for item ID: ${item.id}")
+        }
+
+        // Синхронізація в фоні - НЕ блокує UI
+        triggerBackgroundSync()
     }
 
-    // ТІЛЬКИ для оновлення кількості ІСНУЮЧОГО запису
+    // ОПТИМІСТИЧНИЙ метод для оновлення кількості - НЕ блокує UI
     suspend fun updateItemQuantity(itemId: Long, newQuantity: Int) {
-        Log.d(TAG, "🔢 UPDATING quantity for existing item ID: $itemId to $newQuantity")
+        Log.d(TAG, "🔢 OPTIMISTIC quantity update for item ID: $itemId to $newQuantity")
 
-        val exists = localDao.itemExists(itemId) > 0
-        if (!exists) {
+        val existingItem = localDao.getItemById(itemId)
+        if (existingItem == null) {
             Log.e(TAG, "❌ Item with ID $itemId does NOT exist")
             return
         }
 
-        // КЛЮЧОВЕ: Оновлюємо ІСНУЮЧИЙ запис по ID
+        // МИТТЄВО оновлюємо локально - UI відразу бачить зміни
         val updatedRows = localDao.updateQuantity(itemId, newQuantity)
-        Log.d(TAG, "✅ Quantity updated for existing item (rows: $updatedRows)")
 
-        triggerAutoSyncIfNeeded()
+        if (updatedRows > 0) {
+            Log.d(TAG, "✅ Quantity updated locally, triggering background sync")
+        } else {
+            Log.w(TAG, "⚠️ No rows updated for item ID: $itemId")
+        }
+
+        // Синхронізація в фоні - НЕ чекаємо завершення
+        triggerBackgroundSync()
     }
 
-    // ТІЛЬКИ для оновлення імені ІСНУЮЧОГО запису
+    // ОПТИМІСТИЧНИЙ метод для оновлення імені - НЕ блокує UI
     suspend fun updateItemName(itemId: Long, newName: String) {
-        Log.d(TAG, "📝 UPDATING name for existing item ID: $itemId to '$newName'")
+        Log.d(TAG, "📝 OPTIMISTIC name update for item ID: $itemId to '$newName'")
 
-        val exists = localDao.itemExists(itemId) > 0
-        if (!exists) {
+        val existingItem = localDao.getItemById(itemId)
+        if (existingItem == null) {
             Log.e(TAG, "❌ Item with ID $itemId does NOT exist")
             return
         }
 
-        // КЛЮЧОВЕ: Оновлюємо ІСНУЮЧИЙ запис по ID
+        // МИТТЄВО оновлюємо локально - UI відразу бачить зміни
         val updatedRows = localDao.updateName(itemId, newName.trim())
-        Log.d(TAG, "✅ Name updated for existing item (rows: $updatedRows)")
 
-        triggerAutoSyncIfNeeded()
+        if (updatedRows > 0) {
+            Log.d(TAG, "✅ Name updated locally, triggering background sync")
+        } else {
+            Log.w(TAG, "⚠️ No rows updated for item ID: $itemId")
+        }
+
+        // Синхронізація в фоні - НЕ чекаємо завершення
+        triggerBackgroundSync()
     }
 
     // ТІЛЬКИ для видалення ІСНУЮЧИХ записів
@@ -117,11 +143,17 @@ class InventoryRepositoryImpl @Inject constructor(
 
         Log.d(TAG, "🗑️ Deleting item: ${existingItem.name}, supabaseId: ${existingItem.supabaseId}")
 
-        // КЛЮЧОВЕ: Оновлюємо isDeleted = 1 для ІСНУЮЧОГО запису по ID
+        // МИТТЄВО видаляємо локально - UI відразу бачить зміни
         val deletedRows = localDao.softDeleteItem(id)
-        Log.d(TAG, "✅ Item marked as deleted (rows: $deletedRows)")
 
-        triggerAutoSyncIfNeeded()
+        if (deletedRows > 0) {
+            Log.d(TAG, "✅ Item marked as deleted locally, triggering background sync")
+        } else {
+            Log.w(TAG, "⚠️ No rows updated for item ID: $id")
+        }
+
+        // Синхронізація в фоні - НЕ чекаємо завершення
+        triggerBackgroundSync()
     }
 
     override suspend fun syncWithServer(): SyncResult {
@@ -144,11 +176,24 @@ class InventoryRepositoryImpl @Inject constructor(
         return hasChanges
     }
 
-    private fun triggerAutoSyncIfNeeded() {
-        Log.d(TAG, "🔄 Checking if auto-sync is needed. Online: ${networkMonitor.isOnline}")
+    /**
+     * КЛЮЧОВЕ ВИПРАВЛЕННЯ: Фонова синхронізація без блокування UI
+     */
+    private fun triggerBackgroundSync() {
+        Log.d(TAG, "🔄 Triggering background sync (non-blocking)")
+
         if (networkMonitor.isOnline) {
-            Log.d(TAG, "📡 Triggering immediate sync")
-            autoSyncManager.triggerImmediateSync()
+            // Запускаємо синхронізацію в фоновому scope - НЕ блокує UI
+            backgroundScope.launch {
+                try {
+                    Log.d(TAG, "📡 Starting background sync...")
+                    autoSyncManager.triggerImmediateSync()
+                    Log.d(TAG, "✅ Background sync completed")
+                } catch (e: Exception) {
+                    Log.e(TAG, "❌ Background sync failed", e)
+                    // При помилці синхронізації UI залишається працездатним
+                }
+            }
         } else {
             Log.d(TAG, "📴 Device is offline, sync will happen when online")
         }
