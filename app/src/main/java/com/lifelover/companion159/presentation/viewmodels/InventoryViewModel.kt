@@ -96,6 +96,9 @@ class InventoryViewModel @Inject constructor(
         }
     }
 
+    /**
+     * ВИПРАВЛЕНО: Використовуємо спеціальний метод для оновлення тільки кількості
+     */
     fun updateQuantity(item: InventoryItem, newQuantity: Int) {
         if (newQuantity < 0) return
 
@@ -103,8 +106,9 @@ class InventoryViewModel @Inject constructor(
             try {
                 Log.d(TAG, "Updating quantity for item: ${item.name}, ID: ${item.id}, new quantity: $newQuantity")
 
-                // Використовуємо спеціальний метод для оновлення кількості
+                // КЛЮЧОВЕ ВИПРАВЛЕННЯ: Використовуємо спеціальний метод
                 repository.updateItemQuantity(item.id, newQuantity)
+                Log.d(TAG, "✓ Quantity updated successfully")
 
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to update item quantity", e)
@@ -123,24 +127,9 @@ class InventoryViewModel @Inject constructor(
         _state.value = _state.value.copy(editingItem = null)
     }
 
-    fun updateItemName(item: InventoryItem, newName: String) {
-        if (newName.isBlank()) return
-
-        viewModelScope.launch {
-            try {
-                Log.d(TAG, "Updating name for item: ${item.name} -> $newName")
-
-                repository.updateItemName(item.id, newName.trim())
-                stopEditingItem()
-                _state.value = _state.value.copy(message = "Назву оновлено")
-
-            } catch (e: Exception) {
-                Log.e(TAG, "Failed to update item name", e)
-                _state.value = _state.value.copy(error = "Помилка оновлення назви: ${e.message}")
-            }
-        }
-    }
-
+    /**
+     * ВИПРАВЛЕНО: Оновлення повного елементу з правильною обробкою ID
+     */
     fun updateFullItem(item: InventoryItem, newName: String, newQuantity: Int) {
         if (newName.isBlank() || newQuantity < 0) return
 
@@ -148,12 +137,15 @@ class InventoryViewModel @Inject constructor(
             try {
                 Log.d(TAG, "Updating full item: ${item.name} -> name: $newName, quantity: $newQuantity")
 
+                // КЛЮЧОВЕ ВИПРАВЛЕННЯ: Створюємо оновлений item зі збереженням оригінального ID
                 val updatedItem = item.copy(
                     name = newName.trim(),
                     quantity = newQuantity,
                     lastModified = java.util.Date()
+                    // ID залишається той самий!
                 )
 
+                // Використовуємо стандартний updateItem для повного оновлення
                 updateItem(updatedItem)
                 stopEditingItem()
                 _state.value = _state.value.copy(message = "Елемент оновлено")

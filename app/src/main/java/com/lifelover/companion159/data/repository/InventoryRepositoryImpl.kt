@@ -29,104 +29,108 @@ class InventoryRepositoryImpl @Inject constructor(
             .map { entities -> entities.map { it.toDomainModel() } }
     }
 
+    // ТІЛЬКИ для створення НОВИХ записів
     override suspend fun addItem(item: InventoryItem) {
-        Log.d(TAG, "Adding new item: ${item.name}")
+        Log.d(TAG, "➕ CREATING new item: ${item.name}")
 
         val entity = item.toEntity().copy(
+            id = 0, // Room згенерує новий ID
             supabaseId = null, // Новий запис - немає Supabase ID
             needsSync = true,
-            lastModified = Date()
+            lastModified = Date(),
+            isDeleted = false
         )
 
         val insertedId = localDao.insertItem(entity)
-        Log.d(TAG, "Item inserted with local ID: $insertedId")
+        Log.d(TAG, "✅ NEW item created with local ID: $insertedId")
 
         triggerAutoSyncIfNeeded()
     }
 
+    // ТІЛЬКИ для оновлення ІСНУЮЧИХ записів
     override suspend fun updateItem(item: InventoryItem) {
-        Log.d(TAG, "Updating item: ${item.name} with local ID: ${item.id}")
+        Log.d(TAG, "📝 UPDATING existing item with ID: ${item.id}, name: ${item.name}")
 
-        // Перевіряємо, чи існує елемент локально
-        val existingEntity = localDao.getItemById(item.id)
-
-        if (existingEntity != null) {
-            // Створюємо оновлений entity зі збереженням supabaseId
-            val updatedEntity = existingEntity.copy(
-                name = item.name,
-                quantity = item.quantity,
-                lastModified = Date(),
-                needsSync = true // Позначаємо для синхронізації
-                // supabaseId залишається незмінним!
-            )
-
-            localDao.updateItem(updatedEntity)
-            Log.d(TAG, "Item updated locally: ${item.name}, supabaseId: ${existingEntity.supabaseId}")
-        } else {
-            Log.e(TAG, "Item with local ID ${item.id} not found")
+        // Перевіряємо, чи існує запис
+        val exists = localDao.itemExists(item.id) > 0
+        if (!exists) {
+            Log.e(TAG, "❌ Item with ID ${item.id} does NOT exist, cannot update")
             throw IllegalArgumentException("Item with ID ${item.id} does not exist")
         }
 
+        // КЛЮЧОВЕ: Оновлюємо ІСНУЮЧИЙ запис по ID, НЕ створюємо новий!
+        val updatedRows = localDao.updateItem(
+            id = item.id,
+            name = item.name,
+            quantity = item.quantity,
+            category = item.category
+        )
+
+        Log.d(TAG, "✅ EXISTING item updated successfully (rows: $updatedRows)")
         triggerAutoSyncIfNeeded()
     }
 
-    // Спеціальний метод для оновлення тільки кількості
+    // ТІЛЬКИ для оновлення кількості ІСНУЮЧОГО запису
     suspend fun updateItemQuantity(itemId: Long, newQuantity: Int) {
-        Log.d(TAG, "Updating quantity for local ID: $itemId to $newQuantity")
+        Log.d(TAG, "🔢 UPDATING quantity for existing item ID: $itemId to $newQuantity")
 
         val exists = localDao.itemExists(itemId) > 0
         if (!exists) {
-            Log.w(TAG, "Item with local ID $itemId does not exist")
+            Log.e(TAG, "❌ Item with ID $itemId does NOT exist")
             return
         }
 
-        localDao.updateQuantity(itemId, newQuantity)
-        Log.d(TAG, "Quantity updated successfully")
+        // КЛЮЧОВЕ: Оновлюємо ІСНУЮЧИЙ запис по ID
+        val updatedRows = localDao.updateQuantity(itemId, newQuantity)
+        Log.d(TAG, "✅ Quantity updated for existing item (rows: $updatedRows)")
 
         triggerAutoSyncIfNeeded()
     }
 
-    // Спеціальний метод для оновлення імені
+    // ТІЛЬКИ для оновлення імені ІСНУЮЧОГО запису
     suspend fun updateItemName(itemId: Long, newName: String) {
-        Log.d(TAG, "Updating name for local ID: $itemId to $newName")
+        Log.d(TAG, "📝 UPDATING name for existing item ID: $itemId to '$newName'")
 
         val exists = localDao.itemExists(itemId) > 0
         if (!exists) {
-            Log.w(TAG, "Item with local ID $itemId does not exist")
+            Log.e(TAG, "❌ Item with ID $itemId does NOT exist")
             return
         }
 
-        localDao.updateName(itemId, newName.trim())
-        Log.d(TAG, "Name updated successfully")
+        // КЛЮЧОВЕ: Оновлюємо ІСНУЮЧИЙ запис по ID
+        val updatedRows = localDao.updateName(itemId, newName.trim())
+        Log.d(TAG, "✅ Name updated for existing item (rows: $updatedRows)")
 
         triggerAutoSyncIfNeeded()
     }
 
+    // ТІЛЬКИ для видалення ІСНУЮЧИХ записів
     override suspend fun deleteItem(id: Long) {
-        Log.d(TAG, "Deleting item with local ID: $id")
+        Log.d(TAG, "🗑️ DELETING existing item with ID: $id")
 
-        val existingEntity = localDao.getItemById(id)
-        if (existingEntity == null) {
-            Log.w(TAG, "Item with local ID $id does not exist, cannot delete")
+        // Спочатку отримуємо інформацію про запис для логування
+        val existingItem = localDao.getItemById(id)
+        if (existingItem == null) {
+            Log.w(TAG, "⚠️ Item with ID $id does NOT exist, cannot delete")
             return
         }
 
-        Log.d(TAG, "Deleting item: ${existingEntity.name}, supabaseId: ${existingEntity.supabaseId}")
+        Log.d(TAG, "🗑️ Deleting item: ${existingItem.name}, supabaseId: ${existingItem.supabaseId}")
 
-        // М'яке видалення - позначити для синхронізації
-        localDao.softDeleteItem(id)
-        Log.d(TAG, "Item soft-deleted successfully")
+        // КЛЮЧОВЕ: Оновлюємо isDeleted = 1 для ІСНУЮЧОГО запису по ID
+        val deletedRows = localDao.softDeleteItem(id)
+        Log.d(TAG, "✅ Item marked as deleted (rows: $deletedRows)")
 
         triggerAutoSyncIfNeeded()
     }
 
     override suspend fun syncWithServer(): SyncResult {
-        Log.d(TAG, "Manual sync requested")
+        Log.d(TAG, "🔄 Manual sync requested")
         return try {
             autoSyncManager.triggerImmediateSync()
             SyncResult.Success
         } catch (e: Exception) {
-            Log.e(TAG, "Manual sync failed", e)
+            Log.e(TAG, "❌ Manual sync failed", e)
             when {
                 !networkMonitor.isOnline -> SyncResult.NetworkError
                 else -> SyncResult.Error(e.message ?: "Unknown sync error")
@@ -136,17 +140,17 @@ class InventoryRepositoryImpl @Inject constructor(
 
     override suspend fun hasUnsyncedChanges(): Boolean {
         val hasChanges = localDao.getItemsNeedingSync().isNotEmpty()
-        Log.d(TAG, "Has unsynced changes: $hasChanges")
+        Log.d(TAG, "📊 Has unsynced changes: $hasChanges")
         return hasChanges
     }
 
     private fun triggerAutoSyncIfNeeded() {
-        Log.d(TAG, "Checking if auto-sync is needed. Online: ${networkMonitor.isOnline}")
+        Log.d(TAG, "🔄 Checking if auto-sync is needed. Online: ${networkMonitor.isOnline}")
         if (networkMonitor.isOnline) {
-            Log.d(TAG, "Triggering immediate sync")
+            Log.d(TAG, "📡 Triggering immediate sync")
             autoSyncManager.triggerImmediateSync()
         } else {
-            Log.d(TAG, "Device is offline, sync will happen when online")
+            Log.d(TAG, "📴 Device is offline, sync will happen when online")
         }
     }
 }

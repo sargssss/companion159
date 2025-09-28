@@ -45,8 +45,12 @@ class LocalInventoryRepositoryImpl @Inject constructor(
                 supabaseId = existingEntity.supabaseId, // Зберігаємо supabaseId
                 lastSynced = existingEntity.lastSynced
             )
-            dao.updateItem(updatedEntity)
-        } else {
+            dao.updateItem(
+                id = updatedEntity.id,
+                name = updatedEntity.name,
+                quantity = updatedEntity.quantity,
+                category = updatedEntity.category
+            )        } else {
             // Якщо не знайдено, створюємо новий
             dao.insertItem(item.toEntity())
         }
