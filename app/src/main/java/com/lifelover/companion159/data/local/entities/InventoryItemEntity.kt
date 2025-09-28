@@ -1,4 +1,3 @@
-// Для InventoryItemEntity (якщо ще не створений)
 package com.lifelover.companion159.data.local.entities
 
 import androidx.room.Entity
@@ -9,13 +8,13 @@ import java.util.Date
 @Entity(tableName = "inventory_items")
 data class InventoryItemEntity(
     @PrimaryKey(autoGenerate = true)
-    val id: Long = 0,
+    val id: Long = 0, // Локальний Room ID
     val name: String,
     val quantity: Int,
     val category: InventoryCategory,
 
-    // Sync fields для Supabase
-    val serverId: String? = null,        // ID з Supabase
+    // Sync fields для Supabase - КЛЮЧОВЕ ПОЛЕ!
+    val supabaseId: String? = null,      // ID з Supabase (UUID)
     val lastModified: Date = Date(),
     val lastSynced: Date? = null,
     val needsSync: Boolean = true,

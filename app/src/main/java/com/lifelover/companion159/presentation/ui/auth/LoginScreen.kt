@@ -8,6 +8,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -59,6 +60,50 @@ fun LoginScreen(
         )
 
         Spacer(modifier = Modifier.height(32.dp))
+
+        // Google Sign-In кнопка
+        OutlinedButton(
+            onClick = { viewModel.signInWithGoogle() },
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(50.dp),
+            enabled = !state.isLoading,
+            colors = ButtonDefaults.outlinedButtonColors(
+                contentColor = MaterialTheme.colorScheme.onSurface
+            )
+        ) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Google icon (можна замінити на справжній Google icon)
+                Icon(
+                    imageVector = Icons.Default.AccountCircle,
+                    contentDescription = null,
+                    tint = Color.Unspecified
+                )
+                Text("Увійти через Google")
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Divider
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            HorizontalDivider(modifier = Modifier.weight(1f))
+            Text(
+                text = "або",
+                modifier = Modifier.padding(horizontal = 16.dp),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            HorizontalDivider(modifier = Modifier.weight(1f))
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
 
         // Email поле
         OutlinedTextField(

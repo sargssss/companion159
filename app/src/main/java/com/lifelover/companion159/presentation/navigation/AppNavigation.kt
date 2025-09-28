@@ -26,7 +26,6 @@ fun AppNavigation(
     navController: NavHostController
 ) {
     // Визначаємо початковий маршрут залежно від налаштувань
-    //val startDestination = if (SupabaseConfig.isConfigured()) {
     val startDestination = if (SupabaseConfig.isConfigured) {
         Login
     } else {

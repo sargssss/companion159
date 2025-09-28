@@ -8,12 +8,15 @@ import java.util.Date
 
 @Dao
 interface InventoryDao {
-    // Існуючі методи...
+
     @Query("SELECT * FROM inventory_items WHERE isDeleted = 0 AND category = :category ORDER BY lastModified DESC")
     fun getItemsByCategory(category: InventoryCategory): Flow<List<InventoryItemEntity>>
 
     @Query("SELECT * FROM inventory_items WHERE id = :id AND isDeleted = 0")
     suspend fun getItemById(id: Long): InventoryItemEntity?
+
+    @Query("SELECT * FROM inventory_items WHERE supabaseId = :supabaseId AND isDeleted = 0")
+    suspend fun getItemBySupabaseId(supabaseId: String): InventoryItemEntity?
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertItem(item: InventoryItemEntity): Long
@@ -21,21 +24,28 @@ interface InventoryDao {
     @Update
     suspend fun updateItem(item: InventoryItemEntity)
 
+    // Оновити тільки кількість
+    @Query("UPDATE inventory_items SET quantity = :quantity, needsSync = 1, lastModified = :timestamp WHERE id = :id")
+    suspend fun updateQuantity(id: Long, quantity: Int, timestamp: Date = Date())
+
+    // Оновити тільки назву
+    @Query("UPDATE inventory_items SET name = :name, needsSync = 1, lastModified = :timestamp WHERE id = :id")
+    suspend fun updateName(id: Long, name: String, timestamp: Date = Date())
+
+    // М'яке видалення
     @Query("UPDATE inventory_items SET isDeleted = 1, needsSync = 1, lastModified = :timestamp WHERE id = :id")
     suspend fun softDeleteItem(id: Long, timestamp: Date = Date())
 
+    // Жорстке видалення
     @Query("DELETE FROM inventory_items WHERE id = :id")
     suspend fun deleteItemPermanently(id: Long)
 
     @Query("SELECT COUNT(*) FROM inventory_items WHERE isDeleted = 0 AND category = :category")
     suspend fun getItemCount(category: InventoryCategory): Int
 
-    // Нові методи для Supabase синхронізації:
+    // Методи для синхронізації
     @Query("SELECT * FROM inventory_items WHERE needsSync = 1")
     suspend fun getItemsNeedingSync(): List<InventoryItemEntity>
-
-    @Query("SELECT * FROM inventory_items WHERE serverId = :serverId AND isDeleted = 0")
-    suspend fun getItemByServerId(serverId: String): InventoryItemEntity?
 
     @Query("SELECT * FROM inventory_items WHERE isDeleted = 0 ORDER BY lastModified DESC")
     suspend fun getAllItems(): List<InventoryItemEntity>
@@ -43,6 +53,19 @@ interface InventoryDao {
     @Query("DELETE FROM inventory_items")
     suspend fun deleteAllItems()
 
-    @Query("UPDATE inventory_items SET serverId = :serverId, needsSync = 0 WHERE id = :localId")
-    suspend fun updateServerId(localId: Long, serverId: String)
+    // КЛЮЧОВИЙ МЕТОД: оновити supabaseId після створення на сервері
+    @Query("UPDATE inventory_items SET supabaseId = :supabaseId, needsSync = 0, lastSynced = :timestamp WHERE id = :localId")
+    suspend fun setSupabaseId(localId: Long, supabaseId: String, timestamp: Date = Date())
+
+    // Позначити як синхронізований
+    @Query("UPDATE inventory_items SET needsSync = 0, lastSynced = :timestamp WHERE id = :localId")
+    suspend fun markAsSynced(localId: Long, timestamp: Date = Date())
+
+    // Перевірка існування по ID
+    @Query("SELECT COUNT(*) FROM inventory_items WHERE id = :id")
+    suspend fun itemExists(id: Long): Int
+
+    // Перевірка чи є supabaseId
+    @Query("SELECT supabaseId FROM inventory_items WHERE id = :localId")
+    suspend fun getSupabaseId(localId: Long): String?
 }

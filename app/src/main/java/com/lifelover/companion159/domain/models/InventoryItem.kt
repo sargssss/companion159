@@ -27,12 +27,12 @@ fun InventoryItemEntity.toDomainModel(): InventoryItem {
 
 fun InventoryItem.toEntity(): InventoryItemEntity {
     return InventoryItemEntity(
-        id = if (id == 0L) 0 else id,
+        id = id, // Зберігаємо оригінальний ID
         name = name,
         quantity = quantity,
         category = category,
-        serverId = null,
-        lastModified = lastModified,
-        needsSync = true
+        supabaseId = null, // Буде заповнено після синхронізації
+        lastModified = Date(), // Оновлюємо час модифікації
+        needsSync = true // Позначаємо як потребує синхронізації
     )
 }

@@ -24,7 +24,7 @@ data class SyncResponse(
 // Extension functions for API conversion
 fun InventoryItemEntity.toApiModel(): ApiInventoryItem {
     return ApiInventoryItem(
-        id = serverId ?: "",
+        id = supabaseId ?: "", // Використовуємо supabaseId
         name = name,
         quantity = quantity,
         category = category.name.lowercase(),
@@ -39,7 +39,7 @@ fun ApiInventoryItem.toEntity(): InventoryItemEntity {
         name = name,
         quantity = quantity,
         category = InventoryCategory.valueOf(category.uppercase()),
-        serverId = id,
+        supabaseId = id, // Зберігаємо API ID як supabaseId
         lastModified = parseApiTimestamp(lastModified),
         lastSynced = Date(),
         needsSync = false

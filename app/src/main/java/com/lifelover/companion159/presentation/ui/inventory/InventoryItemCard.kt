@@ -2,8 +2,8 @@ package com.lifelover.companion159.presentation.ui.inventory
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -21,6 +21,7 @@ fun InventoryItemCard(
     item: InventoryItem,
     onQuantityChange: (Int) -> Unit,
     onDelete: () -> Unit,
+    onEdit: () -> Unit,
     showSyncStatus: Boolean = false
 ) {
     Card(
@@ -30,7 +31,7 @@ fun InventoryItemCard(
         Column(
             modifier = Modifier.padding(16.dp)
         ) {
-            // Header з назвою та статусом
+            // Header з назвою та кнопками
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -48,9 +49,9 @@ fun InventoryItemCard(
                     )
 
                     // Індикатор несинхронізованого стану
-                    if (showSyncStatus) {
+                    if (showSyncStatus && !item.isSynced) {
                         Icon(
-                            imageVector = Icons.Default.Add,
+                            painter = painterResource(R.drawable.arrow_right),
                             contentDescription = "Не синхронізовано",
                             modifier = Modifier.size(16.dp),
                             tint = MaterialTheme.colorScheme.error
@@ -58,12 +59,24 @@ fun InventoryItemCard(
                     }
                 }
 
-                IconButton(onClick = onDelete) {
-                    Icon(
-                        imageVector = Icons.Default.Delete,
-                        contentDescription = stringResource(id = R.string.delete),
-                        tint = MaterialTheme.colorScheme.error
-                    )
+                Row {
+                    // Кнопка редагування
+                    IconButton(onClick = onEdit) {
+                        Icon(
+                            imageVector = Icons.Default.Edit,
+                            contentDescription = "Редагувати",
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    }
+
+                    // Кнопка видалення
+                    IconButton(onClick = onDelete) {
+                        Icon(
+                            imageVector = Icons.Default.Delete,
+                            contentDescription = stringResource(id = R.string.delete),
+                            tint = MaterialTheme.colorScheme.error
+                        )
+                    }
                 }
             }
 

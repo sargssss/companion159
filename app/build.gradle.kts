@@ -66,7 +66,6 @@ android {
         enableAggregatingTask = false
     }
 }
-
 dependencies {
     // Default Android/Compose dependencies
     implementation(libs.androidx.core.ktx)
@@ -100,16 +99,20 @@ dependencies {
     // Room
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)
-    implementation(libs.androidx.hilt.common)
     ksp(libs.androidx.room.compiler)
 
     // Work Manager for background sync
     implementation("androidx.work:work-runtime-ktx:2.9.0")
-    implementation("androidx.hilt:hilt-work:1.1.0")
 
-    // Hilt
+    // Hilt - ВАЖЛИВО! Правильний порядок
     implementation(libs.hilt.android)
     implementation(libs.hilt.navigation.compose)
+
+    // Hilt Work Manager integration
+    implementation("androidx.hilt:hilt-work:1.1.0")
+    implementation(libs.androidx.hilt.common)
+
+    // KSP для Hilt
     ksp(libs.hilt.compiler)
     ksp("androidx.hilt:hilt-compiler:1.1.0")
 

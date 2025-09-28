@@ -1,5 +1,6 @@
 package com.lifelover.companion159.data.remote.repository
 
+import android.util.Log
 import com.lifelover.companion159.data.local.entities.InventoryCategory
 import com.lifelover.companion159.data.local.entities.InventoryItemEntity
 import com.lifelover.companion159.data.remote.client.SupabaseClient
@@ -16,125 +17,121 @@ import javax.inject.Singleton
 @Singleton
 class SupabaseInventoryRepository @Inject constructor() {
 
+    companion object {
+        private const val TAG = "SupabaseInventoryRepo"
+    }
+
     private val client = SupabaseClient.client
 
     // Отримати всі елементи користувача
     suspend fun getAllItems(): List<SupabaseInventoryItem> = withContext(Dispatchers.IO) {
         try {
             val userId = client.auth.currentUserOrNull()?.id ?: return@withContext emptyList()
+            Log.d(TAG, "Fetching all items for user: $userId")
 
-            client.from(SupabaseConfig.TABLE_INVENTORY)
+            val items = client.from(SupabaseConfig.TABLE_INVENTORY)
                 .select(columns = Columns.ALL) {
                     filter {
                         eq("user_id", userId)
-                        eq("is_deleted", false)
                     }
                 }
                 .decodeList<SupabaseInventoryItem>()
+
+            Log.d(TAG, "Fetched ${items.size} items from server")
+            items
         } catch (e: Exception) {
-            e.printStackTrace()
+            Log.e(TAG, "Error fetching all items", e)
             emptyList()
         }
     }
 
-    // Отримати елементи за категорією
-    suspend fun getItemsByCategory(category: InventoryCategory): List<SupabaseInventoryItem> =
-        withContext(Dispatchers.IO) {
-            try {
-                val userId = client.auth.currentUserOrNull()?.id ?: return@withContext emptyList()
+    // СТВОРИТИ новий елемент - використовується для записів без supabaseId
+    suspend fun createItem(localItem: InventoryItemEntity): String? = withContext(Dispatchers.IO) {
+        try {
+            val userId = client.auth.currentUserOrNull()?.id ?: return@withContext null
+            Log.d(TAG, "Creating NEW item: ${localItem.name}")
 
-                client.from(SupabaseConfig.TABLE_INVENTORY)
-                    .select(columns = Columns.ALL) {
-                        filter {
-                            eq("user_id", userId)
-                            eq("category", category.name.lowercase())
-                            eq("is_deleted", false)
-                        }
+            val supabaseItem = SupabaseInventoryItem(
+                id = null, // Supabase згенерує UUID автоматично
+                name = localItem.name,
+                quantity = localItem.quantity,
+                category = localItem.category.name.lowercase(),
+                userId = userId,
+                isDeleted = localItem.isDeleted
+            )
+
+            val createdItem = client.from(SupabaseConfig.TABLE_INVENTORY)
+                .insert(supabaseItem)
+                .decodeSingle<SupabaseInventoryItem>()
+
+            Log.d(TAG, "Successfully CREATED item: ${createdItem.name} with Supabase ID: ${createdItem.id}")
+            createdItem.id
+        } catch (e: Exception) {
+            Log.e(TAG, "Error creating item: ${localItem.name}", e)
+            null
+        }
+    }
+
+    // ОНОВИТИ існуючий елемент - використовується для записів з supabaseId
+    suspend fun updateItem(supabaseId: String, localItem: InventoryItemEntity): Boolean = withContext(Dispatchers.IO) {
+        try {
+            val userId = client.auth.currentUserOrNull()?.id ?: return@withContext false
+            Log.d(TAG, "UPDATING existing item with Supabase ID: $supabaseId, name: ${localItem.name}")
+
+            client.from(SupabaseConfig.TABLE_INVENTORY)
+                .update({
+                    set("name", localItem.name)
+                    set("quantity", localItem.quantity)
+                    set("category", localItem.category.name.lowercase())
+                    set("is_deleted", localItem.isDeleted)
+                }) {
+                    filter {
+                        eq("id", supabaseId)
+                        eq("user_id", userId)
                     }
-                    .decodeList<SupabaseInventoryItem>()
-            } catch (e: Exception) {
-                e.printStackTrace()
-                emptyList()
-            }
+                }
+
+            Log.d(TAG, "Successfully UPDATED item: ${localItem.name}")
+            true
+        } catch (e: Exception) {
+            Log.e(TAG, "Error updating item with Supabase ID: $supabaseId", e)
+            false
         }
+    }
 
-    // Створити новий елемент
-    suspend fun createItem(item: SupabaseInventoryItem): SupabaseInventoryItem? =
-        withContext(Dispatchers.IO) {
-            try {
-                val userId = client.auth.currentUserOrNull()?.id ?: return@withContext null
-                val itemWithUser = item.copy(userId = userId)
+    // ВИДАЛИТИ елемент (м'яке видалення)
+    suspend fun deleteItem(supabaseId: String): Boolean = withContext(Dispatchers.IO) {
+        try {
+            val userId = client.auth.currentUserOrNull()?.id ?: return@withContext false
+            Log.d(TAG, "DELETING item with Supabase ID: $supabaseId")
 
-                client.from(SupabaseConfig.TABLE_INVENTORY)
-                    .insert(itemWithUser)
-                    .decodeSingle<SupabaseInventoryItem>()
-            } catch (e: Exception) {
-                e.printStackTrace()
-                null
-            }
-        }
-
-    // Оновити елемент
-    suspend fun updateItem(id: String, updates: Map<String, Any>): Boolean =
-        withContext(Dispatchers.IO) {
-            try {
-                val userId = client.auth.currentUserOrNull()?.id ?: return@withContext false
-
-                client.from(SupabaseConfig.TABLE_INVENTORY)
-                    .update(updates) {
-                        filter {
-                            eq("id", id)
-                            eq("user_id", userId)
-                        }
+            client.from(SupabaseConfig.TABLE_INVENTORY)
+                .update({
+                    set("is_deleted", true)
+                }) {
+                    filter {
+                        eq("id", supabaseId)
+                        eq("user_id", userId)
                     }
-                true
-            } catch (e: Exception) {
-                e.printStackTrace()
-                false
-            }
-        }
+                }
 
-    // М'яке видалення елемента
-    suspend fun softDeleteItem(id: String): Boolean =
-        withContext(Dispatchers.IO) {
-            updateItem(id, mapOf("is_deleted" to true))
+            Log.d(TAG, "Successfully DELETED item with Supabase ID: $supabaseId")
+            true
+        } catch (e: Exception) {
+            Log.e(TAG, "Error deleting item with Supabase ID: $supabaseId", e)
+            false
         }
-
-    // Синхронізація пакету елементів
-    suspend fun syncItems(items: List<SupabaseInventoryItem>): Boolean =
-        withContext(Dispatchers.IO) {
-            try {
-                val userId = client.auth.currentUserOrNull()?.id ?: return@withContext false
-                val itemsWithUser = items.map { it.copy(userId = userId) }
-
-                client.from(SupabaseConfig.TABLE_INVENTORY)
-                    .upsert(itemsWithUser)
-                true
-            } catch (e: Exception) {
-                e.printStackTrace()
-                false
-            }
-        }
+    }
 }
 
 // Extension функції для конвертації
-fun InventoryItemEntity.toSupabaseModel(): SupabaseInventoryItem {
-    return SupabaseInventoryItem(
-        id = serverId,
-        name = name,
-        quantity = quantity,
-        category = category.name.lowercase(),
-        isDeleted = isDeleted
-    )
-}
-
 fun SupabaseInventoryItem.toEntity(): InventoryItemEntity {
     return InventoryItemEntity(
         id = 0, // Room згенерує новий локальний ID
         name = name,
         quantity = quantity,
         category = InventoryCategory.valueOf(category.uppercase()),
-        serverId = id,
+        supabaseId = id, // КЛЮЧОВЕ: зберігаємо Supabase UUID
         lastModified = java.util.Date(),
         lastSynced = java.util.Date(),
         needsSync = false,

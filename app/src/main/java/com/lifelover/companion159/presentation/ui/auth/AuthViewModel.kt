@@ -79,6 +79,27 @@ class AuthViewModel @Inject constructor(
         }
     }
 
+    fun signInWithGoogle() {
+        viewModelScope.launch {
+            _state.update { it.copy(isLoading = true, error = null) }
+
+            authService.signInWithGoogle()
+                .onSuccess {
+                    _state.update { it.copy(
+                        isLoading = false,
+                        isAuthenticated = true,
+                        userEmail = authService.getCurrentUser()?.email
+                    )}
+                }
+                .onFailure { exception ->
+                    _state.update { it.copy(
+                        isLoading = false,
+                        error = mapError(exception)
+                    )}
+                }
+        }
+    }
+
     fun signOut() {
         viewModelScope.launch {
             authService.signOut()
@@ -94,6 +115,8 @@ class AuthViewModel @Inject constructor(
                 "Користувач з таким email вже зареєстрований"
             exception.message?.contains("Password") == true ->
                 "Пароль має містити мінімум 6 символів"
+            exception.message?.contains("Google Sign-In failed") == true ->
+                "Помилка входу через Google"
             else -> exception.message ?: "Невідома помилка"
         }
     }

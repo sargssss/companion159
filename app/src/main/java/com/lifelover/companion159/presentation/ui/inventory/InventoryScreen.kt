@@ -25,12 +25,12 @@ import com.lifelover.companion159.presentation.viewmodels.InventoryViewModel
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun InventoryScreen(
-    inventoryCategory: InventoryCategory, // FIXED: was inventoryType
+    inventoryCategory: InventoryCategory,
     onBackPressed: () -> Unit,
     viewModel: InventoryViewModel = hiltViewModel()
 ) {
     val state by viewModel.state.collectAsState()
-    var showDialog by remember { mutableStateOf(false) }
+    var showAddDialog by remember { mutableStateOf(false) }
 
     // Load items when screen opens
     LaunchedEffect(inventoryCategory) {
@@ -67,7 +67,7 @@ fun InventoryScreen(
                 }
             },
             actions = {
-                IconButton(onClick = { showDialog = true }) {
+                IconButton(onClick = { showAddDialog = true }) {
                     Icon(
                         imageVector = Icons.Default.Add,
                         contentDescription = stringResource(id = R.string.add)
@@ -89,33 +89,10 @@ fun InventoryScreen(
 
             state.items.isEmpty() -> {
                 // Empty state
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(16.dp)
-                    ) {
-                        Icon(
-                            painter = painterResource(inventoryCategory.iconRes()),
-                            contentDescription = null,
-                            modifier = Modifier.size(64.dp),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Text(
-                            text = stringResource(id = R.string.empty_list),
-                            style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Text(
-                            text = stringResource(id = R.string.push_plus_to_add),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            textAlign = TextAlign.Center
-                        )
-                    }
-                }
+                EmptyState(
+                    category = inventoryCategory,
+                    onAddClick = { showAddDialog = true }
+                )
             }
 
             else -> {
@@ -133,7 +110,11 @@ fun InventoryScreen(
                             },
                             onDelete = {
                                 viewModel.deleteItemById(item.id)
-                            }
+                            },
+                            onEdit = {
+                                viewModel.startEditingItem(item)
+                            },
+                            showSyncStatus = !item.isSynced
                         )
                     }
                 }
@@ -142,13 +123,24 @@ fun InventoryScreen(
     }
 
     // Add item dialog
-    if (showDialog) {
+    if (showAddDialog) {
         AddItemDialog(
-            inventoryType = inventoryCategory, // FIXED: now using InventoryCategory
-            onDismiss = { showDialog = false },
+            inventoryType = inventoryCategory,
+            onDismiss = { showAddDialog = false },
             onAdd = { name ->
                 viewModel.addNewItem(name, inventoryCategory)
-                showDialog = false
+                showAddDialog = false
+            }
+        )
+    }
+
+    // Edit item dialog
+    state.editingItem?.let { item ->
+        EditItemDialog(
+            item = item,
+            onDismiss = { viewModel.stopEditingItem() },
+            onUpdate = { newName, newQuantity ->
+                viewModel.updateFullItem(item, newName, newQuantity)
             }
         )
     }
@@ -189,16 +181,4 @@ private fun EmptyState(
             }
         }
     }
-}
-
-@Composable
-private fun getCategoryTitle(category: InventoryCategory): String {
-    return stringResource(
-        when (category) {
-            InventoryCategory.SHIPS -> R.string.drones
-            InventoryCategory.AMMUNITION -> R.string.ammo
-            InventoryCategory.EQUIPMENT -> R.string.tool
-            InventoryCategory.PROVISIONS -> R.string.food
-        }
-    )
 }

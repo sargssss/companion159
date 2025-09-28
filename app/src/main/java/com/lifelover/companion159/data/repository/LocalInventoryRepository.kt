@@ -37,8 +37,19 @@ class LocalInventoryRepositoryImpl @Inject constructor(
     }
 
     override suspend fun updateItem(item: InventoryItem) {
-        val entity = item.toEntity().copy(id = item.id)
-        dao.updateItem(entity)
+        // Отримуємо існуючий entity щоб зберегти supabaseId
+        val existingEntity = dao.getItemById(item.id)
+        if (existingEntity != null) {
+            val updatedEntity = item.toEntity().copy(
+                id = item.id,
+                supabaseId = existingEntity.supabaseId, // Зберігаємо supabaseId
+                lastSynced = existingEntity.lastSynced
+            )
+            dao.updateItem(updatedEntity)
+        } else {
+            // Якщо не знайдено, створюємо новий
+            dao.insertItem(item.toEntity())
+        }
     }
 
     override suspend fun deleteItem(id: Long) {

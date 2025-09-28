@@ -9,6 +9,13 @@
     <!-- Work Manager permission for background sync -->
     <uses-permission android:name="android.permission.WAKE_LOCK" />
 
+    <!-- Опціональні permissions для кращої роботи -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+
+    <!-- Для кращої роботи з Google Sign-In -->
+    <uses-permission android:name="android.permission.GET_ACCOUNTS" />
+
     <application
         android:name=".CompanionApplication"
         android:allowBackup="true"
@@ -19,6 +26,23 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.Companion159">
+
+        <!-- Для автозапуску синхронізації після перезавантаження -->
+        <receiver android:name="androidx.work.impl.background.systemalarm.ConstraintProxy$BatteryChargingProxy"
+            android:enabled="false"
+            tools:replace="android:enabled" />
+
+        <receiver android:name="androidx.work.impl.background.systemalarm.ConstraintProxy$BatteryNotLowProxy"
+            android:enabled="false"
+            tools:replace="android:enabled" />
+
+        <receiver android:name="androidx.work.impl.background.systemalarm.ConstraintProxy$StorageNotLowProxy"
+            android:enabled="false"
+            tools:replace="android:enabled" />
+
+        <receiver android:name="androidx.work.impl.background.systemalarm.ConstraintProxy$NetworkStateProxy"
+            android:enabled="false"
+            tools:replace="android:enabled" />
 
         <activity
             android:name=".MainActivity"

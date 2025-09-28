@@ -1,10 +1,10 @@
 package com.lifelover.companion159.data.sync
 
+import android.util.Log
 import com.lifelover.companion159.data.local.dao.InventoryDao
 import com.lifelover.companion159.data.remote.auth.SupabaseAuthService
 import com.lifelover.companion159.data.remote.repository.SupabaseInventoryRepository
 import com.lifelover.companion159.data.remote.repository.toEntity
-import com.lifelover.companion159.data.remote.repository.toSupabaseModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -28,6 +28,9 @@ class SyncService @Inject constructor(
     private val remoteRepository: SupabaseInventoryRepository,
     private val authService: SupabaseAuthService
 ) {
+    companion object {
+        private const val TAG = "SyncService"
+    }
 
     private val _syncStatus = MutableStateFlow(SyncStatus.IDLE)
     val syncStatus: StateFlow<SyncStatus> = _syncStatus.asStateFlow()
@@ -35,129 +38,129 @@ class SyncService @Inject constructor(
     private val _lastSyncTime = MutableStateFlow<Long?>(null)
     val lastSyncTime: StateFlow<Long?> = _lastSyncTime.asStateFlow()
 
-    // Основна функція синхронізації
     suspend fun performSync(): Result<Unit> = withContext(Dispatchers.IO) {
         try {
+            Log.d(TAG, "Starting intelligent sync...")
             _syncStatus.value = SyncStatus.SYNCING
 
             // Перевірка автентифікації
-            if (authService.getUserId() == null) {
+            val userId = authService.getUserId()
+            if (userId == null) {
+                Log.w(TAG, "User not authenticated")
                 _syncStatus.value = SyncStatus.ERROR
                 return@withContext Result.failure(Exception("Користувач не автентифікований"))
             }
 
-            // 1. Завантажити локальні зміни
+            Log.d(TAG, "User authenticated: $userId")
+
+            // 1. Обробити локальні зміни що потребують синхронізації
             val localItemsNeedingSync = localDao.getItemsNeedingSync()
+            Log.d(TAG, "Items needing sync: ${localItemsNeedingSync.size}")
 
-            // 2. Відправити локальні зміни на сервер
-            if (localItemsNeedingSync.isNotEmpty()) {
-                val supabaseItems = localItemsNeedingSync.map { it.toSupabaseModel() }
-                val syncSuccess = remoteRepository.syncItems(supabaseItems)
+            for (localItem in localItemsNeedingSync) {
+                when {
+                    // ВИПАДОК 1: Новий запис (немає supabaseId) -> СТВОРИТИ
+                    localItem.supabaseId == null && !localItem.isDeleted -> {
+                        Log.d(TAG, "CREATING new item: ${localItem.name}")
+                        val newSupabaseId = remoteRepository.createItem(localItem)
+                        if (newSupabaseId != null) {
+                            // Зберегти отриманий Supabase ID локально
+                            localDao.setSupabaseId(localItem.id, newSupabaseId)
+                            Log.d(TAG, "✓ Created and saved Supabase ID: $newSupabaseId for ${localItem.name}")
+                        } else {
+                            Log.e(TAG, "✗ Failed to create item: ${localItem.name}")
+                        }
+                    }
 
-                if (!syncSuccess) {
-                    _syncStatus.value = SyncStatus.ERROR
-                    return@withContext Result.failure(Exception("Помилка синхронізації"))
-                }
+                    // ВИПАДОК 2: Існуючий запис (є supabaseId) + видалений -> ВИДАЛИТИ
+                    localItem.supabaseId != null && localItem.isDeleted -> {
+                        Log.d(TAG, "DELETING item: ${localItem.name}, supabaseId: ${localItem.supabaseId}")
+                        val deleted = remoteRepository.deleteItem(localItem.supabaseId)
+                        if (deleted) {
+                            localDao.markAsSynced(localItem.id)
+                            Log.d(TAG, "✓ Deleted item: ${localItem.name}")
+                        } else {
+                            Log.e(TAG, "✗ Failed to delete item: ${localItem.name}")
+                        }
+                    }
 
-                // Оновити локальні записи (позначити як синхронізовані)
-                localItemsNeedingSync.forEach { item ->
-                    val updatedItem = item.copy(
-                        needsSync = false,
-                        lastSynced = Date()
-                    )
-                    localDao.updateItem(updatedItem)
+                    // ВИПАДОК 3: Існуючий запис (є supabaseId) + оновлений -> ОНОВИТИ
+                    localItem.supabaseId != null && !localItem.isDeleted -> {
+                        Log.d(TAG, "UPDATING item: ${localItem.name}, supabaseId: ${localItem.supabaseId}")
+                        val updated = remoteRepository.updateItem(localItem.supabaseId, localItem)
+                        if (updated) {
+                            localDao.markAsSynced(localItem.id)
+                            Log.d(TAG, "✓ Updated item: ${localItem.name}")
+                        } else {
+                            Log.e(TAG, "✗ Failed to update item: ${localItem.name}")
+                        }
+                    }
+
+                    // ВИПАДОК 4: Новий запис який видалений локально -> просто позначити як синхронізований
+                    localItem.supabaseId == null && localItem.isDeleted -> {
+                        Log.d(TAG, "Marking deleted new item as synced: ${localItem.name}")
+                        localDao.markAsSynced(localItem.id)
+                    }
                 }
             }
 
-            // 3. Завантажити дані з сервера
+            // 2. Завантажити дані з сервера та оновити локальну базу
+            Log.d(TAG, "Fetching items from server")
             val remoteItems = remoteRepository.getAllItems()
+            Log.d(TAG, "Fetched ${remoteItems.size} items from server")
 
-            // 4. Оновити локальну базу даними з сервера
-            remoteItems.forEach { remoteItem ->
-                val existingItem = remoteItem.id?.let {
-                    localDao.getItemByServerId(it)
-                }
+            // Обробити кожен елемент з сервера
+            for (remoteItem in remoteItems) {
+                if (remoteItem.id == null) continue
 
-                if (existingItem == null) {
+                val existingLocalItem = localDao.getItemBySupabaseId(remoteItem.id)
+
+                when {
                     // Новий елемент з сервера
-                    localDao.insertItem(remoteItem.toEntity())
-                } else if (existingItem.needsSync.not()) {
-                    // Оновити існуючий елемент, якщо він не має локальних змін
-                    val updatedEntity = remoteItem.toEntity().copy(
-                        id = existingItem.id
-                    )
-                    localDao.updateItem(updatedEntity)
-                }
-            }
+                    existingLocalItem == null -> {
+                        if (!remoteItem.isDeleted) {
+                            Log.d(TAG, "Inserting new item from server: ${remoteItem.name}")
+                            localDao.insertItem(remoteItem.toEntity())
+                        }
+                    }
 
-            // 5. Видалити локальні елементи, яких немає на сервері
-            val allLocalItems = localDao.getAllItems()
-            val remoteIds = remoteItems.mapNotNull { it.id }.toSet()
+                    // Елемент оновлений на сервері і локальний не має змін
+                    !existingLocalItem.needsSync -> {
+                        if (remoteItem.isDeleted && !existingLocalItem.isDeleted) {
+                            Log.d(TAG, "Marking item as deleted from server: ${remoteItem.name}")
+                            localDao.softDeleteItem(existingLocalItem.id)
+                        } else if (!remoteItem.isDeleted) {
+                            Log.d(TAG, "Updating item from server: ${remoteItem.name}")
+                            val updatedEntity = remoteItem.toEntity().copy(
+                                id = existingLocalItem.id
+                            )
+                            localDao.updateItem(updatedEntity)
+                        }
+                    }
 
-            allLocalItems.forEach { localItem ->
-                if (localItem.serverId != null &&
-                    localItem.serverId !in remoteIds &&
-                    !localItem.needsSync) {
-                    localDao.deleteItemPermanently(localItem.id)
+                    // Локальний елемент має зміни - пріоритет локальним змінам
+                    else -> {
+                        Log.d(TAG, "Keeping local changes for item: ${existingLocalItem.name}")
+                    }
                 }
             }
 
             _syncStatus.value = SyncStatus.SUCCESS
             _lastSyncTime.value = System.currentTimeMillis()
+            Log.d(TAG, "✓ Intelligent sync completed successfully")
             Result.success(Unit)
 
         } catch (e: Exception) {
-            e.printStackTrace()
+            Log.e(TAG, "✗ Sync failed", e)
             _syncStatus.value = SyncStatus.ERROR
             Result.failure(e)
         }
     }
 
-    // Синхронізація одного елемента
-    suspend fun syncSingleItem(localId: Long): Result<Unit> = withContext(Dispatchers.IO) {
-        try {
-            val item = localDao.getItemById(localId)
-                ?: return@withContext Result.failure(Exception("Елемент не знайдено"))
-
-            val supabaseItem = item.toSupabaseModel()
-
-            val result = if (item.serverId == null) {
-                // Створити новий елемент на сервері
-                remoteRepository.createItem(supabaseItem)
-            } else {
-                // Оновити існуючий елемент
-                val updates = mapOf(
-                    "name" to item.name,
-                    "quantity" to item.quantity,
-                    "category" to item.category.name.lowercase(),
-                    "is_deleted" to item.isDeleted
-                )
-                if (remoteRepository.updateItem(item.serverId, updates)) {
-                    supabaseItem.copy(id = item.serverId)
-                } else {
-                    null
-                }
-            }
-
-            result?.let { remoteItem ->
-                // Оновити локальний елемент з server ID
-                val updatedItem = item.copy(
-                    serverId = remoteItem.id,
-                    needsSync = false,
-                    lastSynced = Date()
-                )
-                localDao.updateItem(updatedItem)
-                Result.success(Unit)
-            } ?: Result.failure(Exception("Помилка синхронізації елемента"))
-
-        } catch (e: Exception) {
-            Result.failure(e)
-        }
-    }
-
-    // Перевірка наявності несинхронізованих змін
     suspend fun hasUnsyncedChanges(): Boolean = withContext(Dispatchers.IO) {
-        localDao.getItemsNeedingSync().isNotEmpty()
+        val count = localDao.getItemsNeedingSync().size
+        Log.d(TAG, "Unsynced items count: $count")
+        count > 0
     }
 
     fun resetSyncStatus() {

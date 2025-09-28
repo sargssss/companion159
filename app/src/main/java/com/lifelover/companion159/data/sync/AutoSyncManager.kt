@@ -1,6 +1,7 @@
 package com.lifelover.companion159.data.sync
 
 import android.content.Context
+import android.util.Log
 import androidx.work.*
 import com.lifelover.companion159.data.remote.auth.SupabaseAuthService
 import com.lifelover.companion159.network.NetworkMonitor
@@ -22,28 +23,26 @@ class AutoSyncManager @Inject constructor(
     private val networkMonitor: NetworkMonitor,
     private val authService: SupabaseAuthService
 ) {
-    // Lazy initialization of WorkManager to avoid initialization issues
-    private val workManager by lazy {
-        try {
-            WorkManager.getInstance(context)
-        } catch (e: IllegalStateException) {
-            // WorkManager not initialized yet, will retry when needed
-            println("WorkManager not initialized yet: ${e.message}")
-            null
-        }
+    companion object {
+        private const val TAG = "AutoSyncManager"
+        private const val IMMEDIATE_SYNC_WORK_NAME = "immediate_sync_work"
+        private const val PERIODIC_SYNC_WORK_NAME = "periodic_sync_work"
+        private const val IMMEDIATE_SYNC_TAG = "immediate_sync"
+        private const val PERIODIC_SYNC_TAG = "periodic_sync"
+        private const val SYNC_INTERVAL_MINUTES = 15L
     }
 
     private val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
-
     private var isInitialized = false
 
     /**
      * Initialize auto-sync monitoring
-     * Starts observing network and auth state changes
      */
     fun initialize() {
         if (isInitialized) return
         isInitialized = true
+
+        Log.d(TAG, "Initializing AutoSyncManager")
 
         scope.launch {
             try {
@@ -54,10 +53,11 @@ class AutoSyncManager @Inject constructor(
                 ) { isOnline, isAuthenticated ->
                     isOnline to isAuthenticated
                 }.collectLatest { (isOnline, isAuthenticated) ->
+                    Log.d(TAG, "State changed - Online: $isOnline, Authenticated: $isAuthenticated")
                     handleStateChange(isOnline, isAuthenticated)
                 }
             } catch (e: Exception) {
-                println("AutoSyncManager initialization error: ${e.message}")
+                Log.e(TAG, "AutoSyncManager initialization error", e)
             }
         }
     }
@@ -70,50 +70,52 @@ class AutoSyncManager @Inject constructor(
             when {
                 // Online and authenticated - check for pending sync
                 isOnline && isAuthenticated -> {
+                    Log.d(TAG, "Device online and authenticated, checking for unsynced changes")
                     if (syncService.hasUnsyncedChanges()) {
+                        Log.d(TAG, "Found unsynced changes, triggering sync")
                         triggerImmediateSync()
                     }
                     schedulePeriodicSync()
                 }
-
                 // Offline or not authenticated - cancel periodic sync
                 else -> {
+                    Log.d(TAG, "Device offline or not authenticated, cancelling periodic sync")
                     cancelPeriodicSync()
                 }
             }
         } catch (e: Exception) {
-            println("Error handling state change: ${e.message}")
+            Log.e(TAG, "Error handling state change", e)
         }
     }
 
     /**
-     * Trigger immediate synchronization
-     * Called when data changes or network comes back online
+     * Trigger immediate synchronization using simple worker
      */
     fun triggerImmediateSync() {
         try {
-            val workManagerInstance = workManager ?: run {
-                println("WorkManager not available for immediate sync")
-                return
-            }
+            Log.d(TAG, "Triggering immediate sync")
+            val workManager = WorkManager.getInstance(context)
 
-            val immediateWorkRequest = OneTimeWorkRequestBuilder<SyncWorker>()
+            // Використовуємо простий Worker замість Hilt Worker
+            val immediateWorkRequest = OneTimeWorkRequestBuilder<SimpleSyncWorker>()
                 .setConstraints(createSyncConstraints())
                 .setBackoffCriteria(
                     BackoffPolicy.EXPONENTIAL,
-                    SyncWorker.RETRY_POLICY_DELAY,
+                    SimpleSyncWorker.RETRY_POLICY_DELAY,
                     TimeUnit.MILLISECONDS
                 )
                 .addTag(IMMEDIATE_SYNC_TAG)
                 .build()
 
-            workManagerInstance.enqueueUniqueWork(
+            workManager.enqueueUniqueWork(
                 IMMEDIATE_SYNC_WORK_NAME,
                 ExistingWorkPolicy.REPLACE,
                 immediateWorkRequest
             )
+
+            Log.d(TAG, "Immediate sync work enqueued")
         } catch (e: Exception) {
-            println("Error triggering immediate sync: ${e.message}")
+            Log.e(TAG, "Error triggering immediate sync", e)
         }
     }
 
@@ -122,27 +124,30 @@ class AutoSyncManager @Inject constructor(
      */
     private fun schedulePeriodicSync() {
         try {
-            val workManagerInstance = workManager ?: return
+            Log.d(TAG, "Scheduling periodic sync")
+            val workManager = WorkManager.getInstance(context)
 
-            val periodicWorkRequest = PeriodicWorkRequestBuilder<SyncWorker>(
+            val periodicWorkRequest = PeriodicWorkRequestBuilder<SimpleSyncWorker>(
                 SYNC_INTERVAL_MINUTES, TimeUnit.MINUTES
             )
                 .setConstraints(createSyncConstraints())
                 .setBackoffCriteria(
                     BackoffPolicy.EXPONENTIAL,
-                    SyncWorker.RETRY_POLICY_DELAY,
+                    SimpleSyncWorker.RETRY_POLICY_DELAY,
                     TimeUnit.MILLISECONDS
                 )
                 .addTag(PERIODIC_SYNC_TAG)
                 .build()
 
-            workManagerInstance.enqueueUniquePeriodicWork(
+            workManager.enqueueUniquePeriodicWork(
                 PERIODIC_SYNC_WORK_NAME,
                 ExistingPeriodicWorkPolicy.KEEP,
                 periodicWorkRequest
             )
+
+            Log.d(TAG, "Periodic sync work scheduled")
         } catch (e: Exception) {
-            println("Error scheduling periodic sync: ${e.message}")
+            Log.e(TAG, "Error scheduling periodic sync", e)
         }
     }
 
@@ -151,9 +156,11 @@ class AutoSyncManager @Inject constructor(
      */
     private fun cancelPeriodicSync() {
         try {
-            workManager?.cancelUniqueWork(PERIODIC_SYNC_WORK_NAME)
+            Log.d(TAG, "Cancelling periodic sync")
+            val workManager = WorkManager.getInstance(context)
+            workManager.cancelUniqueWork(PERIODIC_SYNC_WORK_NAME)
         } catch (e: Exception) {
-            println("Error cancelling periodic sync: ${e.message}")
+            Log.e(TAG, "Error cancelling periodic sync", e)
         }
     }
 
@@ -162,23 +169,22 @@ class AutoSyncManager @Inject constructor(
      */
     fun cancelAllSync() {
         try {
-            workManager?.let { wm ->
-                wm.cancelAllWorkByTag(IMMEDIATE_SYNC_TAG)
-                wm.cancelAllWorkByTag(PERIODIC_SYNC_TAG)
-            }
+            Log.d(TAG, "Cancelling all sync operations")
+            val workManager = WorkManager.getInstance(context)
+            workManager.cancelAllWorkByTag(IMMEDIATE_SYNC_TAG)
+            workManager.cancelAllWorkByTag(PERIODIC_SYNC_TAG)
         } catch (e: Exception) {
-            println("Error cancelling all sync: ${e.message}")
+            Log.e(TAG, "Error cancelling all sync", e)
         }
     }
 
     /**
      * Create constraints for sync work
-     * Only sync when connected to network
      */
     private fun createSyncConstraints(): Constraints {
         return Constraints.Builder()
             .setRequiredNetworkType(NetworkType.CONNECTED)
-            .setRequiresBatteryNotLow(false) // Allow sync even on low battery
+            .setRequiresBatteryNotLow(false)
             .setRequiresCharging(false)
             .setRequiresDeviceIdle(false)
             .build()
@@ -188,19 +194,10 @@ class AutoSyncManager @Inject constructor(
      * Get sync work info for monitoring
      */
     fun getSyncWorkInfo() = try {
-        workManager?.getWorkInfosByTagLiveData(IMMEDIATE_SYNC_TAG)
+        val workManager = WorkManager.getInstance(context)
+        workManager.getWorkInfosByTagLiveData(IMMEDIATE_SYNC_TAG)
     } catch (e: Exception) {
-        println("Error getting sync work info: ${e.message}")
+        Log.e(TAG, "Error getting sync work info", e)
         null
-    }
-
-    companion object {
-        private const val IMMEDIATE_SYNC_WORK_NAME = "immediate_sync_work"
-        private const val PERIODIC_SYNC_WORK_NAME = "periodic_sync_work"
-
-        private const val IMMEDIATE_SYNC_TAG = "immediate_sync"
-        private const val PERIODIC_SYNC_TAG = "periodic_sync"
-
-        private const val SYNC_INTERVAL_MINUTES = 15L // Sync every 15 minutes
     }
 }
