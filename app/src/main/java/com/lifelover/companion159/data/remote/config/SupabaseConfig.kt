@@ -1,10 +1,14 @@
 package com.lifelover.companion159.data.remote.config
 
+import com.lifelover.companion159.BuildConfig
+
 object SupabaseConfig {
-    const val SUPABASE_URL = "https://your-project.supabase.co"
-    const val SUPABASE_ANON_KEY = "your-anon-key-here"
+    val SUPABASE_URL = BuildConfig.SUPABASE_URL
+    val SUPABASE_ANON_KEY = BuildConfig.SUPABASE_ANON_KEY
 
     const val TABLE_INVENTORY = "inventory_items"
     const val TABLE_USERS = "profiles"
-    const val isConfigured = false
+
+    val isConfigured: Boolean
+        get() = SUPABASE_URL.isNotBlank() && SUPABASE_ANON_KEY.isNotBlank()
 }

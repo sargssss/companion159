@@ -4,11 +4,12 @@ import com.lifelover.companion159.data.local.dao.InventoryDao
 import com.lifelover.companion159.data.remote.auth.SupabaseAuthService
 import com.lifelover.companion159.data.remote.client.SupabaseClient
 import com.lifelover.companion159.data.remote.repository.SupabaseInventoryRepository
-import com.lifelover.companion159.data.sync.SyncService
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
+import io.github.jan.supabase.auth.auth
+import io.github.jan.supabase.postgrest.postgrest
 import javax.inject.Singleton
 
 @Module
@@ -43,16 +44,5 @@ object NetworkModule {
     @Singleton
     fun provideSupabaseInventoryRepository(): SupabaseInventoryRepository {
         return SupabaseInventoryRepository()
-    }
-
-    // SyncService провайдер залишаємо тільки тут
-    @Provides
-    @Singleton
-    fun provideSyncService(
-        localDao: InventoryDao,
-        remoteRepository: SupabaseInventoryRepository,
-        authService: SupabaseAuthService
-    ): SyncService {
-        return SyncService(localDao, remoteRepository, authService)
     }
 }

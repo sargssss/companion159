@@ -1,21 +1,14 @@
 package com.lifelover.companion159.presentation.ui.components
 
-
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Face
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-
-enum class SyncStatus {
-    SYNCED,
-    NOT_SYNCED,
-    SYNCING,
-    OFFLINE
-}
+import com.lifelover.companion159.data.sync.SyncStatus // Використовуємо правильний SyncStatus
 
 @Composable
 fun SyncStatusIndicator(
@@ -28,9 +21,9 @@ fun SyncStatusIndicator(
         horizontalArrangement = Arrangement.spacedBy(4.dp)
     ) {
         when (status) {
-            SyncStatus.SYNCED -> {
+            SyncStatus.SUCCESS -> {
                 Icon(
-                    imageVector = Icons.Default.Face,
+                    imageVector = Icons.Default.CheckCircle,
                     contentDescription = "Синхронізовано",
                     modifier = Modifier.size(16.dp),
                     tint = MaterialTheme.colorScheme.primary
@@ -42,7 +35,7 @@ fun SyncStatusIndicator(
                 )
             }
 
-            SyncStatus.NOT_SYNCED -> {
+            SyncStatus.ERROR -> {
                 Icon(
                     imageVector = Icons.Default.Face,
                     contentDescription = "Не синхронізовано",
@@ -76,6 +69,20 @@ fun SyncStatusIndicator(
                 )
                 Text(
                     text = "Offline",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.outline
+                )
+            }
+
+            SyncStatus.IDLE -> {
+                Icon(
+                    imageVector = Icons.Default.Face,
+                    contentDescription = "Готовий до синхронізації",
+                    modifier = Modifier.size(16.dp),
+                    tint = MaterialTheme.colorScheme.outline
+                )
+                Text(
+                    text = "Готовий",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.outline
                 )
