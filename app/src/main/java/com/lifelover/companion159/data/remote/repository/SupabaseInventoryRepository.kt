@@ -45,7 +45,7 @@ class SupabaseInventoryRepository @Inject constructor() {
         }
     }
 
-    // СТВОРИТИ новий елемент - використовується для записів без supabaseId
+    // СТВОРИТИ новий елемент - КЛЮЧОВЕ: використовуємо .select() для отримання ID
     suspend fun createItem(localItem: InventoryItemEntity): String? = withContext(Dispatchers.IO) {
         try {
             val userId = client.auth.currentUserOrNull()?.id ?: return@withContext null
@@ -60,25 +60,34 @@ class SupabaseInventoryRepository @Inject constructor() {
                 isDeleted = localItem.isDeleted
             )
 
-            val createdItem = client.from(SupabaseConfig.TABLE_INVENTORY)
-                .insert(supabaseItem)
-                .decodeSingle<SupabaseInventoryItem>()
+            // КЛЮЧОВЕ ВИПРАВЛЕННЯ: Використовуємо .select() для отримання створеного запису з ID
+            val createdItems = client.from(SupabaseConfig.TABLE_INVENTORY)
+                .insert(supabaseItem) {
+                    select()
+                }
+                .decodeList<SupabaseInventoryItem>()
 
-            Log.d(TAG, "Successfully CREATED item: ${createdItem.name} with Supabase ID: ${createdItem.id}")
-            createdItem.id
+            val createdItem = createdItems.firstOrNull()
+            if (createdItem?.id != null) {
+                Log.d(TAG, "✅ Successfully CREATED item: ${createdItem.name} with Supabase ID: ${createdItem.id}")
+                createdItem.id
+            } else {
+                Log.e(TAG, "❌ Failed to get ID for created item: ${localItem.name}")
+                null
+            }
         } catch (e: Exception) {
-            Log.e(TAG, "Error creating item: ${localItem.name}", e)
+            Log.e(TAG, "❌ Error creating item: ${localItem.name}", e)
             null
         }
     }
 
-    // ОНОВИТИ існуючий елемент - використовується для записів з supabaseId
+    // ОНОВИТИ існуючий елемент
     suspend fun updateItem(supabaseId: String, localItem: InventoryItemEntity): Boolean = withContext(Dispatchers.IO) {
         try {
             val userId = client.auth.currentUserOrNull()?.id ?: return@withContext false
             Log.d(TAG, "UPDATING existing item with Supabase ID: $supabaseId, name: ${localItem.name}")
 
-            client.from(SupabaseConfig.TABLE_INVENTORY)
+            val updatedItems = client.from(SupabaseConfig.TABLE_INVENTORY)
                 .update({
                     set("name", localItem.name)
                     set("quantity", localItem.quantity)
@@ -89,12 +98,19 @@ class SupabaseInventoryRepository @Inject constructor() {
                         eq("id", supabaseId)
                         eq("user_id", userId)
                     }
+                    select() // Отримуємо оновлений запис
                 }
+                .decodeList<SupabaseInventoryItem>()
 
-            Log.d(TAG, "Successfully UPDATED item: ${localItem.name}")
-            true
+            if (updatedItems.isNotEmpty()) {
+                Log.d(TAG, "✅ Successfully UPDATED item: ${localItem.name}")
+                true
+            } else {
+                Log.e(TAG, "❌ No items updated for Supabase ID: $supabaseId")
+                false
+            }
         } catch (e: Exception) {
-            Log.e(TAG, "Error updating item with Supabase ID: $supabaseId", e)
+            Log.e(TAG, "❌ Error updating item with Supabase ID: $supabaseId", e)
             false
         }
     }
@@ -105,7 +121,7 @@ class SupabaseInventoryRepository @Inject constructor() {
             val userId = client.auth.currentUserOrNull()?.id ?: return@withContext false
             Log.d(TAG, "DELETING item with Supabase ID: $supabaseId")
 
-            client.from(SupabaseConfig.TABLE_INVENTORY)
+            val deletedItems = client.from(SupabaseConfig.TABLE_INVENTORY)
                 .update({
                     set("is_deleted", true)
                 }) {
@@ -113,12 +129,19 @@ class SupabaseInventoryRepository @Inject constructor() {
                         eq("id", supabaseId)
                         eq("user_id", userId)
                     }
+                    select() // Отримуємо видалений запис для підтвердження
                 }
+                .decodeList<SupabaseInventoryItem>()
 
-            Log.d(TAG, "Successfully DELETED item with Supabase ID: $supabaseId")
-            true
+            if (deletedItems.isNotEmpty()) {
+                Log.d(TAG, "✅ Successfully DELETED item with Supabase ID: $supabaseId")
+                true
+            } else {
+                Log.e(TAG, "❌ No items deleted for Supabase ID: $supabaseId")
+                false
+            }
         } catch (e: Exception) {
-            Log.e(TAG, "Error deleting item with Supabase ID: $supabaseId", e)
+            Log.e(TAG, "❌ Error deleting item with Supabase ID: $supabaseId", e)
             false
         }
     }
