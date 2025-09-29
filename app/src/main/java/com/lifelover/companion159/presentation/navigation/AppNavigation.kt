@@ -25,11 +25,10 @@ data class InventoryDetail(val category: InventoryCategory)
 fun AppNavigation(
     navController: NavHostController
 ) {
-    // Визначаємо початковий маршрут залежно від налаштувань
     val startDestination = if (SupabaseConfig.isConfigured) {
         Login
     } else {
-        MainMenu // Якщо Supabase не налаштовано, йдемо прямо в меню
+        MainMenu
     }
 
     NavHost(
@@ -50,6 +49,11 @@ fun AppNavigation(
             MainMenuScreen(
                 onInventoryTypeSelected = { category ->
                     navController.navigate(InventoryDetail(category))
+                },
+                onLogout = {
+                    navController.navigate(Login) {
+                        popUpTo(MainMenu) { inclusive = true }
+                    }
                 }
             )
         }

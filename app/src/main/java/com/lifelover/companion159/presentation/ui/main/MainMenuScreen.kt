@@ -25,11 +25,23 @@ import java.util.*
 @Composable
 fun MainMenuScreen(
     onInventoryTypeSelected: (InventoryCategory) -> Unit = {},
+    onLogout: () -> Unit = {}, // Callback for logout navigation
     authViewModel: AuthViewModel = hiltViewModel(),
     inventoryViewModel: InventoryViewModel = hiltViewModel()
 ) {
     val authState by authViewModel.state.collectAsState()
     val inventoryState by inventoryViewModel.state.collectAsState()
+
+    // State for user menu
+    var showUserMenu by remember { mutableStateOf(false) }
+    var showLogoutDialog by remember { mutableStateOf(false) }
+
+    // Observe authentication state and navigate on logout
+    LaunchedEffect(authState.isAuthenticated) {
+        if (!authState.isAuthenticated && showLogoutDialog) {
+            onLogout()
+        }
+    }
 
     Column(modifier = Modifier.fillMaxSize()) {
         TopAppBar(
@@ -54,7 +66,8 @@ fun MainMenuScreen(
                             painter = painterResource(R.drawable.sync_check),
                             contentDescription = "Синхронізовано",
                             tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(42.dp)
+                            modifier = Modifier
+                                .size(42.dp)
                                 .padding(end = 12.dp)
                         )
                     }
@@ -77,17 +90,70 @@ fun MainMenuScreen(
                         Icon(
                             painter = painterResource(R.drawable.repeat),
                             contentDescription = "Синхронізувати",
-                            modifier = Modifier.size(42.dp)
+                            modifier = Modifier
+                                .size(42.dp)
                                 .padding(end = 12.dp)
                         )
                     }
-                }
 
-                if (authState.isAuthenticated) {
-                    IconButton(onClick = { /* TODO: Show user menu */ }) {
+                    // User menu with dropdown
+                    Box {
+                        IconButton(onClick = { showUserMenu = true }) {
+                            Icon(
+                                imageVector = Icons.Default.AccountCircle,
+                                contentDescription = "User menu"
+                            )
+                        }
+
+                        DropdownMenu(
+                            expanded = showUserMenu,
+                            onDismissRequest = { showUserMenu = false }
+                        ) {
+                            // Settings
+                            DropdownMenuItem(
+                                text = { Text("Налаштування") },
+                                onClick = {
+                                    showUserMenu = false
+                                    // TODO: Navigate to settings
+                                },
+                                leadingIcon = {
+                                    Icon(
+                                        imageVector = Icons.Default.Settings,
+                                        contentDescription = null
+                                    )
+                                }
+                            )
+
+                            HorizontalDivider()
+
+                            // Logout
+                            DropdownMenuItem(
+                                text = {
+                                    Text(
+                                        "Вийти з аккаунту",
+                                        color = MaterialTheme.colorScheme.error
+                                    )
+                                },
+                                onClick = {
+                                    showUserMenu = false
+                                    showLogoutDialog = true
+                                },
+                                leadingIcon = {
+                                    Icon(
+                                        imageVector = Icons.Default.ExitToApp,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.error
+                                    )
+                                }
+                            )
+                        }
+                    }
+                } else {
+                    // Offline mode - show login button
+                    IconButton(onClick = onLogout) {
                         Icon(
                             imageVector = Icons.Default.AccountCircle,
-                            contentDescription = "Користувач"
+                            contentDescription = "Увійти"
                         )
                     }
                 }
@@ -125,6 +191,72 @@ fun MainMenuScreen(
             }
         }
     }
+
+    // Діалог підтвердження виходу
+    if (showLogoutDialog) {
+        LogoutConfirmationDialog(
+            userEmail = authState.userEmail,
+            onDismiss = { showLogoutDialog = false },
+            onConfirm = {
+                showLogoutDialog = false
+                authViewModel.signOut()
+                onLogout()
+            }
+        )
+    }
+}
+
+@Composable
+private fun LogoutConfirmationDialog(
+    userEmail: String?,
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = {
+            Icon(
+                imageVector = Icons.Default.ExitToApp,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.error
+            )
+        },
+        title = {
+            Text("Вийти з облікового запису?")
+        },
+        text = {
+            Column {
+                Text("Ви впевнені, що хочете вийти?")
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = userEmail ?: "Невідомий користувач",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "Несинхронізовані зміни будуть збережені локально.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = onConfirm,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.error
+                )
+            ) {
+                Text("Вийти")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Скасувати")
+            }
+        }
+    )
 }
 
 @Composable
