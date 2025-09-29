@@ -12,21 +12,15 @@ import com.lifelover.companion159.data.local.dao.InventoryDao
 import com.lifelover.companion159.data.local.entities.InventoryItemEntity
 
 val MIGRATION_1_2 = object : Migration(1, 2) {
-    override fun migrate(database: SupportSQLiteDatabase) {
-        // Додаємо нову колонку supabaseId
-        database.execSQL("ALTER TABLE inventory_items ADD COLUMN supabaseId TEXT")
-
-        // Копіюємо дані з serverId в supabaseId (якщо потрібно)
-        database.execSQL("UPDATE inventory_items SET supabaseId = serverId WHERE serverId IS NOT NULL")
-
-        // Видаляємо стару колонку serverId (опціонально)
-        // database.execSQL("ALTER TABLE inventory_items DROP COLUMN serverId")
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE inventory_items ADD COLUMN supabaseId TEXT")
+        db.execSQL("UPDATE inventory_items SET supabaseId = serverId WHERE serverId IS NOT NULL")
     }
 }
 
 @Database(
     entities = [InventoryItemEntity::class],
-    version = 2, // Збільшена версія
+    version = 2,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -44,7 +38,7 @@ abstract class InventoryDatabase : RoomDatabase() {
                     InventoryDatabase::class.java,
                     "companion159_inventory_database"
                 )
-                    .addMigrations(MIGRATION_1_2) // Додаємо міграцію
+                    .addMigrations(MIGRATION_1_2)
                     .build()
                 INSTANCE = instance
                 instance

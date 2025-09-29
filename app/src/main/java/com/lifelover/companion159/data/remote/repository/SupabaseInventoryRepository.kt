@@ -23,7 +23,6 @@ class SupabaseInventoryRepository @Inject constructor() {
 
     private val client = SupabaseClient.client
 
-    // Отримати всі елементи користувача
     suspend fun getAllItems(): List<SupabaseInventoryItem> = withContext(Dispatchers.IO) {
         try {
             val userId = client.auth.currentUserOrNull()?.id ?: return@withContext emptyList()
@@ -45,14 +44,13 @@ class SupabaseInventoryRepository @Inject constructor() {
         }
     }
 
-    // СТВОРИТИ новий елемент - КЛЮЧОВЕ: використовуємо .select() для отримання ID
     suspend fun createItem(localItem: InventoryItemEntity): String? = withContext(Dispatchers.IO) {
         try {
             val userId = client.auth.currentUserOrNull()?.id ?: return@withContext null
             Log.d(TAG, "Creating NEW item: ${localItem.name}")
 
             val supabaseItem = SupabaseInventoryItem(
-                id = null, // Supabase згенерує UUID автоматично
+                id = null,
                 name = localItem.name,
                 quantity = localItem.quantity,
                 category = localItem.category.name.lowercase(),
@@ -60,7 +58,6 @@ class SupabaseInventoryRepository @Inject constructor() {
                 isDeleted = localItem.isDeleted
             )
 
-            // КЛЮЧОВЕ ВИПРАВЛЕННЯ: Використовуємо .select() для отримання створеного запису з ID
             val createdItems = client.from(SupabaseConfig.TABLE_INVENTORY)
                 .insert(supabaseItem) {
                     select()
@@ -81,7 +78,6 @@ class SupabaseInventoryRepository @Inject constructor() {
         }
     }
 
-    // ОНОВИТИ існуючий елемент
     suspend fun updateItem(supabaseId: String, localItem: InventoryItemEntity): Boolean = withContext(Dispatchers.IO) {
         try {
             val userId = client.auth.currentUserOrNull()?.id ?: return@withContext false
@@ -98,7 +94,7 @@ class SupabaseInventoryRepository @Inject constructor() {
                         eq("id", supabaseId)
                         eq("user_id", userId)
                     }
-                    select() // Отримуємо оновлений запис
+                    select()
                 }
                 .decodeList<SupabaseInventoryItem>()
 
@@ -115,7 +111,6 @@ class SupabaseInventoryRepository @Inject constructor() {
         }
     }
 
-    // ВИДАЛИТИ елемент (м'яке видалення)
     suspend fun deleteItem(supabaseId: String): Boolean = withContext(Dispatchers.IO) {
         try {
             val userId = client.auth.currentUserOrNull()?.id ?: return@withContext false
@@ -129,7 +124,7 @@ class SupabaseInventoryRepository @Inject constructor() {
                         eq("id", supabaseId)
                         eq("user_id", userId)
                     }
-                    select() // Отримуємо видалений запис для підтвердження
+                    select()
                 }
                 .decodeList<SupabaseInventoryItem>()
 
@@ -147,14 +142,13 @@ class SupabaseInventoryRepository @Inject constructor() {
     }
 }
 
-// Extension функції для конвертації
 fun SupabaseInventoryItem.toEntity(): InventoryItemEntity {
     return InventoryItemEntity(
-        id = 0, // Room згенерує новий локальний ID
+        id = 0,
         name = name,
         quantity = quantity,
         category = InventoryCategory.valueOf(category.uppercase()),
-        supabaseId = id, // КЛЮЧОВЕ: зберігаємо Supabase UUID
+        supabaseId = id,
         lastModified = java.util.Date(),
         lastSynced = java.util.Date(),
         needsSync = false,

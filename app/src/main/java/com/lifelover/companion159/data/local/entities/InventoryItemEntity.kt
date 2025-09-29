@@ -3,18 +3,18 @@ package com.lifelover.companion159.data.local.entities
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 import androidx.room.TypeConverter
+import com.lifelover.companion159.R
 import java.util.Date
 
 @Entity(tableName = "inventory_items")
 data class InventoryItemEntity(
     @PrimaryKey(autoGenerate = true)
-    val id: Long = 0, // Локальний Room ID
+    val id: Long = 0,
     val name: String,
     val quantity: Int,
     val category: InventoryCategory,
 
-    // Sync fields для Supabase - КЛЮЧОВЕ ПОЛЕ!
-    val supabaseId: String? = null,      // ID з Supabase (UUID)
+    val supabaseId: String? = null,
     val lastModified: Date = Date(),
     val lastSynced: Date? = null,
     val needsSync: Boolean = true,
@@ -33,10 +33,10 @@ fun InventoryCategory.titleRes(): Int = when (this) {
 }
 
 fun InventoryCategory.iconRes(): Int = when (this) {
-    InventoryCategory.SHIPS -> com.lifelover.companion159.R.drawable.drone
-    InventoryCategory.AMMUNITION -> com.lifelover.companion159.R.drawable.bomb
-    InventoryCategory.EQUIPMENT -> com.lifelover.companion159.R.drawable.tool
-    InventoryCategory.PROVISIONS -> com.lifelover.companion159.R.drawable.food
+    InventoryCategory.SHIPS -> R.drawable.drone
+    InventoryCategory.AMMUNITION -> R.drawable.bomb
+    InventoryCategory.EQUIPMENT -> R.drawable.tool
+    InventoryCategory.PROVISIONS -> R.drawable.food
 }
 
 class Converters {

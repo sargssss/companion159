@@ -18,13 +18,3 @@ data class SupabaseInventoryItem(
     @SerialName("is_deleted")
     val isDeleted: Boolean = false
 )
-
-@Serializable
-data class SupabaseUser(
-    val id: String,
-    val email: String? = null,
-    @SerialName("created_at")
-    val createdAt: String? = null,
-    @SerialName("updated_at")
-    val updatedAt: String? = null
-)
