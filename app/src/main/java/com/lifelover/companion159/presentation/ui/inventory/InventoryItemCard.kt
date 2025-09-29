@@ -1,6 +1,7 @@
 package com.lifelover.companion159.presentation.ui.inventory
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
@@ -31,7 +32,6 @@ fun InventoryItemCard(
         Column(
             modifier = Modifier.padding(16.dp)
         ) {
-            // Header з назвою та кнопками
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -48,19 +48,18 @@ fun InventoryItemCard(
                         fontWeight = FontWeight.Medium
                     )
 
-                    // Індикатор несинхронізованого стану
+
                     if (showSyncStatus && !item.isSynced) {
                         Icon(
-                            painter = painterResource(R.drawable.arrow_right),
+                            painter = painterResource(R.drawable.sync_attention),
                             contentDescription = "Не синхронізовано",
-                            modifier = Modifier.size(16.dp),
+                            modifier = Modifier.size(32.dp),
                             tint = MaterialTheme.colorScheme.error
                         )
                     }
                 }
 
                 Row {
-                    // Кнопка редагування
                     IconButton(onClick = onEdit) {
                         Icon(
                             imageVector = Icons.Default.Edit,
@@ -69,7 +68,6 @@ fun InventoryItemCard(
                         )
                     }
 
-                    // Кнопка видалення
                     IconButton(onClick = onDelete) {
                         Icon(
                             imageVector = Icons.Default.Delete,
@@ -82,7 +80,6 @@ fun InventoryItemCard(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // Контроли кількості
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.Center,
@@ -114,6 +111,7 @@ fun InventoryItemCard(
                     },
                     modifier = Modifier.width(80.dp),
                     singleLine = true,
+                    shape = RoundedCornerShape(12.dp),
                     textStyle = MaterialTheme.typography.bodyLarge.copy(
                         fontWeight = FontWeight.Bold,
                         textAlign = TextAlign.Center

@@ -7,7 +7,9 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
+import com.lifelover.companion159.R
 import com.lifelover.companion159.data.sync.SyncStatus // Використовуємо правильний SyncStatus
 
 @Composable
@@ -23,7 +25,7 @@ fun SyncStatusIndicator(
         when (status) {
             SyncStatus.SUCCESS -> {
                 Icon(
-                    imageVector = Icons.Default.CheckCircle,
+                    painter = painterResource(R.drawable.sync_attention),
                     contentDescription = "Синхронізовано",
                     modifier = Modifier.size(16.dp),
                     tint = MaterialTheme.colorScheme.primary
@@ -37,7 +39,7 @@ fun SyncStatusIndicator(
 
             SyncStatus.ERROR -> {
                 Icon(
-                    imageVector = Icons.Default.Face,
+                    painter = painterResource(R.drawable.sync_attention),
                     contentDescription = "Не синхронізовано",
                     modifier = Modifier.size(16.dp),
                     tint = MaterialTheme.colorScheme.error
@@ -62,7 +64,7 @@ fun SyncStatusIndicator(
 
             SyncStatus.OFFLINE -> {
                 Icon(
-                    imageVector = Icons.Default.Face,
+                    painter = painterResource(R.drawable.sync_attention),
                     contentDescription = "Offline",
                     modifier = Modifier.size(16.dp),
                     tint = MaterialTheme.colorScheme.outline
@@ -76,7 +78,7 @@ fun SyncStatusIndicator(
 
             SyncStatus.IDLE -> {
                 Icon(
-                    imageVector = Icons.Default.Face,
+                    painter = painterResource(R.drawable.sync_attention),
                     contentDescription = "Готовий до синхронізації",
                     modifier = Modifier.size(16.dp),
                     tint = MaterialTheme.colorScheme.outline

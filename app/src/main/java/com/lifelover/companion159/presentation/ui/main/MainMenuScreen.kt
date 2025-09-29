@@ -7,12 +7,13 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.lifelover.companion159.R
-import com.lifelover.companion159.data.sync.SyncStatus // Правильний імпорт
+import com.lifelover.companion159.data.sync.SyncStatus
 import com.lifelover.companion159.data.local.entities.InventoryCategory
 import com.lifelover.companion159.presentation.ui.auth.AuthViewModel
 import com.lifelover.companion159.presentation.ui.inventory.InventoryMenuButton
@@ -39,49 +40,49 @@ fun MainMenuScreen(
                 )
             },
             actions = {
-                // Індикатор синхронізації
                 when (inventoryState.syncStatus) {
                     SyncStatus.SYNCING -> {
                         CircularProgressIndicator(
                             modifier = Modifier
-                                .size(24.dp)
-                                .padding(end = 12.dp),
+                                .size(32.dp)
+                                .padding(top = 6.dp, end = 14.dp),
                             strokeWidth = 2.dp
                         )
                     }
                     SyncStatus.SUCCESS -> {
                         Icon(
-                            imageVector = Icons.Default.CheckCircle,
+                            painter = painterResource(R.drawable.sync_check),
                             contentDescription = "Синхронізовано",
                             tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.padding(end = 12.dp)
+                            modifier = Modifier.size(42.dp)
+                                .padding(end = 12.dp)
                         )
                     }
                     SyncStatus.ERROR -> {
                         Icon(
-                            imageVector = Icons.Default.Face,
+                            painter = painterResource(R.drawable.sync_attention),
                             contentDescription = "Помилка синхронізації",
                             tint = MaterialTheme.colorScheme.error,
-                            modifier = Modifier.padding(end = 12.dp)
+                            modifier = Modifier.size(40.dp)
                         )
                     }
                     else -> {}
                 }
 
-                // Кнопка синхронізації
                 if (authState.isAuthenticated) {
                     IconButton(
                         onClick = { inventoryViewModel.syncData() },
                         enabled = inventoryState.syncStatus != SyncStatus.SYNCING
                     ) {
                         Icon(
-                            imageVector = Icons.Default.Face,
-                            contentDescription = "Синхронізувати"
+                            painter = painterResource(R.drawable.repeat),
+                            contentDescription = "Синхронізувати",
+                            modifier = Modifier.size(42.dp)
+                                .padding(end = 12.dp)
                         )
                     }
                 }
 
-                // Меню користувача
                 if (authState.isAuthenticated) {
                     IconButton(onClick = { /* TODO: Show user menu */ }) {
                         Icon(
@@ -93,7 +94,6 @@ fun MainMenuScreen(
             }
         )
 
-        // Статус бар
         if (authState.isAuthenticated) {
             StatusCard(
                 userEmail = authState.userEmail,
@@ -119,7 +119,6 @@ fun MainMenuScreen(
             }
         }
 
-        // Повідомлення про помилку
         inventoryState.error?.let { error ->
             LaunchedEffect(error) {
                 // Показуємо Snackbar або Toast тут

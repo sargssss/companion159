@@ -6,7 +6,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Face
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -100,7 +99,7 @@ fun InventoryItemDialog(
                             enabled = quantity > 1
                         ) {
                             Icon(
-                                imageVector = Icons.Default.Face,
+                                painter = painterResource(R.drawable.minus),
                                 contentDescription = "Decrease quantity",
                                 tint = if (quantity > 1) MaterialTheme.colorScheme.primary
                                 else MaterialTheme.colorScheme.outline
@@ -132,7 +131,7 @@ fun InventoryItemDialog(
                             onClick = { quantity++ }
                         ) {
                             Icon(
-                                imageVector = Icons.Default.Add,
+                                painter = painterResource(R.drawable.plus_large),
                                 contentDescription = "Increase quantity",
                                 tint = MaterialTheme.colorScheme.primary
                             )
