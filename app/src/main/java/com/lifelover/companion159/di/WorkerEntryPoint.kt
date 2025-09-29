@@ -12,7 +12,7 @@ import dagger.hilt.android.EntryPointAccessors
 import dagger.hilt.components.SingletonComponent
 
 /**
- * Service Locator для отримання Hilt залежностей в Worker
+ * Service Locator
  */
 @EntryPoint
 @InstallIn(SingletonComponent::class)

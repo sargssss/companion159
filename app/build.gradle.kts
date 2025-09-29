@@ -93,7 +93,7 @@ dependencies {
     implementation(libs.kotlinx.serialization.json)
 
     // Coroutines
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.0")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.9.4")
 
     // Room
@@ -104,7 +104,7 @@ dependencies {
     // Work Manager for background sync
     implementation("androidx.work:work-runtime-ktx:2.9.0")
 
-    // Hilt - ВАЖЛИВО! Правильний порядок
+    // Hilt
     implementation(libs.hilt.android)
     implementation(libs.hilt.navigation.compose)
 
@@ -112,7 +112,6 @@ dependencies {
     implementation("androidx.hilt:hilt-work:1.1.0")
     implementation(libs.androidx.hilt.common)
 
-    // KSP для Hilt
     ksp(libs.hilt.compiler)
     ksp("androidx.hilt:hilt-compiler:1.1.0")
 

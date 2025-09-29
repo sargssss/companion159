@@ -1,4 +1,4 @@
-package com.lifelover.companion159.data.ui
+package com.lifelover.companion159.data.types
 
 import com.lifelover.companion159.R
 import com.lifelover.companion159.data.local.entities.InventoryCategory
@@ -6,10 +6,10 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 enum class InventoryType {
-    SHIPS,      // Борти/Дрони
-    AMMUNITION, // Боєкомплект
-    EQUIPMENT,  // Обладнання
-    PROVISIONS  // Провізія
+    SHIPS,
+    AMMUNITION,
+    EQUIPMENT,
+    PROVISIONS
 }
 
 // Extension functions for UI resources
