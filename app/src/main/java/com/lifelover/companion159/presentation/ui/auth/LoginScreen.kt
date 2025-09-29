@@ -9,6 +9,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -23,13 +24,20 @@ fun LoginScreen(
     onLoginSuccess: () -> Unit,
     viewModel: AuthViewModel = hiltViewModel()
 ) {
+    val context = LocalContext.current
+    // Get Activity context
+    val activity = remember(context) {
+        context as? androidx.activity.ComponentActivity
+            ?: (context as? android.content.ContextWrapper)?.baseContext as? androidx.activity.ComponentActivity
+    }
+
     val state by viewModel.state.collectAsState()
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
     var isLoginMode by remember { mutableStateOf(true) }
 
-    // Обробка успішної автентифікації
+    // Handle successful authentication
     LaunchedEffect(state.isAuthenticated) {
         if (state.isAuthenticated) {
             onLoginSuccess()
@@ -43,7 +51,7 @@ fun LoginScreen(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        // Логотип/Заголовок
+        // Logo/Title
         Icon(
             imageVector = Icons.Default.Lock,
             contentDescription = null,
@@ -61,9 +69,9 @@ fun LoginScreen(
 
         Spacer(modifier = Modifier.height(32.dp))
 
-        // Google Sign-In кнопка
+        // Google Sign-In button
         OutlinedButton(
-            onClick = { viewModel.signInWithGoogle() },
+            onClick = { viewModel.signInWithGoogle(context) }, // Pass Activity context
             modifier = Modifier
                 .fillMaxWidth()
                 .height(50.dp),
@@ -76,7 +84,7 @@ fun LoginScreen(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Google icon (можна замінити на справжній Google icon)
+                // Google icon (can be replaced with actual Google icon)
                 Icon(
                     imageVector = Icons.Default.AccountCircle,
                     contentDescription = null,
@@ -105,7 +113,7 @@ fun LoginScreen(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Email поле
+        // Email field
         OutlinedTextField(
             value = email,
             onValueChange = { email = it },
@@ -120,7 +128,7 @@ fun LoginScreen(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Пароль поле
+        // Password field
         OutlinedTextField(
             value = password,
             onValueChange = { password = it },
@@ -146,7 +154,7 @@ fun LoginScreen(
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        // Кнопка входу/реєстрації
+        // Login/Register button
         Button(
             onClick = {
                 if (isLoginMode) {
@@ -175,7 +183,7 @@ fun LoginScreen(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Перемикач режиму
+        // Mode switch
         TextButton(
             onClick = { isLoginMode = !isLoginMode }
         ) {
@@ -187,14 +195,14 @@ fun LoginScreen(
             )
         }
 
-        // Кнопка пропустити (тимчасова)
+        // Skip button (temporary)
         TextButton(
             onClick = onLoginSuccess
         ) {
             Text("Пропустити (працювати офлайн)")
         }
 
-        // Повідомлення про помилку
+        // Error message
         state.error?.let { error ->
             Spacer(modifier = Modifier.height(16.dp))
             Card(

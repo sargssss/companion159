@@ -1,5 +1,6 @@
 package com.lifelover.companion159.presentation.ui.auth
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.lifelover.companion159.data.remote.auth.SupabaseAuthService
@@ -79,11 +80,11 @@ class AuthViewModel @Inject constructor(
         }
     }
 
-    fun signInWithGoogle() {
+    fun signInWithGoogle(context: Context) {
         viewModelScope.launch {
             _state.update { it.copy(isLoading = true, error = null) }
 
-            authService.signInWithGoogle()
+            authService.signInWithGoogle(context)
                 .onSuccess {
                     _state.update { it.copy(
                         isLoading = false,
