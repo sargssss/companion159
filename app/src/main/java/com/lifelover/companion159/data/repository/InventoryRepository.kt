@@ -33,7 +33,6 @@ sealed class SyncResult {
     data class Error(val message: String) : SyncResult()
     object NetworkError : SyncResult()
 }
-
 @Singleton
 class InventoryRepositoryImpl @Inject constructor(
     private val localDao: InventoryDao,
@@ -48,27 +47,32 @@ class InventoryRepositoryImpl @Inject constructor(
 
     private val backgroundScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
-    override fun getItemsByCategory(category: InventoryCategory): Flow<List<InventoryItem>> {
-        val userId = authService.getUserId() ?: return flowOf(emptyList())
+    // app/src/main/java/com/lifelover/companion159/data/repository/InventoryRepository.kt
 
-        return localDao.getItemsByCategory(category, userId)
-            .map { entities -> entities.map { it.toDomainModel() } }
+    override fun getItemsByCategory(category: InventoryCategory): Flow<List<InventoryItem>> {
+        val userId = authService.getUserId()
+
+        return if (userId != null) {
+            // Show user's items and offline items
+            localDao.getItemsByCategory(category, userId)
+                .map { entities -> entities.map { it.toDomainModel() } }
+        } else {
+            // Show only offline items when not authenticated
+            localDao.getItemsByCategoryOffline(category)
+                .map { entities -> entities.map { it.toDomainModel() } }
+        }
     }
 
     override suspend fun addItem(item: InventoryItem) {
         val userId = authService.getUserId()
-        if (userId == null) {
-            Log.e(TAG, "Cannot add item: user not authenticated")
-            return
-        }
 
-        Log.d(TAG, "Creating new item: ${item.name}")
+        Log.d(TAG, "Creating new item: ${item.name}, userId: $userId")
 
         val entity = item.toEntity().copy(
             id = 0,
-            userId = userId,
+            userId = userId, // Can be null for offline mode
             supabaseId = null,
-            needsSync = true,
+            needsSync = userId != null, // Only sync if user is authenticated
             lastModified = Date(),
             isDeleted = false
         )
@@ -76,15 +80,13 @@ class InventoryRepositoryImpl @Inject constructor(
         val insertedId = localDao.insertItem(entity)
         Log.d(TAG, "New item created with local ID: $insertedId")
 
-        triggerBackgroundSync()
+        if (userId != null) {
+            triggerBackgroundSync()
+        }
     }
 
     override suspend fun updateItem(item: InventoryItem) {
         val userId = authService.getUserId()
-        if (userId == null) {
-            Log.e(TAG, "Cannot update item: user not authenticated")
-            return
-        }
 
         Log.d(TAG, "Updating existing item with ID: ${item.id}, name: ${item.name}")
 
@@ -94,6 +96,7 @@ class InventoryRepositoryImpl @Inject constructor(
             throw IllegalArgumentException("Item with ID ${item.id} does not exist")
         }
 
+        // Allow updating offline items or user's own items
         if (existingItem.userId != null && existingItem.userId != userId) {
             Log.e(TAG, "Cannot update item: belongs to different user")
             throw IllegalArgumentException("Cannot update item of another user")
@@ -107,22 +110,18 @@ class InventoryRepositoryImpl @Inject constructor(
         )
 
         if (updatedRows > 0) {
-            Log.d(TAG, "EXISTING item updated locally (rows: $updatedRows)")
-        } else {
-            Log.w(TAG, "No rows updated for item ID: ${item.id}")
+            Log.d(TAG, "Item updated locally (rows: $updatedRows)")
         }
 
-        triggerBackgroundSync()
+        if (userId != null) {
+            triggerBackgroundSync()
+        }
     }
 
     suspend fun updateItemQuantity(itemId: Long, newQuantity: Int) {
         val userId = authService.getUserId()
-        if (userId == null) {
-            Log.e(TAG, "Cannot update quantity: user not authenticated")
-            return
-        }
 
-        Log.d(TAG, "OPTIMISTIC quantity update for item ID: $itemId to $newQuantity")
+        Log.d(TAG, "Quantity update for item ID: $itemId to $newQuantity")
 
         val existingItem = localDao.getItemById(itemId)
         if (existingItem == null) {
@@ -130,6 +129,7 @@ class InventoryRepositoryImpl @Inject constructor(
             return
         }
 
+        // Allow updating offline items or user's own items
         if (existingItem.userId != null && existingItem.userId != userId) {
             Log.e(TAG, "Cannot update quantity: belongs to different user")
             return
@@ -138,22 +138,18 @@ class InventoryRepositoryImpl @Inject constructor(
         val updatedRows = localDao.updateQuantity(itemId, newQuantity)
 
         if (updatedRows > 0) {
-            Log.d(TAG, "Quantity updated locally, triggering background sync")
-        } else {
-            Log.w(TAG, "No rows updated for item ID: $itemId")
+            Log.d(TAG, "Quantity updated locally")
         }
 
-        triggerBackgroundSync()
+        if (userId != null) {
+            triggerBackgroundSync()
+        }
     }
 
     override suspend fun deleteItem(id: Long) {
         val userId = authService.getUserId()
-        if (userId == null) {
-            Log.e(TAG, "Cannot delete item: user not authenticated")
-            return
-        }
 
-        Log.d(TAG, "DELETING existing item with ID: $id")
+        Log.d(TAG, "Deleting item with ID: $id")
 
         val existingItem = localDao.getItemById(id)
         if (existingItem == null) {
@@ -161,22 +157,21 @@ class InventoryRepositoryImpl @Inject constructor(
             return
         }
 
+        // Allow deleting offline items or user's own items
         if (existingItem.userId != null && existingItem.userId != userId) {
             Log.e(TAG, "Cannot delete item: belongs to different user")
             return
         }
 
-        Log.d(TAG, "Deleting item: ${existingItem.name}, supabaseId: ${existingItem.supabaseId}")
-
         val deletedRows = localDao.softDeleteItem(id)
 
         if (deletedRows > 0) {
-            Log.d(TAG, "Item marked as deleted locally, triggering background sync")
-        } else {
-            Log.w(TAG, "No rows updated for item ID: $id")
+            Log.d(TAG, "Item marked as deleted locally")
         }
 
-        triggerBackgroundSync()
+        if (userId != null) {
+            triggerBackgroundSync()
+        }
     }
 
     override suspend fun syncWithServer(): SyncResult {
