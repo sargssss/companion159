@@ -13,7 +13,7 @@ data class InventoryItemEntity(
     val name: String,
     val quantity: Int,
     val category: InventoryCategory,
-
+    val userId: String? = null,
     val supabaseId: String? = null,
     val lastModified: Date = Date(),
     val lastSynced: Date? = null,

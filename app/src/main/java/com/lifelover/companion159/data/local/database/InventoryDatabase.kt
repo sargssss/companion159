@@ -17,10 +17,15 @@ val MIGRATION_1_2 = object : Migration(1, 2) {
         db.execSQL("UPDATE inventory_items SET supabaseId = serverId WHERE serverId IS NOT NULL")
     }
 }
+val MIGRATION_2_3 = object : Migration(2, 3) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE inventory_items ADD COLUMN userId TEXT")
+    }
+}
 
 @Database(
     entities = [InventoryItemEntity::class],
-    version = 2,
+    version = 3,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -38,7 +43,7 @@ abstract class InventoryDatabase : RoomDatabase() {
                     InventoryDatabase::class.java,
                     "companion159_inventory_database"
                 )
-                    .addMigrations(MIGRATION_1_2)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
                     .build()
                 INSTANCE = instance
                 instance

@@ -35,6 +35,21 @@ class SupabaseAuthService @Inject constructor(
     fun getCurrentUser(): UserInfo? = client.auth.currentUserOrNull()
 
     /**
+     * Get current user ID
+     */
+    fun getUserId(): String? = getCurrentUser()?.id
+
+    suspend fun saveUserIdToPrefs(context: Context) {
+        val userId = getUserId()
+        userId?.let {
+            context.getSharedPreferences("user_prefs", Context.MODE_PRIVATE)
+                .edit()
+                .putString("user_id", it)
+                .apply()
+        }
+    }
+
+    /**
      * Sign up with email/password
      */
     suspend fun signUp(email: String, password: String): Result<Unit> {
@@ -150,9 +165,4 @@ class SupabaseAuthService @Inject constructor(
             Result.failure(e)
         }
     }
-
-    /**
-     * Get current user ID
-     */
-    fun getUserId(): String? = getCurrentUser()?.id
 }

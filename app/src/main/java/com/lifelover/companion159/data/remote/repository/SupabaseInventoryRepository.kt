@@ -47,7 +47,7 @@ class SupabaseInventoryRepository @Inject constructor() {
     suspend fun createItem(localItem: InventoryItemEntity): String? = withContext(Dispatchers.IO) {
         try {
             val userId = client.auth.currentUserOrNull()?.id ?: return@withContext null
-            Log.d(TAG, "Creating NEW item: ${localItem.name}")
+            Log.d(TAG, "Creating item for user: $userId")
 
             val supabaseItem = SupabaseInventoryItem(
                 id = null,
@@ -64,16 +64,9 @@ class SupabaseInventoryRepository @Inject constructor() {
                 }
                 .decodeList<SupabaseInventoryItem>()
 
-            val createdItem = createdItems.firstOrNull()
-            if (createdItem?.id != null) {
-                Log.d(TAG, "✅ Successfully CREATED item: ${createdItem.name} with Supabase ID: ${createdItem.id}")
-                createdItem.id
-            } else {
-                Log.e(TAG, "❌ Failed to get ID for created item: ${localItem.name}")
-                null
-            }
+            createdItems.firstOrNull()?.id
         } catch (e: Exception) {
-            Log.e(TAG, "❌ Error creating item: ${localItem.name}", e)
+            Log.e(TAG, "Error creating item", e)
             null
         }
     }

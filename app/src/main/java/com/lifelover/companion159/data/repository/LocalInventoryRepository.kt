@@ -6,7 +6,9 @@ import com.lifelover.companion159.data.local.dao.InventoryDao
 import com.lifelover.companion159.domain.models.toDomainModel
 import com.lifelover.companion159.domain.models.toEntity
 import com.lifelover.companion159.data.types.InventoryType
+import com.lifelover.companion159.data.remote.auth.SupabaseAuthService
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -16,23 +18,27 @@ interface LocalInventoryRepository {
     suspend fun addItem(item: InventoryItem): Long
     suspend fun updateItem(item: InventoryItem)
     suspend fun deleteItem(id: Long)
-    suspend fun getItemCount(category: InventoryType): Int
 }
 
 @Singleton
 class LocalInventoryRepositoryImpl @Inject constructor(
-    private val dao: InventoryDao
+    private val dao: InventoryDao,
+    private val authService: SupabaseAuthService
 ) : LocalInventoryRepository {
 
     override fun getItemsByCategory(category: InventoryType): Flow<List<InventoryItem>> {
-        return dao.getItemsByCategory(category.toRoomCategory())
+        val userId = authService.getUserId() ?: return flowOf(emptyList())
+
+        return dao.getItemsByCategory(category.toRoomCategory(), userId)
             .map { entities ->
                 entities.map { it.toDomainModel() }
             }
     }
 
     override suspend fun addItem(item: InventoryItem): Long {
-        val entity = item.toEntity()
+        val userId = authService.getUserId() ?: return -1
+
+        val entity = item.toEntity().copy(userId = userId)
         return dao.insertItem(entity)
     }
 
@@ -41,6 +47,7 @@ class LocalInventoryRepositoryImpl @Inject constructor(
         if (existingEntity != null) {
             val updatedEntity = item.toEntity().copy(
                 id = item.id,
+                userId = existingEntity.userId,
                 supabaseId = existingEntity.supabaseId,
                 lastSynced = existingEntity.lastSynced
             )
@@ -49,16 +56,15 @@ class LocalInventoryRepositoryImpl @Inject constructor(
                 name = updatedEntity.name,
                 quantity = updatedEntity.quantity,
                 category = updatedEntity.category
-            )        } else {
-            dao.insertItem(item.toEntity())
+            )
+        } else {
+            val userId = authService.getUserId() ?: return
+            val newEntity = item.toEntity().copy(userId = userId)
+            dao.insertItem(newEntity)
         }
     }
 
     override suspend fun deleteItem(id: Long) {
         dao.softDeleteItem(id)
-    }
-
-    override suspend fun getItemCount(category: InventoryType): Int {
-        return dao.getItemCount(category.toRoomCategory())
     }
 }
