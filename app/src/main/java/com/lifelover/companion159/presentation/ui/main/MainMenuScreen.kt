@@ -25,7 +25,7 @@ import java.util.*
 @Composable
 fun MainMenuScreen(
     onInventoryTypeSelected: (InventoryCategory) -> Unit = {},
-    onLogout: () -> Unit = {}, // Callback for logout navigation
+    onLogout: () -> Unit = {},
     authViewModel: AuthViewModel = hiltViewModel(),
     inventoryViewModel: InventoryViewModel = hiltViewModel()
 ) {
@@ -36,9 +36,10 @@ fun MainMenuScreen(
     var showUserMenu by remember { mutableStateOf(false) }
     var showLogoutDialog by remember { mutableStateOf(false) }
 
-    // Observe authentication state and navigate on logout
-    LaunchedEffect(authState.isAuthenticated) {
-        if (!authState.isAuthenticated && showLogoutDialog) {
+    // FIXED: Only navigate to login if user explicitly logged out
+    LaunchedEffect(authState.hasExplicitlyLoggedOut) {
+        if (authState.hasExplicitlyLoggedOut) {
+            authViewModel.clearLogoutFlag()
             onLogout()
         }
     }
@@ -52,6 +53,7 @@ fun MainMenuScreen(
                 )
             },
             actions = {
+                // Sync status indicator
                 when (inventoryState.syncStatus) {
                     SyncStatus.SYNCING -> {
                         CircularProgressIndicator(
@@ -82,7 +84,8 @@ fun MainMenuScreen(
                     else -> {}
                 }
 
-                if (authState.isAuthenticated) {
+                // Show sync button only when authenticated AND online
+                if (authState.isAuthenticated && !authState.isOffline) {
                     IconButton(
                         onClick = { inventoryViewModel.syncData() },
                         enabled = inventoryState.syncStatus != SyncStatus.SYNCING
@@ -95,8 +98,11 @@ fun MainMenuScreen(
                                 .padding(end = 12.dp)
                         )
                     }
+                }
 
-                    // User menu with dropdown
+                // User menu - show for both authenticated and unauthenticated
+                if (authState.isAuthenticated) {
+                    // Authenticated user menu
                     Box {
                         IconButton(onClick = { showUserMenu = true }) {
                             Icon(
@@ -149,7 +155,7 @@ fun MainMenuScreen(
                         }
                     }
                 } else {
-                    // Offline mode - show login button
+                    // Not authenticated - show login button
                     IconButton(onClick = onLogout) {
                         Icon(
                             imageVector = Icons.Default.AccountCircle,
@@ -160,13 +166,32 @@ fun MainMenuScreen(
             }
         )
 
-        if (authState.isAuthenticated) {
-            StatusCard(
-                userEmail = authState.userEmail,
-                lastSyncTime = inventoryState.lastSyncTime
-            )
-        } else {
-            OfflineStatusCard()
+        // Status card - show different info based on auth and network status
+        when {
+            authState.isAuthenticated && !authState.isOffline -> {
+                // Online with account
+                StatusCard(
+                    userEmail = authState.userEmail,
+                    lastSyncTime = inventoryState.lastSyncTime,
+                    isOffline = false
+                )
+            }
+            authState.isAuthenticated && authState.isOffline -> {
+                // Offline with account
+                StatusCard(
+                    userEmail = authState.userEmail,
+                    lastSyncTime = inventoryState.lastSyncTime,
+                    isOffline = true
+                )
+            }
+            !authState.isAuthenticated && authState.isOffline -> {
+                // Offline without account
+                OfflineStatusCard(message = "Офлайн режим (без аккаунта)")
+            }
+            else -> {
+                // Online without account
+                OfflineStatusCard(message = "Режим без аккаунта")
+            }
         }
 
         Column(
@@ -177,7 +202,7 @@ fun MainMenuScreen(
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             // Menu buttons for each category
-            InventoryCategory.values().forEach { category ->
+            InventoryCategory.entries.forEach { category ->
                 InventoryMenuButton(
                     inventoryType = category,
                     onClick = { onInventoryTypeSelected(category) }
@@ -187,12 +212,12 @@ fun MainMenuScreen(
 
         inventoryState.error?.let { error ->
             LaunchedEffect(error) {
-                // Показуємо Snackbar або Toast тут
+                // Show Snackbar or Toast here
             }
         }
     }
 
-    // Діалог підтвердження виходу
+    // Logout confirmation dialog
     if (showLogoutDialog) {
         LogoutConfirmationDialog(
             userEmail = authState.userEmail,
@@ -200,7 +225,6 @@ fun MainMenuScreen(
             onConfirm = {
                 showLogoutDialog = false
                 authViewModel.signOut()
-                onLogout()
             }
         )
     }
@@ -257,6 +281,106 @@ private fun LogoutConfirmationDialog(
             }
         }
     )
+}
+
+@Composable
+private fun StatusCard(
+    userEmail: String?,
+    lastSyncTime: Long?,
+    isOffline: Boolean
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = if (isOffline)
+                MaterialTheme.colorScheme.secondaryContainer
+            else
+                MaterialTheme.colorScheme.primaryContainer
+        )
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Користувач: ${userEmail ?: "Невідомий"}",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Medium
+                    )
+
+                    if (isOffline) {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Icon(
+                                painter = painterResource(R.drawable.sync_attention),
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp),
+                                tint = MaterialTheme.colorScheme.onSecondaryContainer
+                            )
+                            Text(
+                                text = "Офлайн",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSecondaryContainer
+                            )
+                        }
+                    }
+                }
+
+                if (!isOffline) {
+                    lastSyncTime?.let { time ->
+                        val formatter = SimpleDateFormat("HH:mm", Locale.getDefault())
+                        Text(
+                            text = "Синхр.: ${formatter.format(Date(time))}",
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun OfflineStatusCard(message: String = "Офлайн режим") {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.secondaryContainer
+        )
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                painter = painterResource(R.drawable.offline),
+                contentDescription = null,
+                modifier = Modifier.size(20.dp)
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                text = message,
+                style = MaterialTheme.typography.bodyMedium
+            )
+        }
+    }
 }
 
 @Composable
