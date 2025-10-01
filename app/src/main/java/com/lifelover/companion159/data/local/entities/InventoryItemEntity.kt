@@ -15,6 +15,7 @@ data class InventoryItemEntity(
     val category: InventoryCategory,
     val userId: String? = null,
     val supabaseId: String? = null,
+    val createdAt: Date = Date(),
     val lastModified: Date = Date(),
     val lastSynced: Date? = null,
     val needsSync: Boolean = true,
