@@ -5,9 +5,13 @@ import android.net.ConnectivityManager
 import android.net.Network
 import android.net.NetworkCapabilities
 import android.net.NetworkRequest
+import android.util.Log
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import javax.inject.Inject
@@ -17,45 +21,63 @@ import javax.inject.Singleton
 class NetworkMonitor @Inject constructor(
     @ApplicationContext private val context: Context
 ) {
+    companion object {
+        private const val TAG = "NetworkMonitor"
+    }
+
     private val connectivityManager =
         context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
 
+    // StateFlow for immediate access to current state
+    private val _isOnlineState = MutableStateFlow(getCurrentNetworkStatus())
+    val isOnlineState: StateFlow<Boolean> = _isOnlineState.asStateFlow()
+
     /**
-     * Current network status
+     * Current network status - synchronous access
      */
     val isOnline: Boolean
-        get() = getCurrentNetworkStatus()
+        get() = _isOnlineState.value
+
+    init {
+        // Start monitoring immediately on creation
+        registerNetworkCallback()
+    }
 
     /**
      * Flow that emits network connectivity changes
+     * This is the primary way to observe network changes
      */
     val isOnlineFlow: Flow<Boolean> = callbackFlow {
         val networkCallback = object : ConnectivityManager.NetworkCallback() {
             override fun onAvailable(network: Network) {
-                // Network becomes available
-                trySend(true)
+                Log.d(TAG, "Network available")
+                val status = true
+                _isOnlineState.value = status
+                trySend(status)
             }
 
             override fun onLost(network: Network) {
-                // Network becomes unavailable
-                trySend(getCurrentNetworkStatus())
+                Log.d(TAG, "Network lost")
+                val status = getCurrentNetworkStatus()
+                _isOnlineState.value = status
+                trySend(status)
             }
 
             override fun onCapabilitiesChanged(
                 network: Network,
                 networkCapabilities: NetworkCapabilities
             ) {
-                // Network capabilities changed (e.g., WiFi to mobile data)
                 val hasInternet = networkCapabilities.hasCapability(
                     NetworkCapabilities.NET_CAPABILITY_INTERNET
                 ) && networkCapabilities.hasCapability(
                     NetworkCapabilities.NET_CAPABILITY_VALIDATED
                 )
+                Log.d(TAG, "Capabilities changed, hasInternet: $hasInternet")
+                _isOnlineState.value = hasInternet
                 trySend(hasInternet)
             }
         }
 
-        // Register network callback
         val networkRequest = NetworkRequest.Builder()
             .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
             .build()
@@ -63,13 +85,56 @@ class NetworkMonitor @Inject constructor(
         connectivityManager.registerNetworkCallback(networkRequest, networkCallback)
 
         // Send initial state
-        trySend(getCurrentNetworkStatus())
+        val initialState = getCurrentNetworkStatus()
+        _isOnlineState.value = initialState
+        trySend(initialState)
 
-        // Cleanup when flow is cancelled
         awaitClose {
+            Log.d(TAG, "Unregistering network callback")
             connectivityManager.unregisterNetworkCallback(networkCallback)
         }
     }.distinctUntilChanged()
+
+    /**
+     * Register permanent network callback for StateFlow updates
+     */
+    private fun registerNetworkCallback() {
+        val networkCallback = object : ConnectivityManager.NetworkCallback() {
+            override fun onAvailable(network: Network) {
+                _isOnlineState.value = true
+                Log.d(TAG, "StateFlow updated: online")
+            }
+
+            override fun onLost(network: Network) {
+                _isOnlineState.value = getCurrentNetworkStatus()
+                Log.d(TAG, "StateFlow updated: ${_isOnlineState.value}")
+            }
+
+            override fun onCapabilitiesChanged(
+                network: Network,
+                networkCapabilities: NetworkCapabilities
+            ) {
+                val hasInternet = networkCapabilities.hasCapability(
+                    NetworkCapabilities.NET_CAPABILITY_INTERNET
+                ) && networkCapabilities.hasCapability(
+                    NetworkCapabilities.NET_CAPABILITY_VALIDATED
+                )
+                _isOnlineState.value = hasInternet
+                Log.d(TAG, "StateFlow updated: $hasInternet")
+            }
+        }
+
+        val networkRequest = NetworkRequest.Builder()
+            .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+            .build()
+
+        try {
+            connectivityManager.registerNetworkCallback(networkRequest, networkCallback)
+            Log.d(TAG, "Network callback registered successfully")
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to register network callback", e)
+        }
+    }
 
     /**
      * Check current network status
