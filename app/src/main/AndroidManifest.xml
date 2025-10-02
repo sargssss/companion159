@@ -2,19 +2,21 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
-    <!-- Network permissions for Supabase and Google Auth -->
+    <!-- Існуючі permissions -->
     <uses-permission android:name="android.permission.INTERNET"/>
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
-
-    <!-- Work Manager permission for background sync -->
     <uses-permission android:name="android.permission.WAKE_LOCK" />
-
-    <!-- Опціональні permissions для кращої роботи -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
 
-    <!-- Для кращої роботи з Google Sign-In -->
-    <uses-permission android:name="android.permission.GET_ACCOUNTS" />
+    <!-- НОВІ КРИТИЧНІ permissions для фонової роботи -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC"
+        android:minSdkVersion="34" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+    <!-- Для Android 12+ (API 31+) - точні алярми -->
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
 
     <application
         android:name=".CompanionApplication"
@@ -27,22 +29,43 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.Companion159">
 
-        <!-- Для автозапуску синхронізації після перезавантаження -->
-        <receiver android:name="androidx.work.impl.background.systemalarm.ConstraintProxy$BatteryChargingProxy"
-            android:enabled="false"
-            tools:replace="android:enabled" />
+        <!-- ==================== RECEIVERS ==================== -->
 
-        <receiver android:name="androidx.work.impl.background.systemalarm.ConstraintProxy$BatteryNotLowProxy"
-            android:enabled="false"
-            tools:replace="android:enabled" />
+        <!-- Receiver для перезавантаження пристрою -->
+        <receiver
+            android:name=".data.sync.BootReceiver"
+            android:enabled="true"
+            android:exported="true"
+            android:directBootAware="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.LOCKED_BOOT_COMPLETED" />
+                <action android:name="android.intent.action.QUICKBOOT_POWERON" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </receiver>
 
-        <receiver android:name="androidx.work.impl.background.systemalarm.ConstraintProxy$StorageNotLowProxy"
-            android:enabled="false"
-            tools:replace="android:enabled" />
+        <!-- Receiver для зміни мережі -->
+        <receiver
+            android:name=".data.sync.NetworkChangeReceiver"
+            android:enabled="true"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.net.conn.CONNECTIVITY_CHANGE" />
+                <action android:name="android.net.wifi.STATE_CHANGE" />
+            </intent-filter>
+        </receiver>
 
-        <receiver android:name="androidx.work.impl.background.systemalarm.ConstraintProxy$NetworkStateProxy"
-            android:enabled="false"
-            tools:replace="android:enabled" />
+        <!-- ==================== SERVICES ==================== -->
+
+        <!-- Foreground Service для критичної синхронізації -->
+        <service
+            android:name=".data.sync.SyncForegroundService"
+            android:enabled="true"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
+
+        <!-- ==================== ACTIVITIES ==================== -->
 
         <activity
             android:name=".MainActivity"

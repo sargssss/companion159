@@ -25,13 +25,14 @@ class CompanionApplication : Application(), Configuration.Provider {
 
     override fun onCreate() {
         super.onCreate()
-        Log.d("CompanionApplication", "Application started")
+        Log.d("CompanionApplication", "🚀 Application started")
         try {
             // Ініціалізуємо автоматичну синхронізацію
+            // Вона буде спостерігати за статусом мережі та автентифікації
             autoSyncManager.initialize()
-            Log.d("CompanionApplication", "AutoSyncManager initialized successfully")
+            Log.d("CompanionApplication", "✅ AutoSyncManager initialized successfully")
         } catch (e: Exception) {
-            Log.e("CompanionApplication", "Failed to initialize AutoSyncManager", e)
+            Log.e("CompanionApplication", "❌ Failed to initialize AutoSyncManager", e)
         }
     }
 }

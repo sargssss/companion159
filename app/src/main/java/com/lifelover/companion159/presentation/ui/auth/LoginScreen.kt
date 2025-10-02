@@ -1,5 +1,6 @@
 package com.lifelover.companion159.presentation.ui.auth
 
+import android.util.Log
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -40,6 +41,8 @@ fun LoginScreen(
     // Handle successful authentication
     LaunchedEffect(state.isAuthenticated) {
         if (state.isAuthenticated) {
+            Log.d("LoginScreen", "🎉 Authentication successful - navigating to main menu")
+            Log.d("LoginScreen", "👤 User: ${state.userEmail}")
             onLoginSuccess()
         }
     }

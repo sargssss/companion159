@@ -3,6 +3,7 @@ package com.lifelover.companion159.data.sync
 import android.content.Context
 import android.util.Log
 import androidx.work.*
+import com.lifelover.companion159.data.local.UserPreferences
 import com.lifelover.companion159.data.remote.auth.SupabaseAuthService
 import com.lifelover.companion159.network.NetworkMonitor
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -21,7 +22,8 @@ class AutoSyncManager @Inject constructor(
     @ApplicationContext private val context: Context,
     private val syncService: SyncService,
     private val networkMonitor: NetworkMonitor,
-    private val authService: SupabaseAuthService
+    private val authService: SupabaseAuthService,
+    private val userPreferences: UserPreferences // НОВИЙ
 ) {
     companion object {
         private const val TAG = "AutoSyncManager"
@@ -34,69 +36,110 @@ class AutoSyncManager @Inject constructor(
 
     private val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
     private var isInitialized = false
+    private var wasAuthenticated = false
 
-    /**
-     * Initialize auto-sync monitoring
-     */
     fun initialize() {
         if (isInitialized) return
         isInitialized = true
 
-        Log.d(TAG, "Initializing AutoSyncManager")
+        Log.d(TAG, "🚀 Initializing AutoSyncManager")
+
+        wasAuthenticated = authService.getCurrentUser() != null
 
         scope.launch {
             try {
-                // Combine network status and auth status
                 combine(
                     networkMonitor.isOnlineFlow,
                     authService.isAuthenticated
                 ) { isOnline, isAuthenticated ->
                     isOnline to isAuthenticated
                 }.collectLatest { (isOnline, isAuthenticated) ->
-                    Log.d(TAG, "State changed - Online: $isOnline, Authenticated: $isAuthenticated")
-                    handleStateChange(isOnline, isAuthenticated)
+
+                    // Перевіряємо чи є взагалі користувач (поточний або останній)
+                    val hasUser = isAuthenticated || userPreferences.hasLastUser()
+
+                    Log.d(TAG, "📡 State - Online: $isOnline, Current auth: $isAuthenticated, Has user: $hasUser")
+
+                    // Виявляємо щойно автентифікованого користувача
+                    val justAuthenticated = isAuthenticated && !wasAuthenticated
+                    if (justAuthenticated) {
+                        Log.d(TAG, "🎉 User just authenticated! Checking for offline data...")
+                        wasAuthenticated = true
+                        onUserAuthenticated()
+                    } else if (!isAuthenticated) {
+                        wasAuthenticated = false
+                    }
+
+                    handleStateChange(isOnline, hasUser)
                 }
             } catch (e: Exception) {
-                Log.e(TAG, "AutoSyncManager initialization error", e)
+                Log.e(TAG, "❌ AutoSyncManager initialization error", e)
             }
         }
     }
 
-    /**
-     * Handle changes in network or authentication state
-     */
-    private suspend fun handleStateChange(isOnline: Boolean, isAuthenticated: Boolean) {
+    private suspend fun onUserAuthenticated() {
+        try {
+            Log.d(TAG, "🔍 Checking for offline items to sync...")
+
+            val hasOfflineItems = syncService.hasOfflineItems()
+
+            if (hasOfflineItems) {
+                Log.d(TAG, "📦 Found offline items - triggering immediate sync")
+                triggerCriticalSync()
+            } else {
+                Log.d(TAG, "✨ No offline items found")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ Error checking offline items", e)
+        }
+    }
+
+    private suspend fun handleStateChange(isOnline: Boolean, hasUser: Boolean) {
         try {
             when {
-                // Online and authenticated - check for pending sync
-                isOnline && isAuthenticated -> {
-                    Log.d(TAG, "Device online and authenticated, checking for unsynced changes")
-                    if (syncService.hasUnsyncedChanges()) {
-                        Log.d(TAG, "Found unsynced changes, triggering sync")
-                        triggerImmediateSync()
+                isOnline && hasUser -> {
+                    Log.d(TAG, "✅ Device online AND has user (current or last)")
+
+                    if (syncService.hasUnsyncedChanges() || syncService.hasOfflineItems()) {
+                        Log.d(TAG, "📤 Found data to sync, triggering sync")
+                        triggerCriticalSync()
+                    } else {
+                        Log.d(TAG, "✨ No data to sync")
                     }
+
                     schedulePeriodicSync()
                 }
-                // Offline or not authenticated - cancel periodic sync
+                isOnline && !hasUser -> {
+                    Log.d(TAG, "⚠️ Device online but NO user (never logged in)")
+                    Log.d(TAG, "💡 User can work offline. Data will sync after first login.")
+                    cancelPeriodicSync()
+                }
                 else -> {
-                    Log.d(TAG, "Device offline or not authenticated, cancelling periodic sync")
+                    Log.d(TAG, "📴 Device offline")
                     cancelPeriodicSync()
                 }
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Error handling state change", e)
+            Log.e(TAG, "❌ Error handling state change", e)
         }
     }
 
-    /**
-     * Trigger immediate synchronization using simple worker
-     */
+    fun triggerCriticalSync() {
+        try {
+            Log.d(TAG, "🔥 Triggering CRITICAL sync with Foreground Service")
+            SyncForegroundService.start(context)
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ Failed to start foreground sync, falling back to WorkManager", e)
+            triggerImmediateSync()
+        }
+    }
+
     fun triggerImmediateSync() {
         try {
-            Log.d(TAG, "Triggering immediate sync")
+            Log.d(TAG, "⚡ Triggering immediate sync via WorkManager")
             val workManager = WorkManager.getInstance(context)
 
-            // Використовуємо простий Worker замість Hilt Worker
             val immediateWorkRequest = OneTimeWorkRequestBuilder<SimpleSyncWorker>()
                 .setConstraints(createSyncConstraints())
                 .setBackoffCriteria(
@@ -113,18 +156,15 @@ class AutoSyncManager @Inject constructor(
                 immediateWorkRequest
             )
 
-            Log.d(TAG, "Immediate sync work enqueued")
+            Log.d(TAG, "✅ Immediate sync work enqueued")
         } catch (e: Exception) {
-            Log.e(TAG, "Error triggering immediate sync", e)
+            Log.e(TAG, "❌ Error triggering immediate sync", e)
         }
     }
 
-    /**
-     * Schedule periodic background synchronization
-     */
     private fun schedulePeriodicSync() {
         try {
-            Log.d(TAG, "Scheduling periodic sync")
+            Log.d(TAG, "⏰ Scheduling periodic sync (every $SYNC_INTERVAL_MINUTES minutes)")
             val workManager = WorkManager.getInstance(context)
 
             val periodicWorkRequest = PeriodicWorkRequestBuilder<SimpleSyncWorker>(
@@ -145,59 +185,48 @@ class AutoSyncManager @Inject constructor(
                 periodicWorkRequest
             )
 
-            Log.d(TAG, "Periodic sync work scheduled")
+            Log.d(TAG, "✅ Periodic sync work scheduled")
         } catch (e: Exception) {
-            Log.e(TAG, "Error scheduling periodic sync", e)
+            Log.e(TAG, "❌ Error scheduling periodic sync", e)
         }
     }
 
-    /**
-     * Cancel periodic synchronization
-     */
     private fun cancelPeriodicSync() {
         try {
-            Log.d(TAG, "Cancelling periodic sync")
+            Log.d(TAG, "🛑 Cancelling periodic sync")
             val workManager = WorkManager.getInstance(context)
             workManager.cancelUniqueWork(PERIODIC_SYNC_WORK_NAME)
         } catch (e: Exception) {
-            Log.e(TAG, "Error cancelling periodic sync", e)
+            Log.e(TAG, "❌ Error cancelling periodic sync", e)
         }
     }
 
-    /**
-     * Cancel all sync operations
-     */
     fun cancelAllSync() {
         try {
-            Log.d(TAG, "Cancelling all sync operations")
+            Log.d(TAG, "🛑 Cancelling all sync operations")
             val workManager = WorkManager.getInstance(context)
             workManager.cancelAllWorkByTag(IMMEDIATE_SYNC_TAG)
             workManager.cancelAllWorkByTag(PERIODIC_SYNC_TAG)
         } catch (e: Exception) {
-            Log.e(TAG, "Error cancelling all sync", e)
+            Log.e(TAG, "❌ Error cancelling all sync", e)
         }
     }
 
-    /**
-     * Create constraints for sync work
-     */
     private fun createSyncConstraints(): Constraints {
         return Constraints.Builder()
             .setRequiredNetworkType(NetworkType.CONNECTED)
-            .setRequiresBatteryNotLow(false)
+            .setRequiresBatteryNotLow(true)
             .setRequiresCharging(false)
             .setRequiresDeviceIdle(false)
+            .setRequiresStorageNotLow(true)
             .build()
     }
 
-    /**
-     * Get sync work info for monitoring
-     */
     fun getSyncWorkInfo() = try {
         val workManager = WorkManager.getInstance(context)
         workManager.getWorkInfosByTagLiveData(IMMEDIATE_SYNC_TAG)
     } catch (e: Exception) {
-        Log.e(TAG, "Error getting sync work info", e)
+        Log.e(TAG, "❌ Error getting sync work info", e)
         null
     }
 }

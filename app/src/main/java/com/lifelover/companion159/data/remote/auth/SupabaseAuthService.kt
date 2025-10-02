@@ -2,6 +2,7 @@ package com.lifelover.companion159.data.remote.auth
 
 import android.content.Context
 import android.util.Log
+import com.lifelover.companion159.data.local.UserPreferences
 import com.lifelover.companion159.data.remote.client.SupabaseClient
 import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.auth.providers.builtin.Email
@@ -14,7 +15,8 @@ import javax.inject.Singleton
 
 @Singleton
 class SupabaseAuthService @Inject constructor(
-    private val googleAuthService: GoogleAuthService
+    private val googleAuthService: GoogleAuthService,
+    private val userPreferences: UserPreferences // НОВИЙ
 ) {
     companion object {
         private const val TAG = "SupabaseAuthService"
@@ -39,13 +41,28 @@ class SupabaseAuthService @Inject constructor(
      */
     fun getUserId(): String? = getCurrentUser()?.id
 
-    suspend fun saveUserIdToPrefs(context: Context) {
-        val userId = getUserId()
-        userId?.let {
-            context.getSharedPreferences("user_prefs", Context.MODE_PRIVATE)
-                .edit()
-                .putString("user_id", it)
-                .apply()
+    /**
+     * НОВИЙ: Отримує ID користувача для синхронізації
+     * Повертає поточного користувача АБО останнього авторизованого
+     */
+    fun getUserIdForSync(): String? {
+        val currentUserId = getUserId()
+        if (currentUserId != null) {
+            return currentUserId
+        }
+
+        // Якщо немає поточного користувача, повертаємо останнього
+        return userPreferences.getLastUserId()
+    }
+
+    /**
+     * НОВИЙ: Зберігає поточного користувача як останнього
+     */
+    private fun saveCurrentUserAsLast() {
+        val user = getCurrentUser()
+        if (user != null) {
+            userPreferences.saveLastUser(user.id, user.email)
+            Log.d(TAG, "💾 Saved last user: ${user.email} (${user.id})")
         }
     }
 
@@ -59,6 +76,7 @@ class SupabaseAuthService @Inject constructor(
                 this.email = email
                 this.password = password
             }
+            saveCurrentUserAsLast() // НОВИЙ
             Log.d(TAG, "Sign up successful")
             Result.success(Unit)
         } catch (e: Exception) {
@@ -77,6 +95,7 @@ class SupabaseAuthService @Inject constructor(
                 this.email = email
                 this.password = password
             }
+            saveCurrentUserAsLast() // НОВИЙ
             Log.d(TAG, "Sign in successful")
             Result.success(Unit)
         } catch (e: Exception) {
@@ -109,6 +128,7 @@ class SupabaseAuthService @Inject constructor(
                             idToken = googleSignInResult.idToken
                             provider = io.github.jan.supabase.auth.providers.Google
                         }
+                        saveCurrentUserAsLast() // НОВИЙ
                         Log.d(TAG, "Step 2: SUCCESS - Authenticated with Supabase")
                         Log.d(TAG, "=== Supabase Google Sign-In COMPLETE ===")
                         Result.success(Unit)
@@ -143,6 +163,7 @@ class SupabaseAuthService @Inject constructor(
             Log.d(TAG, "Signing out from Supabase")
             client.auth.signOut()
             googleAuthService.signOut()
+            // НЕ очищаємо userPreferences - зберігаємо останнього користувача
             Log.d(TAG, "Sign out successful")
             Result.success(Unit)
         } catch (e: Exception) {

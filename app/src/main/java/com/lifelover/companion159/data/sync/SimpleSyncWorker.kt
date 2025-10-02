@@ -8,9 +8,6 @@ import com.lifelover.companion159.di.ServiceLocator
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-/**
- * Простий Worker з доступом до Hilt залежностей через ServiceLocator
- */
 class SimpleSyncWorker(
     context: Context,
     workerParams: WorkerParameters
@@ -24,26 +21,29 @@ class SimpleSyncWorker(
 
     override suspend fun doWork(): Result = withContext(Dispatchers.IO) {
         try {
-            Log.d(TAG, "SimpleSyncWorker started")
+            Log.d(TAG, "🔄 SimpleSyncWorker started")
 
             // Отримуємо SyncService через ServiceLocator
             val syncService = ServiceLocator.getSyncService(applicationContext)
 
-            // Виконуємо синхронізацію
+            // Виконуємо синхронізацію (перевірка userId всередині SyncService)
             val result = syncService.performSync()
 
             result.fold(
                 onSuccess = {
-                    Log.d(TAG, "Sync completed successfully")
+                    Log.d(TAG, "✅ Sync completed successfully")
                     Result.success()
                 },
                 onFailure = { error ->
-                    Log.e(TAG, "Sync failed: ${error.message}")
-                    // Повторити при помилці мережі
+                    Log.e(TAG, "❌ Sync failed: ${error.message}")
                     when {
                         error.message?.contains("network", ignoreCase = true) == true ||
                                 error.message?.contains("timeout", ignoreCase = true) == true -> {
                             Result.retry()
+                        }
+                        error.message?.contains("No user", ignoreCase = true) == true -> {
+                            Log.d(TAG, "⚠️ No user available - cannot sync")
+                            Result.success() // Не повторювати
                         }
                         else -> Result.failure()
                     }
@@ -51,7 +51,7 @@ class SimpleSyncWorker(
             )
 
         } catch (e: Exception) {
-            Log.e(TAG, "Worker exception", e)
+            Log.e(TAG, "❌ Worker exception", e)
             Result.retry()
         }
     }

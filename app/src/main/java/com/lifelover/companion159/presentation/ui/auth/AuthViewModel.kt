@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.lifelover.companion159.data.remote.auth.SupabaseAuthService
+import com.lifelover.companion159.data.sync.AutoSyncManager
 import com.lifelover.companion159.network.NetworkMonitor
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
@@ -22,7 +23,8 @@ data class AuthState(
 @HiltViewModel
 class AuthViewModel @Inject constructor(
     private val authService: SupabaseAuthService,
-    private val networkMonitor: NetworkMonitor // NEW: Inject NetworkMonitor
+    private val networkMonitor: NetworkMonitor,
+    private val autoSyncManager: AutoSyncManager // НОВИЙ: Inject AutoSyncManager
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(AuthState())
@@ -30,7 +32,7 @@ class AuthViewModel @Inject constructor(
 
     init {
         checkAuthStatus()
-        observeNetworkStatus() // NEW: Observe network changes
+        observeNetworkStatus()
     }
 
     private fun checkAuthStatus() {
@@ -44,7 +46,6 @@ class AuthViewModel @Inject constructor(
         }
     }
 
-    // NEW: Observe network status
     private fun observeNetworkStatus() {
         viewModelScope.launch {
             networkMonitor.isOnlineFlow.collect { isOnline ->
@@ -64,6 +65,9 @@ class AuthViewModel @Inject constructor(
                         isAuthenticated = true,
                         userEmail = email
                     )}
+
+                    // НОВИЙ: Тригер синхронізації після успішного входу
+                    triggerPostLoginSync()
                 }
                 .onFailure { exception ->
                     _state.update { it.copy(
@@ -105,6 +109,9 @@ class AuthViewModel @Inject constructor(
                         isAuthenticated = true,
                         userEmail = authService.getCurrentUser()?.email
                     )}
+
+                    // НОВИЙ: Тригер синхронізації після успішного входу через Google
+                    triggerPostLoginSync()
                 }
                 .onFailure { exception ->
                     _state.update { it.copy(
@@ -115,12 +122,27 @@ class AuthViewModel @Inject constructor(
         }
     }
 
+    /**
+     * НОВИЙ: Тригер синхронізації після входу
+     */
+    private fun triggerPostLoginSync() {
+        viewModelScope.launch {
+            try {
+                android.util.Log.d("AuthViewModel", "🎉 User logged in - initializing sync")
+                // AutoSyncManager автоматично перевірить офлайн елементи
+                // завдяки новій логіці onUserAuthenticated()
+            } catch (e: Exception) {
+                android.util.Log.e("AuthViewModel", "❌ Failed to trigger post-login sync", e)
+            }
+        }
+    }
+
     fun signOut() {
         viewModelScope.launch {
             authService.signOut()
             _state.update { AuthState(
                 hasExplicitlyLoggedOut = true,
-                isOffline = _state.value.isOffline // Preserve offline state
+                isOffline = _state.value.isOffline
             )}
         }
     }

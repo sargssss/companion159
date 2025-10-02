@@ -1,6 +1,7 @@
 package com.lifelover.companion159.di
 
 import android.content.Context
+import com.lifelover.companion159.data.local.UserPreferences
 import com.lifelover.companion159.data.local.dao.InventoryDao
 import com.lifelover.companion159.data.remote.auth.GoogleAuthService
 import com.lifelover.companion159.data.remote.auth.SupabaseAuthService
@@ -48,12 +49,22 @@ object NetworkModule {
         return GoogleAuthService(context)
     }
 
+    // НОВИЙ: Provide UserPreferences
+    @Provides
+    @Singleton
+    fun provideUserPreferences(
+        @ApplicationContext context: Context
+    ): UserPreferences {
+        return UserPreferences(context)
+    }
+
     @Provides
     @Singleton
     fun provideSupabaseAuthService(
-        googleAuthService: GoogleAuthService
+        googleAuthService: GoogleAuthService,
+        userPreferences: UserPreferences // ДОДАНО
     ): SupabaseAuthService {
-        return SupabaseAuthService(googleAuthService)
+        return SupabaseAuthService(googleAuthService, userPreferences)
     }
 
     @Provides
@@ -86,8 +97,9 @@ object NetworkModule {
         @ApplicationContext context: Context,
         syncService: SyncService,
         networkMonitor: NetworkMonitor,
-        authService: SupabaseAuthService
+        authService: SupabaseAuthService,
+        userPreferences: UserPreferences // ДОДАНО
     ): AutoSyncManager {
-        return AutoSyncManager(context, syncService, networkMonitor, authService)
+        return AutoSyncManager(context, syncService, networkMonitor, authService, userPreferences)
     }
 }
