@@ -172,16 +172,18 @@ class SyncService @Inject constructor(
                         } else if (!remoteItem.isDeleted) {
                             val needsUpdate = existingLocalItem.name != remoteItem.name ||
                                     existingLocalItem.quantity != remoteItem.quantity ||
-                                    existingLocalItem.category.name.lowercase() != remoteItem.category.lowercase()
+                                    existingLocalItem.category.name.lowercase() != remoteItem.category.lowercase() ||
+                                    existingLocalItem.position != remoteItem.position // NEW: check position change
 
                             if (needsUpdate) {
-                                Log.d(TAG, "⬇️ Updating from server: ${remoteItem.name}")
+                                Log.d(TAG, "Updating from server: ${remoteItem.name}")
                                 localDao.updateFromServer(
                                     supabaseId = remoteItem.id,
                                     userId = userId,
                                     name = remoteItem.name,
                                     quantity = remoteItem.quantity,
                                     category = InventoryCategory.valueOf(remoteItem.category.uppercase()),
+                                    position = remoteItem.position, // NEW: include position
                                     isDeleted = remoteItem.isDeleted
                                 )
                             } else {

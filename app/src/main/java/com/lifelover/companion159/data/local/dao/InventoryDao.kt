@@ -13,7 +13,10 @@ import java.util.Date
 interface InventoryDao {
 
     @Query("SELECT * FROM inventory_items WHERE isDeleted = 0 AND category = :category AND (userId = :userId OR userId IS NULL) ORDER BY createdAt DESC")
-    fun getItemsByCategory(category: InventoryCategory, userId: String?): Flow<List<InventoryItemEntity>>
+    fun getItemsByCategory(
+        category: InventoryCategory,
+        userId: String?
+    ): Flow<List<InventoryItemEntity>>
 
     @Query("SELECT * FROM inventory_items WHERE isDeleted = 0 AND category = :category AND userId IS NULL ORDER BY createdAt DESC")
     fun getItemsByCategoryOffline(category: InventoryCategory): Flow<List<InventoryItemEntity>>
@@ -43,7 +46,8 @@ interface InventoryDao {
     @Insert
     suspend fun insertItem(item: InventoryItemEntity): Long
 
-    @Query("""
+    @Query(
+        """
         UPDATE inventory_items 
         SET name = :name, 
             quantity = :quantity, 
@@ -51,7 +55,8 @@ interface InventoryDao {
             needsSync = 1, 
             lastModified = :timestamp 
         WHERE id = :id
-    """)
+    """
+    )
     suspend fun updateItem(
         id: Long,
         name: String,
@@ -60,61 +65,94 @@ interface InventoryDao {
         timestamp: Date = Date()
     ): Int
 
-    @Query("""
+    @Query(
+        """
         UPDATE inventory_items 
         SET quantity = :quantity, 
             needsSync = 1, 
             lastModified = :timestamp 
         WHERE id = :id
-    """)
+    """
+    )
     suspend fun updateQuantity(id: Long, quantity: Int, timestamp: Date = Date()): Int
 
-    @Query("""
+    @Query(
+        """
         UPDATE inventory_items 
         SET isDeleted = 1, 
             needsSync = 1, 
             lastModified = :timestamp 
         WHERE id = :id
-    """)
+    """
+    )
     suspend fun softDeleteItem(id: Long, timestamp: Date = Date()): Int
 
-    @Query("""
+    @Query(
+        """
+    UPDATE inventory_items 
+    SET name = :name, 
+        quantity = :quantity, 
+        category = :category,
+        position = :position,
+        needsSync = 1, 
+        lastModified = :timestamp 
+    WHERE id = :id
+"""
+    )
+    suspend fun updateItem(
+        id: Long,
+        name: String,
+        quantity: Int,
+        category: InventoryCategory,
+        position: String? = null, // NEW parameter
+        timestamp: Date = Date()
+    ): Int
+
+    @Query(
+        """
         UPDATE inventory_items 
         SET supabaseId = :supabaseId, 
             needsSync = 0, 
             lastSynced = :timestamp 
         WHERE id = :localId
-    """)
+    """
+    )
     suspend fun setSupabaseId(localId: Long, supabaseId: String, timestamp: Date = Date()): Int
 
-    @Query("""
+    @Query(
+        """
         UPDATE inventory_items 
         SET needsSync = 0, 
             lastSynced = :timestamp 
         WHERE id = :localId
-    """)
+    """
+    )
     suspend fun markAsSynced(localId: Long, timestamp: Date = Date()): Int
 
     @Query("SELECT supabaseId FROM inventory_items WHERE id = :localId")
     suspend fun getSupabaseId(localId: Long): String?
 
-    @Query("""
-        UPDATE inventory_items 
-        SET name = :name,
-            quantity = :quantity,
-            category = :category,
-            isDeleted = :isDeleted,
-            userId = :userId,
-            needsSync = 0,
-            lastSynced = :timestamp
-        WHERE supabaseId = :supabaseId
-    """)
+    @Query(
+        """
+    UPDATE inventory_items 
+    SET name = :name,
+        quantity = :quantity,
+        category = :category,
+        position = :position,
+        isDeleted = :isDeleted,
+        userId = :userId,
+        needsSync = 0,
+        lastSynced = :timestamp
+    WHERE supabaseId = :supabaseId
+"""
+    )
     suspend fun updateFromServer(
         supabaseId: String,
         userId: String,
         name: String,
         quantity: Int,
         category: InventoryCategory,
+        position: String?, // NEW parameter
         isDeleted: Boolean,
         timestamp: Date = Date()
     ): Int

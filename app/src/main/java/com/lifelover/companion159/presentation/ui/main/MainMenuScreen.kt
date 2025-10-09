@@ -26,6 +26,7 @@ import java.util.*
 fun MainMenuScreen(
     onInventoryTypeSelected: (InventoryCategory) -> Unit = {},
     onLogout: () -> Unit = {},
+    onChangePosition: () -> Unit = {},
     authViewModel: AuthViewModel = hiltViewModel(),
     inventoryViewModel: InventoryViewModel = hiltViewModel()
 ) {
@@ -115,6 +116,23 @@ fun MainMenuScreen(
                             expanded = showUserMenu,
                             onDismissRequest = { showUserMenu = false }
                         ) {
+
+                            DropdownMenuItem(
+                                text = { Text("Змінити позицію") },
+                                onClick = {
+                                    showUserMenu = false
+                                    onChangePosition() // Navigate to position screen
+                                },
+                                leadingIcon = {
+                                    Icon(
+                                        imageVector = Icons.Default.Face, // Use appropriate icon
+                                        contentDescription = null
+                                    )
+                                }
+                            )
+
+                            HorizontalDivider()
+
                             // Settings
                             DropdownMenuItem(
                                 text = { Text("Налаштування") },
@@ -131,6 +149,8 @@ fun MainMenuScreen(
                             )
 
                             HorizontalDivider()
+
+
 
                             // Logout
                             DropdownMenuItem(

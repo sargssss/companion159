@@ -38,12 +38,16 @@ class InventoryRepositoryImpl @Inject constructor(
     private val localDao: InventoryDao,
     private val autoSyncManager: AutoSyncManager,
     private val networkMonitor: NetworkMonitor,
-    private val authService: SupabaseAuthService
+    private val authService: SupabaseAuthService,
+    private val positionRepository: PositionRepository // NEW: inject PositionRepository
 ) : InventoryRepository {
 
     companion object {
         private const val TAG = "InventoryRepository"
     }
+
+    @Inject
+    lateinit var positionRepository: PositionRepository // NEW: inject PositionRepository
 
     private val backgroundScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
@@ -65,14 +69,16 @@ class InventoryRepositoryImpl @Inject constructor(
 
     override suspend fun addItem(item: InventoryItem) {
         val userId = authService.getUserId()
+        val position = positionRepository.getPosition()
 
-        Log.d(TAG, "Creating new item: ${item.name}, userId: $userId")
+        Log.d(TAG, "Creating new item: ${item.name}, userId: $userId, position: $position")
 
         val entity = item.toEntity().copy(
             id = 0,
-            userId = userId, // Can be null for offline mode
+            userId = userId,
+            position = position,
             supabaseId = null,
-            needsSync = userId != null, // Only sync if user is authenticated
+            needsSync = userId != null,
             lastModified = Date(),
             isDeleted = false
         )
@@ -87,6 +93,7 @@ class InventoryRepositoryImpl @Inject constructor(
 
     override suspend fun updateItem(item: InventoryItem) {
         val userId = authService.getUserId()
+        val position = positionRepository.getPosition() // NEW: get current position
 
         Log.d(TAG, "Updating existing item with ID: ${item.id}, name: ${item.name}")
 
@@ -96,7 +103,6 @@ class InventoryRepositoryImpl @Inject constructor(
             throw IllegalArgumentException("Item with ID ${item.id} does not exist")
         }
 
-        // Allow updating offline items or user's own items
         if (existingItem.userId != null && existingItem.userId != userId) {
             Log.e(TAG, "Cannot update item: belongs to different user")
             throw IllegalArgumentException("Cannot update item of another user")
@@ -106,7 +112,8 @@ class InventoryRepositoryImpl @Inject constructor(
             id = item.id,
             name = item.name.trim(),
             quantity = item.quantity,
-            category = item.category
+            category = item.category,
+            position = position
         )
 
         if (updatedRows > 0) {

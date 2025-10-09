@@ -7,6 +7,7 @@ import com.lifelover.companion159.data.remote.auth.GoogleAuthService
 import com.lifelover.companion159.data.remote.auth.SupabaseAuthService
 import com.lifelover.companion159.data.remote.client.SupabaseClient
 import com.lifelover.companion159.data.remote.repository.SupabaseInventoryRepository
+import com.lifelover.companion159.data.repository.PositionRepository
 import com.lifelover.companion159.data.sync.AutoSyncManager
 import com.lifelover.companion159.data.sync.SyncService
 import com.lifelover.companion159.network.NetworkMonitor
@@ -101,5 +102,13 @@ object NetworkModule {
         userPreferences: UserPreferences // ДОДАНО
     ): AutoSyncManager {
         return AutoSyncManager(context, syncService, networkMonitor, authService, userPreferences)
+    }
+
+    @Provides
+    @Singleton
+    fun providePositionRepository(
+        @ApplicationContext context: Context
+    ): PositionRepository {
+        return PositionRepository(context)
     }
 }

@@ -54,6 +54,7 @@ class SupabaseInventoryRepository @Inject constructor() {
                 name = localItem.name,
                 quantity = localItem.quantity,
                 category = localItem.category.name.lowercase(),
+                position = localItem.position,
                 userId = userId,
                 isDeleted = localItem.isDeleted
             )
@@ -81,6 +82,7 @@ class SupabaseInventoryRepository @Inject constructor() {
                     set("name", localItem.name)
                     set("quantity", localItem.quantity)
                     set("category", localItem.category.name.lowercase())
+                    set("position", localItem.position) // NEW: include position
                     set("is_deleted", localItem.isDeleted)
                 }) {
                     filter {
@@ -141,6 +143,7 @@ fun SupabaseInventoryItem.toEntity(): InventoryItemEntity {
         name = name,
         quantity = quantity,
         category = InventoryCategory.valueOf(category.uppercase()),
+        position = position,
         supabaseId = id,
         lastModified = java.util.Date(),
         lastSynced = java.util.Date(),

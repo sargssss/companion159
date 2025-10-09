@@ -10,10 +10,14 @@ import com.lifelover.companion159.data.remote.config.SupabaseConfig
 import com.lifelover.companion159.presentation.ui.auth.LoginScreen
 import com.lifelover.companion159.presentation.ui.inventory.InventoryScreen
 import com.lifelover.companion159.presentation.ui.main.MainMenuScreen
+import com.lifelover.companion159.presentation.ui.position.PositionScreen
 import kotlinx.serialization.Serializable
 
 @Serializable
 object Login
+
+@Serializable
+object Position
 
 @Serializable
 object MainMenu
@@ -23,18 +27,33 @@ data class InventoryDetail(val category: InventoryCategory)
 
 @Composable
 fun AppNavigation(
-    navController: NavHostController
+    navController: NavHostController,
+    isPositionSet: Boolean // NEW: parameter to check if position is set
 ) {
-    val startDestination = if (SupabaseConfig.isConfigured) {
-        Login
-    } else {
-        MainMenu
+    val startDestination = when {
+        !isPositionSet -> Position // First time - set position
+        SupabaseConfig.isConfigured -> Login // Has Supabase config - show login
+        else -> MainMenu // No config - go to main menu
     }
 
     NavHost(
         navController = navController,
         startDestination = startDestination
     ) {
+        // NEW: Position screen
+        composable<Position> {
+            PositionScreen(
+                onPositionSaved = {
+                    navController.navigate(
+                        if (SupabaseConfig.isConfigured) Login else MainMenu
+                    ) {
+                        popUpTo(Position) { inclusive = true }
+                    }
+                },
+                showBackButton = false
+            )
+        }
+
         composable<Login> {
             LoginScreen(
                 onLoginSuccess = {
@@ -54,6 +73,9 @@ fun AppNavigation(
                     navController.navigate(Login) {
                         popUpTo(MainMenu) { inclusive = true }
                     }
+                },
+                onChangePosition = { // NEW: callback to change position
+                    navController.navigate(Position)
                 }
             )
         }

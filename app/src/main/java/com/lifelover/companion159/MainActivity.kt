@@ -26,9 +26,11 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
 import androidx.navigation.compose.rememberNavController
+import com.lifelover.companion159.data.repository.PositionRepository
 import com.lifelover.companion159.presentation.navigation.AppNavigation
 import com.lifelover.companion159.presentation.theme.Companion159Theme
 import dagger.hilt.android.AndroidEntryPoint
+import javax.inject.Inject
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -36,6 +38,9 @@ class MainActivity : ComponentActivity() {
     companion object {
         private const val TAG = "MainActivity"
     }
+
+    @Inject // NEW: inject PositionRepository
+    lateinit var positionRepository: PositionRepository
 
     // Launcher для запиту дозволу на сповіщення
     private val notificationPermissionLauncher = registerForActivityResult(
@@ -54,19 +59,20 @@ class MainActivity : ComponentActivity() {
 
         // Enable edge-to-edge display
         enableEdgeToEdge()
-        WindowCompat.setDecorFitsSystemWindows(window, false)
 
-        // Запитуємо необхідні дозволи
-        requestNecessaryPermissions()
+        // Make status bar transparent
+        WindowCompat.setDecorFitsSystemWindows(window, false)
 
         setContent {
             Companion159Theme {
                 val darkTheme = isSystemInDarkTheme()
 
                 SideEffect {
+                    // Set status bar to transparent with appropriate icons
                     window.statusBarColor = Color.Transparent.toArgb()
                     window.navigationBarColor = Color.Transparent.toArgb()
 
+                    // Set light/dark status bar icons based on theme
                     WindowCompat.getInsetsController(window, window.decorView).apply {
                         isAppearanceLightStatusBars = !darkTheme
                         isAppearanceLightNavigationBars = !darkTheme
@@ -78,17 +84,13 @@ class MainActivity : ComponentActivity() {
                     color = MaterialTheme.colorScheme.background
                 ) {
                     val navController = rememberNavController()
-                    AppNavigation(navController = navController)
-                }
 
-                // Діалог пояснення для дозволів
-                if (showRationaleDialog) {
-                    PermissionRationaleDialog(
-                        onDismiss = { showRationaleDialog = false },
-                        onOpenSettings = {
-                            showRationaleDialog = false
-                            openAppSettings()
-                        }
+                    // NEW: check if position is set
+                    val isPositionSet = positionRepository.isPositionSet()
+
+                    AppNavigation(
+                        navController = navController,
+                        isPositionSet = isPositionSet // Pass position status
                     )
                 }
             }

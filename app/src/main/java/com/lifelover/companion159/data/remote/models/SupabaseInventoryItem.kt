@@ -9,6 +9,7 @@ data class SupabaseInventoryItem(
     val name: String,
     val quantity: Int,
     val category: String,
+    val position: String? = null,
     @SerialName("user_id")
     val userId: String? = null,
     @SerialName("created_at")
