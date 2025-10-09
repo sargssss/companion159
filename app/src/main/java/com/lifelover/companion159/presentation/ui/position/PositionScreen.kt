@@ -49,16 +49,18 @@ fun PositionScreen(
                     fontWeight = FontWeight.Bold
                 )
             },
-            navigationIcon = if (showBackButton) {
-                {
-                    IconButton(onClick = { onBackPressed?.invoke() }) {
-                        Icon(
-                            imageVector = Icons.Default.ArrowBack,
-                            contentDescription = "Назад"
-                        )
+            navigationIcon = {
+                if (showBackButton) {
+                    @Composable {
+                        IconButton(onClick = { onBackPressed?.invoke() }) {
+                            Icon(
+                                imageVector = Icons.Default.ArrowBack,
+                                contentDescription = "Назад"
+                            )
+                        }
                     }
-                }
-            } else null
+                } else null
+            }
         )
 
         Column(

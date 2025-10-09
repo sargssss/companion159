@@ -39,19 +39,14 @@ class InventoryRepositoryImpl @Inject constructor(
     private val autoSyncManager: AutoSyncManager,
     private val networkMonitor: NetworkMonitor,
     private val authService: SupabaseAuthService,
-    private val positionRepository: PositionRepository // NEW: inject PositionRepository
+    private val positionRepository: PositionRepository
 ) : InventoryRepository {
 
     companion object {
         private const val TAG = "InventoryRepository"
     }
 
-    @Inject
-    lateinit var positionRepository: PositionRepository // NEW: inject PositionRepository
-
     private val backgroundScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
-
-    // app/src/main/java/com/lifelover/companion159/data/repository/InventoryRepository.kt
 
     override fun getItemsByCategory(category: InventoryCategory): Flow<List<InventoryItem>> {
         val userId = authService.getUserId()
