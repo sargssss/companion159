@@ -27,107 +27,115 @@ fun InventoryItemCard(
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
         Column(
-            modifier = Modifier.padding(16.dp)
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp)
         ) {
+            // Name section (full width, multi-line)
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.Top
             ) {
-                Row(
-                    modifier = Modifier.weight(1f),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Text(
-                        text = item.name,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Medium
+                Text(
+                    text = item.name,
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.Medium,
+                    modifier = Modifier.weight(1f) // Takes all available space
+                    // Multi-line by default
+                )
+
+                if (showSyncStatus && !item.isSynced) {
+                    Icon(
+                        painter = painterResource(R.drawable.sync_attention),
+                        contentDescription = "Не синхронізовано",
+                        modifier = Modifier
+                            .size(16.dp)
+                            .padding(start = 4.dp),
+                        tint = MaterialTheme.colorScheme.error
                     )
-
-
-                    if (showSyncStatus && !item.isSynced) {
-                        Icon(
-                            painter = painterResource(R.drawable.sync_attention),
-                            contentDescription = "Не синхронізовано",
-                            modifier = Modifier.size(32.dp),
-                            tint = MaterialTheme.colorScheme.error
-                        )
-                    }
-                }
-
-                Row {
-                    IconButton(onClick = onEdit) {
-                        Icon(
-                            imageVector = Icons.Default.Edit,
-                            contentDescription = "Редагувати",
-                            tint = MaterialTheme.colorScheme.primary
-                        )
-                    }
-
-                    IconButton(onClick = onDelete) {
-                        Icon(
-                            imageVector = Icons.Default.Delete,
-                            contentDescription = stringResource(id = R.string.delete),
-                            tint = MaterialTheme.colorScheme.error
-                        )
-                    }
                 }
             }
 
             Spacer(modifier = Modifier.height(8.dp))
 
+            // Controls section (quantity + actions in one row)
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.Center,
+                horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                IconButton(
-                    onClick = {
-                        if (item.quantity > 0) {
-                            onQuantityChange(item.quantity - 1)
-                        }
-                    },
-                    enabled = item.quantity > 0
+                // Quantity controls (left side)
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(
-                        modifier = Modifier.size(32.dp),
-                        painter = painterResource(R.drawable.minus_circle),
-                        contentDescription = stringResource(id = R.string.decrease_quantity)
-                    )
-                }
-
-                OutlinedTextField(
-                    value = item.quantity.toString(),
-                    onValueChange = { value ->
-                        value.toIntOrNull()?.let { newQuantity ->
-                            if (newQuantity >= 0) {
-                                onQuantityChange(newQuantity)
+                    IconButton(
+                        onClick = {
+                            if (item.quantity > 0) {
+                                onQuantityChange(item.quantity - 1)
                             }
-                        }
-                    },
-                    modifier = Modifier.width(80.dp),
-                    singleLine = true,
-                    shape = RoundedCornerShape(12.dp),
-                    textStyle = MaterialTheme.typography.bodyLarge.copy(
+                        },
+                        enabled = item.quantity > 0,
+                        modifier = Modifier.size(32.dp)
+                    ) {
+                        Icon(
+                            modifier = Modifier.size(20.dp),
+                            painter = painterResource(R.drawable.minus_circle),
+                            contentDescription = stringResource(id = R.string.decrease_quantity)
+                        )
+                    }
+
+                    Text(
+                        text = item.quantity.toString(),
+                        style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
+                        modifier = Modifier.widthIn(min = 32.dp),
                         textAlign = TextAlign.Center
                     )
-                )
 
-                IconButton(
-                    onClick = {
-                        onQuantityChange(item.quantity + 1)
+                    IconButton(
+                        onClick = { onQuantityChange(item.quantity + 1) },
+                        modifier = Modifier.size(32.dp)
+                    ) {
+                        Icon(
+                            modifier = Modifier.size(20.dp),
+                            painter = painterResource(R.drawable.plus_circle),
+                            contentDescription = stringResource(id = R.string.increase_quantity)
+                        )
                     }
+                }
+
+                // Action buttons (right side)
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(0.dp)
                 ) {
-                    Icon(
-                        modifier = Modifier.size(32.dp),
-                        painter = painterResource(R.drawable.plus_circle),
-                        contentDescription = stringResource(id = R.string.increase_quantity)
-                    )
+                    IconButton(
+                        onClick = onEdit,
+                        modifier = Modifier.size(40.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Edit,
+                            contentDescription = "Редагувати",
+                            modifier = Modifier.size(20.dp),
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    }
+
+                    IconButton(
+                        onClick = onDelete,
+                        modifier = Modifier.size(40.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Delete,
+                            contentDescription = stringResource(id = R.string.delete),
+                            modifier = Modifier.size(20.dp),
+                            tint = MaterialTheme.colorScheme.error
+                        )
+                    }
                 }
             }
         }

@@ -39,7 +39,7 @@ class MainActivity : ComponentActivity() {
         private const val TAG = "MainActivity"
     }
 
-    @Inject // NEW: inject PositionRepository
+    @Inject
     lateinit var positionRepository: PositionRepository
 
     // Launcher для запиту дозволу на сповіщення

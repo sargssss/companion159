@@ -24,19 +24,19 @@ fun DeleteConfirmationDialog(
         Card(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
-            shape = RoundedCornerShape(16.dp),
+                .padding(horizontal = 16.dp),
+            shape = RoundedCornerShape(24.dp), // Increased from 16dp
             elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
         ) {
             Column(
-                modifier = Modifier.padding(24.dp),
-                verticalArrangement = Arrangement.spacedBy(20.dp),
+                modifier = Modifier.padding(32.dp), // Increased from 24dp
+                verticalArrangement = Arrangement.spacedBy(24.dp), // Increased spacing
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 // Title
                 Text(
                     text = "Видалити",
-                    style = MaterialTheme.typography.headlineLarge,
+                    style = MaterialTheme.typography.headlineMedium, // Larger font
                     fontWeight = FontWeight.Bold,
                     textAlign = TextAlign.Center
                 )
@@ -44,43 +44,45 @@ fun DeleteConfirmationDialog(
                 // Message
                 Text(
                     text = "Впевнені що хочете видалити \"${item.name}\"?",
-                    style = MaterialTheme.typography.bodyLarge,
+                    style = MaterialTheme.typography.bodyLarge, // Slightly larger
                     textAlign = TextAlign.Center,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
 
                 // Action buttons
-                // btn delete
-                Row(
+                Column(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     Button(
                         onClick = onConfirm,
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(56.dp), // Taller button
+                        shape = RoundedCornerShape(16.dp),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = MaterialTheme.colorScheme.error,
                             contentColor = MaterialTheme.colorScheme.onError
                         )
                     ) {
-                        Text(stringResource(id = R.string.delete))
+                        Text(
+                            stringResource(id = R.string.delete),
+                            style = MaterialTheme.typography.titleMedium
+                        )
                     }
-                }
-                // btn cancel
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
+
                     OutlinedButton(
                         onClick = onDismiss,
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp)
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(56.dp),
+                        shape = RoundedCornerShape(16.dp)
                     ) {
-                        Text(stringResource(id = R.string.cancel))
+                        Text(
+                            stringResource(id = R.string.cancel),
+                            style = MaterialTheme.typography.titleMedium
+                        )
                     }
-
-
                 }
             }
         }
