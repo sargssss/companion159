@@ -84,8 +84,8 @@ class InventoryViewModel @Inject constructor(
                 Log.d(TAG, "Creating new item: $name with quantity: $quantity")
                 val item = InventoryItem(
                     id = 0,
-                    itemName = name.trim(),  // FIXED
-                    availableQuantity = quantity,  // FIXED
+                    itemName = name.trim(),
+                    availableQuantity = quantity,
                     category = category,
                     crewName = ""  // Will be set in repository
                 )
@@ -107,8 +107,8 @@ class InventoryViewModel @Inject constructor(
                 Log.d(TAG, "Updating item: ${item.itemName} -> name: $newName, quantity: $newQuantity")
 
                 val updatedItem = item.copy(
-                    itemName = newName.trim(),  // FIXED
-                    availableQuantity = newQuantity  // FIXED
+                    itemName = newName.trim(),
+                    availableQuantity = newQuantity
                 )
 
                 updateItem(updatedItem)
@@ -129,7 +129,8 @@ class InventoryViewModel @Inject constructor(
         // Launch update without waiting for completion
         viewModelScope.launch {
             try {
-                Log.d(TAG, "Optimistic quantity update: ${item.name}, ID: ${item.id}, new quantity: $newQuantity")
+                // FIXED: Use itemName instead of name
+                Log.d(TAG, "Optimistic quantity update: ${item.itemName}, ID: ${item.id}, new quantity: $newQuantity")
 
                 // Key: Do not wait for sync completion - UI remains responsive
                 repository.updateItemQuantity(item.id, newQuantity)
@@ -144,7 +145,8 @@ class InventoryViewModel @Inject constructor(
     }
 
     fun startEditingItem(item: InventoryItem) {
-        Log.d(TAG, "Starting to edit item: ${item.name}")
+        // FIXED: Use itemName instead of name
+        Log.d(TAG, "Starting to edit item: ${item.itemName}")
         _state.value = _state.value.copy(editingItem = item)
     }
 

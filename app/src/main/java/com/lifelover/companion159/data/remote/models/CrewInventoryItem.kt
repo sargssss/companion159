@@ -8,8 +8,7 @@ import kotlinx.serialization.json.JsonObject
 data class CrewInventoryItem(
     val id: Long? = null,
 
-    @SerialName("tenant_id")
-    val tenantId: Long = 0,
+    val tenantId: Long = 9999, // its always 0 on server but if set 0 there gives error on request
 
     @SerialName("crew_name")
     val crewName: String,

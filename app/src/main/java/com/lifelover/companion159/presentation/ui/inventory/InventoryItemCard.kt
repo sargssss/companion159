@@ -34,18 +34,17 @@ fun InventoryItemCard(
                 .fillMaxWidth()
                 .padding(12.dp)
         ) {
-            // Name section (full width, multi-line)
+            // Name section (full width, multi-line) - FIXED: Use itemName
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.Top
             ) {
                 Text(
-                    text = item.name,
+                    text = item.itemName,
                     style = MaterialTheme.typography.bodyLarge,
                     fontWeight = FontWeight.Medium,
-                    modifier = Modifier.weight(1f) // Takes all available space
-                    // Multi-line by default
+                    modifier = Modifier.weight(1f)
                 )
 
                 if (showSyncStatus && !item.isSynced) {
@@ -68,18 +67,18 @@ fun InventoryItemCard(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Quantity controls (left side)
+                // Quantity controls (left side) - FIXED: Use availableQuantity
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(4.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     IconButton(
                         onClick = {
-                            if (item.quantity > 0) {
-                                onQuantityChange(item.quantity - 1)
+                            if (item.availableQuantity > 0) {
+                                onQuantityChange(item.availableQuantity - 1)
                             }
                         },
-                        enabled = item.quantity > 0,
+                        enabled = item.availableQuantity > 0,
                         modifier = Modifier.size(32.dp)
                     ) {
                         Icon(
@@ -90,7 +89,7 @@ fun InventoryItemCard(
                     }
 
                     Text(
-                        text = item.quantity.toString(),
+                        text = item.availableQuantity.toString(),
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                         modifier = Modifier.widthIn(min = 32.dp),
@@ -98,7 +97,7 @@ fun InventoryItemCard(
                     )
 
                     IconButton(
-                        onClick = { onQuantityChange(item.quantity + 1) },
+                        onClick = { onQuantityChange(item.availableQuantity + 1) },
                         modifier = Modifier.size(32.dp)
                     ) {
                         Icon(

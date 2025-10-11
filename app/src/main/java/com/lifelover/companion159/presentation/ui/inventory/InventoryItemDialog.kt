@@ -33,9 +33,9 @@ fun InventoryItemDialog(
     // Determine if this is edit mode
     val isEditMode = editingItem != null
 
-    // Initialize values based on mode
-    var itemName by remember { mutableStateOf(editingItem?.name ?: "") }
-    var quantity by remember { mutableIntStateOf(editingItem?.quantity ?: 1) }
+    // Initialize values based on mode - FIXED: Use itemName and availableQuantity
+    var itemName by remember { mutableStateOf(editingItem?.itemName ?: "") }
+    var quantity by remember { mutableIntStateOf(editingItem?.availableQuantity ?: 1) }
 
     Dialog(onDismissRequest = onDismiss) {
         Card(

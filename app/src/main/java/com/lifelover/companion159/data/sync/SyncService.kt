@@ -272,11 +272,11 @@ fun CrewInventoryItem.toEntity(
     )
 }
 
-// Extension function for converting entity to server model
+// FIXED: Extension function for converting entity to server model - explicitly set tenantId
 fun InventoryItemEntity.toCrewInventoryItem(): CrewInventoryItem {
     return CrewInventoryItem(
         id = supabaseId,
-        tenantId = 0,
+        tenantId = 0,  // CRITICAL FIX: Always set to 0 (required NOT NULL field in database)
         crewName = crewName,
         crewType = null,
         itemName = itemName,

@@ -25,26 +25,26 @@ fun DeleteConfirmationDialog(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp),
-            shape = RoundedCornerShape(24.dp), // Increased from 16dp
+            shape = RoundedCornerShape(24.dp),
             elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
         ) {
             Column(
-                modifier = Modifier.padding(32.dp), // Increased from 24dp
-                verticalArrangement = Arrangement.spacedBy(24.dp), // Increased spacing
+                modifier = Modifier.padding(32.dp),
+                verticalArrangement = Arrangement.spacedBy(24.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 // Title
                 Text(
                     text = "Видалити",
-                    style = MaterialTheme.typography.headlineMedium, // Larger font
+                    style = MaterialTheme.typography.headlineMedium,
                     fontWeight = FontWeight.Bold,
                     textAlign = TextAlign.Center
                 )
 
-                // Message
+                // Message - FIXED: Use itemName instead of name
                 Text(
-                    text = "Впевнені що хочете видалити \"${item.name}\"?",
-                    style = MaterialTheme.typography.bodyLarge, // Slightly larger
+                    text = "Впевнені що хочете видалити \"${item.itemName}\"?",
+                    style = MaterialTheme.typography.bodyLarge,
                     textAlign = TextAlign.Center,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -58,7 +58,7 @@ fun DeleteConfirmationDialog(
                         onClick = onConfirm,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(56.dp), // Taller button
+                            .height(56.dp),
                         shape = RoundedCornerShape(16.dp),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = MaterialTheme.colorScheme.error,

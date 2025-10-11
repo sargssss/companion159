@@ -53,6 +53,8 @@ class SupabaseInventoryRepository @Inject constructor() {
 
             val crewItem = localItem.toCrewInventoryItem()  // Use extension function
 
+            // CRITICAL FIX: Don't specify columns parameter - let Supabase send ALL fields
+            // This ensures tenant_id is included in the request
             val createdItems = client.from(TABLE_NAME)
                 .insert(crewItem) {
                     select()

@@ -102,13 +102,13 @@ fun AppNavigation(
                 onAddItem = { // NEW: Navigate to Add screen
                     navController.navigate(AddItem(args.category))
                 },
-                onEditItem = { item -> // NEW: Navigate to Edit screen
+                onEditItem = { item -> // FIXED: Use correct property names
                     navController.navigate(
                         EditItem(
                             category = args.category,
                             itemId = item.id,
-                            itemName = item.name,
-                            itemQuantity = item.quantity
+                            itemName = item.itemName,
+                            itemQuantity = item.availableQuantity
                         )
                     )
                 }
@@ -145,11 +145,13 @@ fun AppNavigation(
                 itemQuantity = args.itemQuantity,
                 onBackPressed = { navController.popBackStack() },
                 onSave = { name, quantity ->
+                    // FIXED: Use correct property names and include crewName
                     val item = InventoryItem(
                         id = args.itemId,
-                        name = args.itemName,
-                        quantity = args.itemQuantity,
-                        category = args.category
+                        itemName = args.itemName,
+                        availableQuantity = args.itemQuantity,
+                        category = args.category,
+                        crewName = "" // Will be set by repository
                     )
                     viewModel.updateFullItem(item, name, quantity)
                     navController.popBackStack()
