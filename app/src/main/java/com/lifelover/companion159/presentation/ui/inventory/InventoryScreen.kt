@@ -28,10 +28,11 @@ import com.lifelover.companion159.presentation.viewmodels.InventoryViewModel
 fun InventoryScreen(
     inventoryCategory: InventoryCategory,
     onBackPressed: () -> Unit,
+    onAddItem: () -> Unit, // NEW: callback for navigation
+    onEditItem: (InventoryItem) -> Unit, // NEW: callback for navigation
     viewModel: InventoryViewModel = hiltViewModel()
 ) {
     val state by viewModel.state.collectAsState()
-    var showAddDialog by remember { mutableStateOf(false) }
     var itemToDelete by remember { mutableStateOf<InventoryItem?>(null) }
 
     // Load items when screen opens
@@ -52,6 +53,7 @@ fun InventoryScreen(
         }
     }
 
+    // Delete confirmation dialog (only this dialog remains)
     itemToDelete?.let { item ->
         DeleteConfirmationDialog(
             item = item,
@@ -80,7 +82,7 @@ fun InventoryScreen(
                 }
             },
             actions = {
-                IconButton(onClick = { showAddDialog = true }) {
+                IconButton(onClick = onAddItem) { // CHANGED: navigate instead of dialog
                     Icon(
                         imageVector = Icons.Default.Add,
                         contentDescription = stringResource(id = R.string.add)
@@ -101,15 +103,13 @@ fun InventoryScreen(
             }
 
             state.items.isEmpty() -> {
-                // Empty state
                 EmptyState(
                     category = inventoryCategory,
-                    onAddClick = { showAddDialog = true }
+                    onAddClick = onAddItem // CHANGED: navigate instead of dialog
                 )
             }
 
             else -> {
-                // Items list
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(16.dp),
@@ -122,12 +122,7 @@ fun InventoryScreen(
                                 viewModel.updateQuantity(item, newQuantity)
                             },
                             onDelete = { itemToDelete = item },
-                            /*onDelete = {
-                                viewModel.deleteItemById(item.id)
-                            },*/
-                            onEdit = {
-                                viewModel.startEditingItem(item)
-                            },
+                            onEdit = { onEditItem(item) }, // CHANGED: navigate instead of dialog
                             showSyncStatus = !item.isSynced
                         )
                     }
@@ -136,30 +131,7 @@ fun InventoryScreen(
         }
     }
 
-    // Universal dialog for both add and edit
-    if (showAddDialog) {
-        InventoryItemDialog(
-            inventoryType = inventoryCategory,
-            editingItem = null, // null for create mode
-            onDismiss = { showAddDialog = false },
-            onSave = { name: String, quantity: Int ->
-                viewModel.addNewItem(name, quantity, inventoryCategory)
-                showAddDialog = false
-            }
-        )
-    }
-
-    // Edit item dialog using the same universal dialog
-    state.editingItem?.let { item ->
-        InventoryItemDialog(
-            inventoryType = inventoryCategory,
-            editingItem = item, // pass item for edit mode
-            onDismiss = { viewModel.stopEditingItem() },
-            onSave = { newName: String, newQuantity: Int ->
-                viewModel.updateFullItem(item, newName, newQuantity)
-            }
-        )
-    }
+    // REMOVED: All dialog code (showAddDialog, InventoryItemDialog, etc.)
 }
 
 @Composable
@@ -207,7 +179,7 @@ private fun EmptyState(
                     modifier = Modifier.size(18.dp)
                 )
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("Add first item")
+                Text("Додати перший предмет")
             }
         }
     }

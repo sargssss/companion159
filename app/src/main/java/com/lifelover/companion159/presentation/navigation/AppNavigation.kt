@@ -11,6 +11,10 @@ import com.lifelover.companion159.presentation.ui.auth.LoginScreen
 import com.lifelover.companion159.presentation.ui.inventory.InventoryScreen
 import com.lifelover.companion159.presentation.ui.main.MainMenuScreen
 import com.lifelover.companion159.presentation.ui.position.PositionScreen
+import androidx.hilt.navigation.compose.hiltViewModel
+import com.lifelover.companion159.domain.models.InventoryItem
+import com.lifelover.companion159.presentation.viewmodels.InventoryViewModel
+import com.lifelover.companion159.presentation.ui.inventory.AddEditItemScreen
 import kotlinx.serialization.Serializable
 
 @Serializable
@@ -25,22 +29,32 @@ object MainMenu
 @Serializable
 data class InventoryDetail(val category: InventoryCategory)
 
+@Serializable
+data class AddItem(val category: InventoryCategory)
+
+@Serializable
+data class EditItem(
+    val category: InventoryCategory,
+    val itemId: Long,
+    val itemName: String,
+    val itemQuantity: Int
+)
+
 @Composable
 fun AppNavigation(
     navController: NavHostController,
-    isPositionSet: Boolean // NEW: parameter to check if position is set
+    isPositionSet: Boolean
 ) {
     val startDestination = when {
-        !isPositionSet -> Position // First time - set position
-        SupabaseConfig.isConfigured -> Login // Has Supabase config - show login
-        else -> MainMenu // No config - go to main menu
+        !isPositionSet -> Position
+        SupabaseConfig.isConfigured -> Login
+        else -> MainMenu
     }
 
     NavHost(
         navController = navController,
         startDestination = startDestination
     ) {
-        // NEW: Position screen
         composable<Position> {
             PositionScreen(
                 onPositionSaved = {
@@ -74,7 +88,7 @@ fun AppNavigation(
                         popUpTo(MainMenu) { inclusive = true }
                     }
                 },
-                onChangePosition = { // NEW: callback to change position
+                onChangePosition = {
                     navController.navigate(Position)
                 }
             )
@@ -84,7 +98,62 @@ fun AppNavigation(
             val args = backStackEntry.toRoute<InventoryDetail>()
             InventoryScreen(
                 inventoryCategory = args.category,
-                onBackPressed = { navController.popBackStack() }
+                onBackPressed = { navController.popBackStack() },
+                onAddItem = { // NEW: Navigate to Add screen
+                    navController.navigate(AddItem(args.category))
+                },
+                onEditItem = { item -> // NEW: Navigate to Edit screen
+                    navController.navigate(
+                        EditItem(
+                            category = args.category,
+                            itemId = item.id,
+                            itemName = item.name,
+                            itemQuantity = item.quantity
+                        )
+                    )
+                }
+            )
+        }
+
+        // NEW: Add Item screen
+        composable<AddItem> { backStackEntry ->
+            val args = backStackEntry.toRoute<AddItem>()
+            val viewModel: InventoryViewModel = hiltViewModel()
+
+            AddEditItemScreen(
+                category = args.category,
+                itemId = null, // null = create mode
+                itemName = null,
+                itemQuantity = null,
+                onBackPressed = { navController.popBackStack() },
+                onSave = { name, quantity ->
+                    viewModel.addNewItem(name, quantity, args.category)
+                    navController.popBackStack()
+                }
+            )
+        }
+
+        // NEW: Edit Item screen
+        composable<EditItem> { backStackEntry ->
+            val args = backStackEntry.toRoute<EditItem>()
+            val viewModel: InventoryViewModel = hiltViewModel()
+
+            AddEditItemScreen(
+                category = args.category,
+                itemId = args.itemId,
+                itemName = args.itemName,
+                itemQuantity = args.itemQuantity,
+                onBackPressed = { navController.popBackStack() },
+                onSave = { name, quantity ->
+                    val item = InventoryItem(
+                        id = args.itemId,
+                        name = args.itemName,
+                        quantity = args.itemQuantity,
+                        category = args.category
+                    )
+                    viewModel.updateFullItem(item, name, quantity)
+                    navController.popBackStack()
+                }
             )
         }
     }
