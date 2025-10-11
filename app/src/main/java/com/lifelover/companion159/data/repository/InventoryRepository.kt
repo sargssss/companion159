@@ -33,6 +33,7 @@ sealed class SyncResult {
     data class Error(val message: String) : SyncResult()
     object NetworkError : SyncResult()
 }
+
 @Singleton
 class InventoryRepositoryImpl @Inject constructor(
     private val localDao: InventoryDao,
@@ -52,11 +53,9 @@ class InventoryRepositoryImpl @Inject constructor(
         val userId = authService.getUserId()
 
         return if (userId != null) {
-            // Show user's items and offline items
             localDao.getItemsByCategory(category, userId)
                 .map { entities -> entities.map { it.toDomainModel() } }
         } else {
-            // Show only offline items when not authenticated
             localDao.getItemsByCategoryOffline(category)
                 .map { entities -> entities.map { it.toDomainModel() } }
         }
@@ -64,18 +63,18 @@ class InventoryRepositoryImpl @Inject constructor(
 
     override suspend fun addItem(item: InventoryItem) {
         val userId = authService.getUserId()
-        val position = positionRepository.getPosition()
+        val crewName = positionRepository.getPosition() ?: "Default"  // FIXED
 
-        Log.d(TAG, "Creating new item: ${item.name}, userId: $userId, position: $position")
+        Log.d(TAG, "Creating new item: ${item.itemName}, userId: $userId, crew: $crewName")
 
         val entity = item.toEntity().copy(
             id = 0,
             userId = userId,
-            position = position,
+            crewName = crewName,  // FIXED
             supabaseId = null,
             needsSync = userId != null,
             lastModified = Date(),
-            isDeleted = false
+            isActive = true
         )
 
         val insertedId = localDao.insertItem(entity)
@@ -88,9 +87,9 @@ class InventoryRepositoryImpl @Inject constructor(
 
     override suspend fun updateItem(item: InventoryItem) {
         val userId = authService.getUserId()
-        val position = positionRepository.getPosition() // NEW: get current position
+        val crewName = positionRepository.getPosition() ?: "Default"  // FIXED
 
-        Log.d(TAG, "Updating existing item with ID: ${item.id}, name: ${item.name}")
+        Log.d(TAG, "Updating existing item with ID: ${item.id}, name: ${item.itemName}")
 
         val existingItem = localDao.getItemById(item.id)
         if (existingItem == null) {
@@ -105,10 +104,10 @@ class InventoryRepositoryImpl @Inject constructor(
 
         val updatedRows = localDao.updateItem(
             id = item.id,
-            name = item.name.trim(),
-            quantity = item.quantity,
+            name = item.itemName.trim(),
+            quantity = item.availableQuantity,
             category = item.category,
-            position = position
+            crewName = crewName  // FIXED
         )
 
         if (updatedRows > 0) {
@@ -131,7 +130,6 @@ class InventoryRepositoryImpl @Inject constructor(
             return
         }
 
-        // Allow updating offline items or user's own items
         if (existingItem.userId != null && existingItem.userId != userId) {
             Log.e(TAG, "Cannot update quantity: belongs to different user")
             return
@@ -159,7 +157,6 @@ class InventoryRepositoryImpl @Inject constructor(
             return
         }
 
-        // Allow deleting offline items or user's own items
         if (existingItem.userId != null && existingItem.userId != userId) {
             Log.e(TAG, "Cannot delete item: belongs to different user")
             return

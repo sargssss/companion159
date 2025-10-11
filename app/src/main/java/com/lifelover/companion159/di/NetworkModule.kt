@@ -50,7 +50,6 @@ object NetworkModule {
         return GoogleAuthService(context)
     }
 
-    // НОВИЙ: Provide UserPreferences
     @Provides
     @Singleton
     fun provideUserPreferences(
@@ -63,7 +62,7 @@ object NetworkModule {
     @Singleton
     fun provideSupabaseAuthService(
         googleAuthService: GoogleAuthService,
-        userPreferences: UserPreferences // ДОДАНО
+        userPreferences: UserPreferences
     ): SupabaseAuthService {
         return SupabaseAuthService(googleAuthService, userPreferences)
     }
@@ -84,12 +83,21 @@ object NetworkModule {
 
     @Provides
     @Singleton
+    fun providePositionRepository(
+        @ApplicationContext context: Context
+    ): PositionRepository {
+        return PositionRepository(context)
+    }
+
+    @Provides
+    @Singleton
     fun provideSyncService(
         localDao: InventoryDao,
         remoteRepository: SupabaseInventoryRepository,
-        authService: SupabaseAuthService
+        authService: SupabaseAuthService,
+        positionRepository: PositionRepository  // FIXED: Added parameter
     ): SyncService {
-        return SyncService(localDao, remoteRepository, authService)
+        return SyncService(localDao, remoteRepository, authService, positionRepository)
     }
 
     @Provides
@@ -99,16 +107,8 @@ object NetworkModule {
         syncService: SyncService,
         networkMonitor: NetworkMonitor,
         authService: SupabaseAuthService,
-        userPreferences: UserPreferences // ДОДАНО
+        userPreferences: UserPreferences
     ): AutoSyncManager {
         return AutoSyncManager(context, syncService, networkMonitor, authService, userPreferences)
-    }
-
-    @Provides
-    @Singleton
-    fun providePositionRepository(
-        @ApplicationContext context: Context
-    ): PositionRepository {
-        return PositionRepository(context)
     }
 }

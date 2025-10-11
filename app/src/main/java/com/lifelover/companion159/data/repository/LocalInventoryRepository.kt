@@ -45,17 +45,12 @@ class LocalInventoryRepositoryImpl @Inject constructor(
     override suspend fun updateItem(item: InventoryItem) {
         val existingEntity = dao.getItemById(item.id)
         if (existingEntity != null) {
-            val updatedEntity = item.toEntity().copy(
+            val updatedRows = dao.updateItem(
                 id = item.id,
-                userId = existingEntity.userId,
-                supabaseId = existingEntity.supabaseId,
-                lastSynced = existingEntity.lastSynced
-            )
-            dao.updateItem(
-                id = updatedEntity.id,
-                name = updatedEntity.name,
-                quantity = updatedEntity.quantity,
-                category = updatedEntity.category
+                name = item.itemName,  // FIXED
+                quantity = item.availableQuantity,  // FIXED
+                category = item.category,
+                crewName = item.crewName  // FIXED
             )
         } else {
             val userId = authService.getUserId() ?: return

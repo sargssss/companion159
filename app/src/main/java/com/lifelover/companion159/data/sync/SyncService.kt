@@ -3,9 +3,11 @@ package com.lifelover.companion159.data.sync
 import android.util.Log
 import com.lifelover.companion159.data.local.dao.InventoryDao
 import com.lifelover.companion159.data.local.entities.InventoryCategory
+import com.lifelover.companion159.data.local.entities.InventoryItemEntity
 import com.lifelover.companion159.data.remote.auth.SupabaseAuthService
+import com.lifelover.companion159.data.remote.models.CrewInventoryItem
 import com.lifelover.companion159.data.remote.repository.SupabaseInventoryRepository
-import com.lifelover.companion159.data.remote.repository.toEntity
+import com.lifelover.companion159.data.repository.PositionRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -27,10 +29,12 @@ enum class SyncStatus {
 class SyncService @Inject constructor(
     private val localDao: InventoryDao,
     private val remoteRepository: SupabaseInventoryRepository,
-    private val authService: SupabaseAuthService
+    private val authService: SupabaseAuthService,
+    private val positionRepository: PositionRepository
 ) {
     companion object {
         private const val TAG = "SyncService"
+        private val DEFAULT_CATEGORY = InventoryCategory.EQUIPMENT  // "інвентар"
     }
 
     private val _syncStatus = MutableStateFlow(SyncStatus.IDLE)
@@ -39,9 +43,6 @@ class SyncService @Inject constructor(
     private val _lastSyncTime = MutableStateFlow<Long?>(null)
     val lastSyncTime: StateFlow<Long?> = _lastSyncTime.asStateFlow()
 
-    /**
-     * Перевіряє чи є офлайн елементи (без userId)
-     */
     suspend fun hasOfflineItems(): Boolean = withContext(Dispatchers.IO) {
         try {
             val offlineItems = localDao.getOfflineItems()
@@ -59,12 +60,18 @@ class SyncService @Inject constructor(
             Log.d(TAG, "🔄 Starting sync...")
             _syncStatus.value = SyncStatus.SYNCING
 
-            // ЗМІНЕНО: Використовуємо getUserIdForSync() замість getUserId()
             val userId = authService.getUserIdForSync()
             if (userId == null) {
-                Log.w(TAG, "⚠️ No user found (current or last) - cannot sync")
+                Log.w(TAG, "⚠️ No user found - cannot sync")
                 _syncStatus.value = SyncStatus.ERROR
                 return@withContext Result.failure(Exception("No user available for sync"))
+            }
+
+            val crewName = positionRepository.getPosition()
+            if (crewName.isNullOrBlank()) {
+                Log.w(TAG, "⚠️ No crew name (position) set - cannot sync")
+                _syncStatus.value = SyncStatus.ERROR
+                return@withContext Result.failure(Exception("No crew name set"))
             }
 
             val currentUser = authService.getCurrentUser()
@@ -74,13 +81,13 @@ class SyncService @Inject constructor(
                 Log.d(TAG, "🔄 Syncing for LAST logged user: $userId")
             }
 
-            // КРОК 1: Призначити userId всім офлайн елементам
+            // STEP 1: Assign userId to offline items
             val offlineItemsCount = localDao.assignUserIdToOfflineItems(userId)
             if (offlineItemsCount > 0) {
                 Log.d(TAG, "📝 Assigned userId to $offlineItemsCount offline items")
             }
 
-            // КРОК 2: PUSH - Завантажити локальні зміни на сервер
+            // STEP 2: PUSH - Upload local changes to server
             val localItemsNeedingSync = localDao.getItemsNeedingSync(userId)
             Log.d(TAG, "📤 Local items needing sync: ${localItemsNeedingSync.size}")
 
@@ -95,50 +102,57 @@ class SyncService @Inject constructor(
                     continue
                 }
 
+                // Ensure crew name is set
+                val itemWithCrew = if (localItem.crewName.isBlank()) {
+                    localItem.copy(crewName = crewName)
+                } else {
+                    localItem
+                }
+
                 when {
-                    localItem.supabaseId == null && !localItem.isDeleted -> {
-                        Log.d(TAG, "➕ Creating new item: ${localItem.name}")
-                        val newSupabaseId = remoteRepository.createItem(localItem)
+                    localItem.supabaseId == null && localItem.isActive -> {
+                        Log.d(TAG, "➕ Creating new item: ${localItem.itemName}")
+                        val newSupabaseId = remoteRepository.createItem(itemWithCrew)
                         if (newSupabaseId != null) {
                             localDao.setSupabaseId(localItem.id, newSupabaseId)
-                            Log.d(TAG, "✅ Created and linked: ${localItem.name}")
+                            Log.d(TAG, "✅ Created and linked: ${localItem.itemName}")
                         } else {
-                            Log.e(TAG, "❌ Failed to create: ${localItem.name}")
+                            Log.e(TAG, "❌ Failed to create: ${localItem.itemName}")
                         }
                     }
 
-                    localItem.supabaseId != null && localItem.isDeleted -> {
-                        Log.d(TAG, "🗑️ Deleting on server: ${localItem.name}")
+                    localItem.supabaseId != null && !localItem.isActive -> {
+                        Log.d(TAG, "🗑️ Deleting on server: ${localItem.itemName}")
                         val deleted = remoteRepository.deleteItem(localItem.supabaseId)
                         if (deleted) {
                             localDao.markAsSynced(localItem.id)
-                            Log.d(TAG, "✅ Deleted on server: ${localItem.name}")
+                            Log.d(TAG, "✅ Deleted on server: ${localItem.itemName}")
                         } else {
-                            Log.e(TAG, "❌ Failed to delete: ${localItem.name}")
+                            Log.e(TAG, "❌ Failed to delete: ${localItem.itemName}")
                         }
                     }
 
-                    localItem.supabaseId != null && !localItem.isDeleted -> {
-                        Log.d(TAG, "✏️ Updating on server: ${localItem.name}")
-                        val updated = remoteRepository.updateItem(localItem.supabaseId, localItem)
+                    localItem.supabaseId != null && localItem.isActive -> {
+                        Log.d(TAG, "✏️ Updating on server: ${localItem.itemName}")
+                        val updated = remoteRepository.updateItem(localItem.supabaseId, itemWithCrew)
                         if (updated) {
                             localDao.markAsSynced(localItem.id)
-                            Log.d(TAG, "✅ Updated on server: ${localItem.name}")
+                            Log.d(TAG, "✅ Updated on server: ${localItem.itemName}")
                         } else {
-                            Log.e(TAG, "❌ Failed to update: ${localItem.name}")
+                            Log.e(TAG, "❌ Failed to update: ${localItem.itemName}")
                         }
                     }
 
-                    localItem.supabaseId == null && localItem.isDeleted -> {
-                        Log.d(TAG, "🗑️ Marking deleted new item as synced: ${localItem.name}")
+                    localItem.supabaseId == null && !localItem.isActive -> {
+                        Log.d(TAG, "🗑️ Marking deleted new item as synced: ${localItem.itemName}")
                         localDao.markAsSynced(localItem.id)
                     }
                 }
             }
 
-            // КРОК 3: PULL - Завантажити дані з сервера
+            // STEP 3: PULL - Download items from server
             Log.d(TAG, "📥 Fetching items from server...")
-            val remoteItems = remoteRepository.getAllItems()
+            val remoteItems = remoteRepository.getAllItems(crewName)
             Log.d(TAG, "📥 Fetched ${remoteItems.size} items from server")
 
             val allLocalItems = localDao.getAllItems(userId)
@@ -149,8 +163,8 @@ class SyncService @Inject constructor(
             for (remoteItem in remoteItems) {
                 if (remoteItem.id == null) continue
 
-                if (remoteItem.userId != userId) {
-                    Log.w(TAG, "⚠️ Skipping remote item with different userId: ${remoteItem.id}")
+                if (remoteItem.crewName != crewName) {
+                    Log.w(TAG, "⚠️ Skipping remote item with different crew: ${remoteItem.id}")
                     continue
                 }
 
@@ -158,33 +172,48 @@ class SyncService @Inject constructor(
 
                 when {
                     existingLocalItem == null -> {
-                        if (!remoteItem.isDeleted) {
-                            Log.d(TAG, "⬇️ Creating new local item from server: ${remoteItem.name}")
-                            val newEntity = remoteItem.toEntity().copy(userId = userId)
+                        if (remoteItem.isActive) {
+                            Log.d(TAG, "⬇️ Creating new local item from server: ${remoteItem.itemName}")
+
+                            // FIXED: Use default category
+                            val newEntity = remoteItem.toEntity(
+                                localCategory = DEFAULT_CATEGORY,
+                                userId = userId
+                            )
                             localDao.insertItem(newEntity)
                         }
                     }
 
                     !existingLocalItem.needsSync -> {
-                        if (remoteItem.isDeleted && !existingLocalItem.isDeleted) {
-                            Log.d(TAG, "🗑️ Marking as deleted from server: ${remoteItem.name}")
+                        if (remoteItem.isActive && !existingLocalItem.isActive) {
+                            Log.d(TAG, "♻️ Restoring from server: ${remoteItem.itemName}")
+                            localDao.updateFromServer(
+                                supabaseId = remoteItem.id,
+                                userId = userId,
+                                name = remoteItem.itemName,
+                                quantity = remoteItem.availableQuantity,
+                                category = existingLocalItem.category,
+                                crewName = remoteItem.crewName,
+                                isActive = true
+                            )
+                        } else if (!remoteItem.isActive && existingLocalItem.isActive) {
+                            Log.d(TAG, "🗑️ Marking as deleted from server: ${remoteItem.itemName}")
                             localDao.softDeleteItem(existingLocalItem.id)
-                        } else if (!remoteItem.isDeleted) {
-                            val needsUpdate = existingLocalItem.name != remoteItem.name ||
-                                    existingLocalItem.quantity != remoteItem.quantity ||
-                                    existingLocalItem.category.name.lowercase() != remoteItem.category.lowercase() ||
-                                    existingLocalItem.position != remoteItem.position // NEW: check position change
+                        } else if (remoteItem.isActive) {
+                            val needsUpdate = existingLocalItem.itemName != remoteItem.itemName ||
+                                    existingLocalItem.availableQuantity != remoteItem.availableQuantity ||
+                                    existingLocalItem.crewName != remoteItem.crewName
 
                             if (needsUpdate) {
-                                Log.d(TAG, "Updating from server: ${remoteItem.name}")
+                                Log.d(TAG, "🔄 Updating from server: ${remoteItem.itemName}")
                                 localDao.updateFromServer(
                                     supabaseId = remoteItem.id,
                                     userId = userId,
-                                    name = remoteItem.name,
-                                    quantity = remoteItem.quantity,
-                                    category = InventoryCategory.valueOf(remoteItem.category.uppercase()),
-                                    position = remoteItem.position, // NEW: include position
-                                    isDeleted = remoteItem.isDeleted
+                                    name = remoteItem.itemName,
+                                    quantity = remoteItem.availableQuantity,
+                                    category = existingLocalItem.category,
+                                    crewName = remoteItem.crewName,
+                                    isActive = remoteItem.isActive
                                 )
                             } else {
                                 localDao.markAsSynced(existingLocalItem.id)
@@ -193,7 +222,7 @@ class SyncService @Inject constructor(
                     }
 
                     else -> {
-                        Log.d(TAG, "📝 Keeping local changes for: ${existingLocalItem.name}")
+                        Log.d(TAG, "📝 Keeping local changes for: ${existingLocalItem.itemName}")
                     }
                 }
             }
@@ -211,7 +240,6 @@ class SyncService @Inject constructor(
     }
 
     suspend fun hasUnsyncedChanges(): Boolean = withContext(Dispatchers.IO) {
-        // ЗМІНЕНО: Використовуємо getUserIdForSync()
         val userId = authService.getUserIdForSync() ?: return@withContext false
         val count = localDao.getItemsNeedingSync(userId).size
         Log.d(TAG, "📊 Unsynced items count: $count")
@@ -221,4 +249,49 @@ class SyncService @Inject constructor(
     fun resetSyncStatus() {
         _syncStatus.value = SyncStatus.IDLE
     }
+}
+
+// FIXED: Extension function for conversion with default category
+fun CrewInventoryItem.toEntity(
+    localCategory: InventoryCategory = InventoryCategory.EQUIPMENT,  // Default "інвентар"
+    userId: String? = null
+): InventoryItemEntity {
+    return InventoryItemEntity(
+        id = 0,
+        itemName = itemName,
+        availableQuantity = availableQuantity,
+        category = localCategory,
+        userId = userId,
+        crewName = crewName,
+        supabaseId = id,
+        createdAt = Date(),
+        lastModified = Date(),
+        lastSynced = Date(),
+        needsSync = false,
+        isActive = isActive
+    )
+}
+
+// Extension function for converting entity to server model
+fun InventoryItemEntity.toCrewInventoryItem(): CrewInventoryItem {
+    return CrewInventoryItem(
+        id = supabaseId,
+        tenantId = 0,
+        crewName = crewName,
+        crewType = null,
+        itemName = itemName,
+        itemCategory = null,
+        unit = "шт",
+        availableQuantity = availableQuantity,
+        neededQuantity = 0,
+        priority = "medium",
+        description = null,
+        notes = null,
+        lastNeedUpdatedAt = null,
+        neededBy = null,
+        createdBy = null,
+        updatedBy = null,
+        metadata = null,
+        isActive = isActive
+    )
 }

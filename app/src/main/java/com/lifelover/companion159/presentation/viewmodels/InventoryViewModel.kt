@@ -76,7 +76,6 @@ class InventoryViewModel @Inject constructor(
         }
     }
 
-    // Updated to include quantity parameter
     fun addNewItem(name: String, quantity: Int, category: InventoryCategory) {
         if (name.isBlank() || quantity <= 0) return
 
@@ -84,10 +83,11 @@ class InventoryViewModel @Inject constructor(
             try {
                 Log.d(TAG, "Creating new item: $name with quantity: $quantity")
                 val item = InventoryItem(
-                    id = 0, // New item always has ID = 0
-                    name = name.trim(),
+                    id = 0,
+                    itemName = name.trim(),  // FIXED
+                    availableQuantity = quantity,  // FIXED
                     category = category,
-                    quantity = quantity // Use specified quantity
+                    crewName = ""  // Will be set in repository
                 )
                 addItem(item)
                 Log.d(TAG, "New item created: $name")
@@ -95,6 +95,29 @@ class InventoryViewModel @Inject constructor(
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to add item", e)
                 _state.value = _state.value.copy(error = e.message)
+            }
+        }
+    }
+
+    fun updateFullItem(item: InventoryItem, newName: String, newQuantity: Int) {
+        if (newName.isBlank() || newQuantity < 0) return
+
+        viewModelScope.launch {
+            try {
+                Log.d(TAG, "Updating item: ${item.itemName} -> name: $newName, quantity: $newQuantity")
+
+                val updatedItem = item.copy(
+                    itemName = newName.trim(),  // FIXED
+                    availableQuantity = newQuantity  // FIXED
+                )
+
+                updateItem(updatedItem)
+                stopEditingItem()
+                _state.value = _state.value.copy(message = "Item updated")
+
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to update item", e)
+                _state.value = _state.value.copy(error = "Update error: ${e.message}")
             }
         }
     }
@@ -128,32 +151,6 @@ class InventoryViewModel @Inject constructor(
     fun stopEditingItem() {
         Log.d(TAG, "Stopping item editing")
         _state.value = _state.value.copy(editingItem = null)
-    }
-
-    // Optimistic full item update
-    fun updateFullItem(item: InventoryItem, newName: String, newQuantity: Int) {
-        if (newName.isBlank() || newQuantity < 0) return
-
-        viewModelScope.launch {
-            try {
-                Log.d(TAG, "Optimistic full update: ${item.name} -> name: $newName, quantity: $newQuantity")
-
-                // Create updated item preserving original ID
-                val updatedItem = item.copy(
-                    name = newName.trim(),
-                    quantity = newQuantity
-                )
-
-                // Key: Do not wait for sync completion
-                updateItem(updatedItem)
-                stopEditingItem()
-                _state.value = _state.value.copy(message = "Item updated")
-
-            } catch (e: Exception) {
-                Log.e(TAG, "Failed to update full item", e)
-                _state.value = _state.value.copy(error = "Update error: ${e.message}")
-            }
-        }
     }
 
     // Optimistic deletion

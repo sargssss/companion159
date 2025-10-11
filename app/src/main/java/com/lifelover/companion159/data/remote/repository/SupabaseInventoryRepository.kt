@@ -1,12 +1,10 @@
 package com.lifelover.companion159.data.remote.repository
 
 import android.util.Log
-import com.lifelover.companion159.data.local.entities.InventoryCategory
 import com.lifelover.companion159.data.local.entities.InventoryItemEntity
 import com.lifelover.companion159.data.remote.client.SupabaseClient
-import com.lifelover.companion159.data.remote.config.SupabaseConfig
-import com.lifelover.companion159.data.remote.models.SupabaseInventoryItem
-import io.github.jan.supabase.auth.auth
+import com.lifelover.companion159.data.remote.models.CrewInventoryItem
+import com.lifelover.companion159.data.sync.toCrewInventoryItem  // Import extension
 import io.github.jan.supabase.postgrest.from
 import io.github.jan.supabase.postgrest.query.Columns
 import kotlinx.coroutines.Dispatchers
@@ -19,135 +17,128 @@ class SupabaseInventoryRepository @Inject constructor() {
 
     companion object {
         private const val TAG = "SupabaseInventoryRepo"
+        private const val TABLE_NAME = "crew_inventory_items_duplicate"
     }
 
     private val client = SupabaseClient.client
 
-    suspend fun getAllItems(): List<SupabaseInventoryItem> = withContext(Dispatchers.IO) {
-        try {
-            val userId = client.auth.currentUserOrNull()?.id ?: return@withContext emptyList()
-            Log.d(TAG, "Fetching all items for user: $userId")
+    suspend fun getAllItems(crewName: String): List<CrewInventoryItem> =
+        withContext(Dispatchers.IO) {
+            try {
+                Log.d(TAG, "Fetching items for crew: $crewName")
 
-            val items = client.from(SupabaseConfig.TABLE_INVENTORY)
-                .select(columns = Columns.ALL) {
-                    filter {
-                        eq("user_id", userId)
+                val items = client.from(TABLE_NAME)
+                    .select(columns = Columns.ALL) {
+                        filter {
+                            eq("tenant_id", 0)
+                            eq("crew_name", crewName)
+                            eq("is_active", true)
+                        }
                     }
-                }
-                .decodeList<SupabaseInventoryItem>()
+                    .decodeList<CrewInventoryItem>()
 
-            Log.d(TAG, "Fetched ${items.size} items from server")
-            items
-        } catch (e: Exception) {
-            Log.e(TAG, "Error fetching all items", e)
-            emptyList()
+                Log.d(TAG, "✅ Fetched ${items.size} items from server")
+                items
+            } catch (e: Exception) {
+                Log.e(TAG, "❌ Error fetching items", e)
+                emptyList()
+            }
         }
-    }
 
-    suspend fun createItem(localItem: InventoryItemEntity): String? = withContext(Dispatchers.IO) {
+    suspend fun createItem(
+        localItem: InventoryItemEntity
+    ): Long? = withContext(Dispatchers.IO) {
         try {
-            val userId = client.auth.currentUserOrNull()?.id ?: return@withContext null
-            Log.d(TAG, "Creating item for user: $userId")
+            Log.d(TAG, "Creating item: ${localItem.itemName} for crew: ${localItem.crewName}")
 
-            val supabaseItem = SupabaseInventoryItem(
-                id = null,
-                name = localItem.name,
-                quantity = localItem.quantity,
-                category = localItem.category.name.lowercase(),
-                position = localItem.position,
-                userId = userId,
-                isDeleted = localItem.isDeleted
-            )
+            val crewItem = localItem.toCrewInventoryItem()  // Use extension function
 
-            val createdItems = client.from(SupabaseConfig.TABLE_INVENTORY)
-                .insert(supabaseItem) {
+            val createdItems = client.from(TABLE_NAME)
+                .insert(crewItem) {
                     select()
                 }
-                .decodeList<SupabaseInventoryItem>()
+                .decodeList<CrewInventoryItem>()
 
-            createdItems.firstOrNull()?.id
+            val serverId = createdItems.firstOrNull()?.id
+
+            if (serverId != null) {
+                Log.d(TAG, "✅ Item created with server ID: $serverId")
+            } else {
+                Log.e(TAG, "❌ Item created but no ID returned")
+            }
+
+            serverId
         } catch (e: Exception) {
-            Log.e(TAG, "Error creating item", e)
+            Log.e(TAG, "❌ Error creating item", e)
             null
         }
     }
 
-    suspend fun updateItem(supabaseId: String, localItem: InventoryItemEntity): Boolean = withContext(Dispatchers.IO) {
+    suspend fun updateItem(
+        supabaseId: Long,
+        localItem: InventoryItemEntity
+    ): Boolean = withContext(Dispatchers.IO) {
         try {
-            val userId = client.auth.currentUserOrNull()?.id ?: return@withContext false
-            Log.d(TAG, "UPDATING existing item with Supabase ID: $supabaseId, name: ${localItem.name}")
+            Log.d(TAG, "Updating item with server ID: $supabaseId")
 
-            val updatedItems = client.from(SupabaseConfig.TABLE_INVENTORY)
+            val updatedItems = client.from(TABLE_NAME)
                 .update({
-                    set("name", localItem.name)
-                    set("quantity", localItem.quantity)
-                    set("category", localItem.category.name.lowercase())
-                    set("position", localItem.position) // NEW: include position
-                    set("is_deleted", localItem.isDeleted)
+                    set("item_name", localItem.itemName)
+                    set("available_quantity", localItem.availableQuantity)
+                    set("crew_name", localItem.crewName)
+                    set("is_active", localItem.isActive)
                 }) {
                     filter {
                         eq("id", supabaseId)
-                        eq("user_id", userId)
+                        eq("tenant_id", 0)
                     }
                     select()
                 }
-                .decodeList<SupabaseInventoryItem>()
+                .decodeList<CrewInventoryItem>()
 
-            if (updatedItems.isNotEmpty()) {
-                Log.d(TAG, "✅ Successfully UPDATED item: ${localItem.name}")
-                true
+            val success = updatedItems.isNotEmpty()
+
+            if (success) {
+                Log.d(TAG, "✅ Item updated successfully")
             } else {
-                Log.e(TAG, "❌ No items updated for Supabase ID: $supabaseId")
-                false
+                Log.e(TAG, "❌ No items updated")
             }
+
+            success
         } catch (e: Exception) {
-            Log.e(TAG, "❌ Error updating item with Supabase ID: $supabaseId", e)
+            Log.e(TAG, "❌ Error updating item", e)
             false
         }
     }
 
-    suspend fun deleteItem(supabaseId: String): Boolean = withContext(Dispatchers.IO) {
+    suspend fun deleteItem(supabaseId: Long): Boolean = withContext(Dispatchers.IO) {
         try {
-            val userId = client.auth.currentUserOrNull()?.id ?: return@withContext false
-            Log.d(TAG, "DELETING item with Supabase ID: $supabaseId")
+            Log.d(TAG, "Deleting item with server ID: $supabaseId")
 
-            val deletedItems = client.from(SupabaseConfig.TABLE_INVENTORY)
+            val deletedItems = client.from(TABLE_NAME)
                 .update({
-                    set("is_deleted", true)
+                    set("is_active", false)
                 }) {
                     filter {
                         eq("id", supabaseId)
-                        eq("user_id", userId)
+                        eq("tenant_id", 0)
                     }
                     select()
                 }
-                .decodeList<SupabaseInventoryItem>()
+                .decodeList<CrewInventoryItem>()
 
-            if (deletedItems.isNotEmpty()) {
-                Log.d(TAG, "✅ Successfully DELETED item with Supabase ID: $supabaseId")
-                true
+            val success = deletedItems.isNotEmpty()
+
+            if (success) {
+                Log.d(TAG, "✅ Item deleted successfully")
             } else {
-                Log.e(TAG, "❌ No items deleted for Supabase ID: $supabaseId")
-                false
+                Log.e(TAG, "❌ No items deleted")
             }
+
+            success
         } catch (e: Exception) {
-            Log.e(TAG, "❌ Error deleting item with Supabase ID: $supabaseId", e)
+            Log.e(TAG, "❌ Error deleting item", e)
             false
         }
     }
-}
-
-fun SupabaseInventoryItem.toEntity(): InventoryItemEntity {
-    return InventoryItemEntity(
-        id = 0,
-        name = name,
-        quantity = quantity,
-        category = InventoryCategory.valueOf(category.uppercase()),
-        position = position,
-        supabaseId = id,
-        lastModified = java.util.Date(),
-        lastSynced = java.util.Date(),
-        needsSync = false,
-        isDeleted = isDeleted
-    )
 }
