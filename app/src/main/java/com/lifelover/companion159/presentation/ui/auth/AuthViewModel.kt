@@ -4,8 +4,6 @@ import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.lifelover.companion159.data.remote.auth.SupabaseAuthService
-import com.lifelover.companion159.data.sync.AutoSyncManager
-import com.lifelover.companion159.network.NetworkMonitor
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -20,11 +18,13 @@ data class AuthState(
     val hasExplicitlyLoggedOut: Boolean = false
 )
 
+/**
+ * ViewModel for authentication
+ * Handles login, logout, and auth state
+ */
 @HiltViewModel
 class AuthViewModel @Inject constructor(
-    private val authService: SupabaseAuthService,
-    private val networkMonitor: NetworkMonitor,
-    private val autoSyncManager: AutoSyncManager // НОВИЙ: Inject AutoSyncManager
+    private val authService: SupabaseAuthService
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(AuthState())
@@ -32,9 +32,11 @@ class AuthViewModel @Inject constructor(
 
     init {
         checkAuthStatus()
-        observeNetworkStatus()
     }
 
+    /**
+     * Observe authentication status from Supabase
+     */
     private fun checkAuthStatus() {
         viewModelScope.launch {
             authService.isAuthenticated.collect { isAuth ->
@@ -46,14 +48,9 @@ class AuthViewModel @Inject constructor(
         }
     }
 
-    private fun observeNetworkStatus() {
-        viewModelScope.launch {
-            networkMonitor.isOnlineFlow.collect { isOnline ->
-                _state.update { it.copy(isOffline = !isOnline) }
-            }
-        }
-    }
-
+    /**
+     * Sign in with email and password
+     */
     fun signIn(email: String, password: String) {
         viewModelScope.launch {
             _state.update { it.copy(isLoading = true, error = null) }
@@ -65,9 +62,6 @@ class AuthViewModel @Inject constructor(
                         isAuthenticated = true,
                         userEmail = email
                     )}
-
-                    // НОВИЙ: Тригер синхронізації після успішного входу
-                    triggerPostLoginSync()
                 }
                 .onFailure { exception ->
                     _state.update { it.copy(
@@ -78,6 +72,9 @@ class AuthViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Sign up with email and password
+     */
     fun signUp(email: String, password: String) {
         viewModelScope.launch {
             _state.update { it.copy(isLoading = true, error = null) }
@@ -98,6 +95,9 @@ class AuthViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Sign in with Google
+     */
     fun signInWithGoogle(context: Context) {
         viewModelScope.launch {
             _state.update { it.copy(isLoading = true, error = null) }
@@ -109,9 +109,6 @@ class AuthViewModel @Inject constructor(
                         isAuthenticated = true,
                         userEmail = authService.getCurrentUser()?.email
                     )}
-
-                    // НОВИЙ: Тригер синхронізації після успішного входу через Google
-                    triggerPostLoginSync()
                 }
                 .onFailure { exception ->
                     _state.update { it.copy(
@@ -123,20 +120,8 @@ class AuthViewModel @Inject constructor(
     }
 
     /**
-     * НОВИЙ: Тригер синхронізації після входу
+     * Sign out
      */
-    private fun triggerPostLoginSync() {
-        viewModelScope.launch {
-            try {
-                android.util.Log.d("AuthViewModel", "🎉 User logged in - initializing sync")
-                // AutoSyncManager автоматично перевірить офлайн елементи
-                // завдяки новій логіці onUserAuthenticated()
-            } catch (e: Exception) {
-                android.util.Log.e("AuthViewModel", "❌ Failed to trigger post-login sync", e)
-            }
-        }
-    }
-
     fun signOut() {
         viewModelScope.launch {
             authService.signOut()
@@ -147,10 +132,16 @@ class AuthViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Clear logout flag after navigation
+     */
     fun clearLogoutFlag() {
         _state.update { it.copy(hasExplicitlyLoggedOut = false) }
     }
 
+    /**
+     * Map exceptions to user-friendly error messages
+     */
     private fun mapError(exception: Throwable): String {
         return when {
             exception.message?.contains("Invalid login") == true ->

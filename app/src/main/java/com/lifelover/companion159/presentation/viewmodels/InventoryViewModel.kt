@@ -3,31 +3,47 @@ package com.lifelover.companion159.presentation.viewmodels
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.lifelover.companion159.data.sync.SyncService
-import com.lifelover.companion159.data.local.entities.InventoryCategory
-import com.lifelover.companion159.data.sync.SyncStatus
-import com.lifelover.companion159.domain.models.InventoryItem
 import com.lifelover.companion159.domain.models.DisplayCategory
+import com.lifelover.companion159.domain.models.InventoryItem
+import com.lifelover.companion159.domain.models.StorageCategory
 import com.lifelover.companion159.data.repository.InventoryRepositoryImpl
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
+/**
+ * UI state for inventory screens
+ */
 data class InventoryState(
     val items: List<InventoryItem> = emptyList(),
     val isLoading: Boolean = false,
-    val isSyncing: Boolean = false,
-    val syncStatus: SyncStatus = SyncStatus.IDLE,
-    val lastSyncTime: Long? = null,
     val error: String? = null,
     val message: String? = null,
-    val currentDisplayCategory: DisplayCategory? = null
+    val currentDisplayCategory: DisplayCategory? = null,
+    // Keep sync UI states for future use (but not functional now)
+    val syncStatus: SyncStatus = SyncStatus.IDLE,
+    val lastSyncTime: Long? = null
 )
 
+/**
+ * Sync status enum - kept for UI compatibility
+ * Will be functional again when sync is re-implemented
+ */
+enum class SyncStatus {
+    IDLE,
+    SYNCING,
+    SUCCESS,
+    ERROR,
+    OFFLINE
+}
+
+/**
+ * ViewModel for inventory operations
+ * Manages UI state and coordinates with repository
+ */
 @HiltViewModel
 class InventoryViewModel @Inject constructor(
-    private val syncService: SyncService,
     private val repository: InventoryRepositoryImpl
 ) : ViewModel() {
 
@@ -37,27 +53,6 @@ class InventoryViewModel @Inject constructor(
 
     private val _state = MutableStateFlow(InventoryState())
     val state = _state.asStateFlow()
-
-    init {
-        observeSyncStatus()
-    }
-
-    private fun observeSyncStatus() {
-        viewModelScope.launch {
-            syncService.syncStatus.collect { status ->
-                _state.update { it.copy(
-                    syncStatus = status,
-                    isSyncing = status == SyncStatus.SYNCING
-                )}
-            }
-        }
-
-        viewModelScope.launch {
-            syncService.lastSyncTime.collect { time ->
-                _state.update { it.copy(lastSyncTime = time) }
-            }
-        }
-    }
 
     /**
      * Load items based on DisplayCategory
@@ -87,10 +82,7 @@ class InventoryViewModel @Inject constructor(
 
     /**
      * Add new item
-     * Category logic:
-     * - If displayCategory is AMMUNITION -> InventoryCategory.AMMUNITION
-     * - If displayCategory is NEEDS -> Check if ammunition exists, otherwise EQUIPMENT
-     * - Otherwise -> InventoryCategory.EQUIPMENT (default)
+     * Determines storage category based on display context
      */
     fun addNewItem(
         name: String,
@@ -107,37 +99,30 @@ class InventoryViewModel @Inject constructor(
                 Log.d(TAG, "   Needed: $neededQuantity")
                 Log.d(TAG, "   Display category: $displayCategory")
 
-                // Determine internal category
-                val internalCategory: InventoryCategory = when (displayCategory) {
-                    DisplayCategory.AMMUNITION -> {
-                        InventoryCategory.AMMUNITION
-                    }
-                    DisplayCategory.NEEDS -> {
-                        InventoryCategory.EQUIPMENT
-                    }
-                    else -> {
-                        // Creating from Наявність -> always EQUIPMENT
-                        InventoryCategory.EQUIPMENT
-                    }
+                // Determine internal category based on DisplayCategory
+                val storageCategory: StorageCategory = when (displayCategory) {
+                    DisplayCategory.AMMUNITION -> StorageCategory.AMMUNITION
+                    DisplayCategory.AVAILABILITY,
+                    DisplayCategory.NEEDS -> StorageCategory.EQUIPMENT
                 }
 
-                Log.d(TAG, "   Internal category: $internalCategory")
+                Log.d(TAG, "   Storage category: $storageCategory")
 
                 val item = InventoryItem(
                     id = 0,
                     itemName = name.trim(),
                     availableQuantity = availableQuantity,
                     neededQuantity = neededQuantity,
-                    category = internalCategory,
+                    category = storageCategory,
                     crewName = ""  // Will be set in repository
                 )
 
                 repository.addItem(item)
-                Log.d(TAG, "Item created successfully")
+                Log.d(TAG, "✅ Item created successfully")
                 _state.update { it.copy(message = "Предмет додано") }
 
             } catch (e: Exception) {
-                Log.e(TAG, "Failed to add item", e)
+                Log.e(TAG, "❌ Failed to add item", e)
                 _state.update { it.copy(error = e.message) }
             }
         }
@@ -145,6 +130,7 @@ class InventoryViewModel @Inject constructor(
 
     /**
      * Update full item with both quantities
+     * Used when editing item from AddEditItemScreen
      */
     fun updateFullItem(
         itemId: Long,
@@ -162,22 +148,24 @@ class InventoryViewModel @Inject constructor(
                 Log.d(TAG, "   New name: $newName")
                 Log.d(TAG, "   New available: $newAvailableQuantity")
                 Log.d(TAG, "   New needed: $newNeededQuantity")
-                Log.d(TAG, "   Display category: $displayCategory")
 
                 // Get existing item to preserve other fields
                 val existingItem = _state.value.items.find { it.id == itemId }
                 if (existingItem == null) {
                     Log.e(TAG, "❌ Item not found in current state: $itemId")
-                    // Try to get from repository
+                    // Create new item object with updated values
+                    val storageCategory = when (displayCategory) {
+                        DisplayCategory.AMMUNITION -> StorageCategory.AMMUNITION
+                        DisplayCategory.AVAILABILITY,
+                        DisplayCategory.NEEDS -> StorageCategory.EQUIPMENT
+                    }
+
                     val item = InventoryItem(
                         id = itemId,
                         itemName = newName.trim(),
                         availableQuantity = newAvailableQuantity,
                         neededQuantity = newNeededQuantity,
-                        category = when (displayCategory) {
-                            DisplayCategory.AMMUNITION -> InventoryCategory.AMMUNITION
-                            else -> InventoryCategory.EQUIPMENT
-                        },
+                        category = storageCategory,
                         crewName = ""  // Will be set in repository
                     )
                     repository.updateItem(item)
@@ -205,51 +193,41 @@ class InventoryViewModel @Inject constructor(
     }
 
     /**
-     * Update available quantity (for AVAILABILITY and AMMUNITION categories)
+     * Update quantity based on display category
+     * - AVAILABILITY/AMMUNITION: updates available_quantity
+     * - NEEDS: updates needed_quantity
      */
-    fun updateAvailableQuantity(item: InventoryItem, newQuantity: Int) {
+    fun updateQuantity(
+        itemId: Long,
+        newQuantity: Int,
+        displayCategory: DisplayCategory
+    ) {
         if (newQuantity < 0) return
 
         viewModelScope.launch {
             try {
-                Log.d(TAG, "Updating available quantity: ${item.itemName}, new: $newQuantity")
-                repository.updateItemQuantity(item.id, newQuantity)
-
+                when (displayCategory) {
+                    DisplayCategory.AVAILABILITY,
+                    DisplayCategory.AMMUNITION -> {
+                        Log.d(TAG, "Updating available quantity: $itemId -> $newQuantity")
+                        repository.updateItemQuantity(itemId, newQuantity)
+                    }
+                    DisplayCategory.NEEDS -> {
+                        Log.d(TAG, "Updating needed quantity: $itemId -> $newQuantity")
+                        repository.updateNeededQuantity(itemId, newQuantity)
+                    }
+                }
             } catch (e: Exception) {
-                Log.e(TAG, "Failed to update available quantity", e)
+                Log.e(TAG, "❌ Failed to update quantity", e)
                 _state.update { it.copy(error = "Помилка: ${e.message}") }
             }
         }
     }
 
     /**
-     * Update needed quantity (for NEEDS category)
-     * CRITICAL: This triggers DB update which should reflect in UI via Flow
+     * Delete item by ID
      */
-    fun updateNeededQuantity(item: InventoryItem, newQuantity: Int) {
-        if (newQuantity < 0) return
-
-        viewModelScope.launch {
-            try {
-                Log.d(TAG, "🔄 Updating needed quantity: ${item.itemName}")
-                Log.d(TAG, "   Item ID: ${item.id}")
-                Log.d(TAG, "   Old needed: ${item.neededQuantity} -> New needed: $newQuantity")
-
-                repository.updateNeededQuantity(item.id, newQuantity)
-
-                Log.d(TAG, "✅ Needed quantity update completed")
-
-            } catch (e: Exception) {
-                Log.e(TAG, "❌ Failed to update needed quantity", e)
-                _state.update { it.copy(error = "Помилка: ${e.message}") }
-            }
-        }
-    }
-
-    /**
-     * Delete item
-     */
-    fun deleteItemById(id: Long) {
+    fun deleteItem(id: Long) {
         viewModelScope.launch {
             try {
                 Log.d(TAG, "Deleting item ID: $id")
@@ -257,31 +235,22 @@ class InventoryViewModel @Inject constructor(
                 _state.update { it.copy(message = "Предмет видалено") }
 
             } catch (e: Exception) {
-                Log.e(TAG, "Failed to delete item", e)
+                Log.e(TAG, "❌ Failed to delete item", e)
                 _state.update { it.copy(error = "Помилка видалення: ${e.message}") }
             }
         }
     }
 
     /**
-     * Manual sync
+     * Sync function - kept for UI compatibility
+     * Does nothing until sync is re-implemented
      */
-    fun syncData() {
-        viewModelScope.launch {
-            try {
-                Log.d(TAG, "Manual sync requested")
-                syncService.performSync()
-                    .onSuccess {
-                        _state.update { it.copy(message = "Синхронізація успішна") }
-                    }
-                    .onFailure { error ->
-                        _state.update { it.copy(error = "Помилка синхронізації: ${error.message}") }
-                    }
-            } catch (e: Exception) {
-                Log.e(TAG, "Manual sync failed", e)
-                _state.update { it.copy(error = "Помилка синхронізації: ${e.message}") }
-            }
-        }
+    fun sync() {
+        Log.d(TAG, "⚠️ Sync called but not implemented (sync removed)")
+        _state.update { it.copy(
+            syncStatus = SyncStatus.IDLE,
+            message = "Синхронізація тимчасово недоступна"
+        )}
     }
 
     fun clearMessage() {

@@ -41,15 +41,6 @@ class SupabaseAuthService @Inject constructor(
      */
     fun getUserId(): String? = getCurrentUser()?.id
 
-    fun getUserIdForSync(): String? {
-        val currentUserId = getUserId()
-        if (currentUserId != null) {
-            return currentUserId
-        }
-
-        return userPreferences.getLastUserId()
-    }
-
     private fun saveCurrentUserAsLast() {
         val user = getCurrentUser()
         if (user != null) {

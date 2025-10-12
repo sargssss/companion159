@@ -13,22 +13,22 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.lifelover.companion159.R
-import com.lifelover.companion159.data.sync.SyncStatus
-import com.lifelover.companion159.domain.models.Category
 import com.lifelover.companion159.domain.models.DisplayCategory
 import com.lifelover.companion159.domain.models.titleRes
 import com.lifelover.companion159.presentation.ui.auth.AuthViewModel
 import com.lifelover.companion159.presentation.viewmodels.InventoryViewModel
+import com.lifelover.companion159.presentation.viewmodels.SyncStatus
 import java.text.SimpleDateFormat
 import java.util.*
 
 /**
- * Main menu screen with category buttons and sync status
+ * Main menu screen with category buttons
+ * Sync UI is kept for future implementation but not functional
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainMenuScreen(
-    onCategorySelected: (Category) -> Unit = {},
+    onDisplayCategorySelected: (DisplayCategory) -> Unit = {},
     onLogout: () -> Unit = {},
     onChangePosition: () -> Unit = {},
     authViewModel: AuthViewModel = hiltViewModel(),
@@ -57,7 +57,7 @@ fun MainMenuScreen(
                 )
             },
             actions = {
-                // Sync status indicator
+                // Sync status indicator (kept for UI, but not functional)
                 when (inventoryState.syncStatus) {
                     SyncStatus.SYNCING -> {
                         CircularProgressIndicator(
@@ -91,7 +91,7 @@ fun MainMenuScreen(
                     else -> {}
                 }
 
-                // Sync button
+                // Sync button (kept for UI, shows message when clicked)
                 if (authState.isAuthenticated && !authState.isOffline) {
                     IconButton(
                         onClick = { inventoryViewModel.sync() },
@@ -184,7 +184,7 @@ fun MainMenuScreen(
             }
         )
 
-        // Status card
+        // Status card (kept for UI)
         when {
             authState.isAuthenticated && !authState.isOffline -> {
                 StatusCard(
@@ -211,6 +211,7 @@ fun MainMenuScreen(
             }
         }
 
+        // Category buttons
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -242,10 +243,18 @@ fun MainMenuScreen(
             }
         }
 
-        // Error handling
+        // Show messages from ViewModel
+        inventoryState.message?.let { message ->
+            LaunchedEffect(message) {
+                // Show Snackbar
+                inventoryViewModel.clearMessage()
+            }
+        }
+
         inventoryState.error?.let { error ->
             LaunchedEffect(error) {
-                // Show Snackbar or Toast
+                // Show Snackbar
+                inventoryViewModel.clearError()
             }
         }
     }
@@ -293,12 +302,6 @@ private fun LogoutConfirmationDialog(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = "Несинхронізовані зміни будуть збережені локально.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
             }
         },
         confirmButton = {
@@ -320,7 +323,8 @@ private fun LogoutConfirmationDialog(
 }
 
 /**
- * Status card showing user and sync info
+ * Status card showing user info
+ * Sync info kept for UI but not functional
  */
 @Composable
 private fun StatusCard(

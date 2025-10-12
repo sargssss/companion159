@@ -16,18 +16,19 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.lifelover.companion159.R
-import com.lifelover.companion159.domain.models.Category
+import com.lifelover.companion159.domain.models.DisplayCategory
 import com.lifelover.companion159.domain.models.InventoryItem
+import com.lifelover.companion159.domain.models.titleRes
 import com.lifelover.companion159.presentation.viewmodels.InventoryViewModel
 
 /**
- * Screen for displaying inventory items filtered by category
+ * Screen for displaying inventory items filtered by display category
  * Supports CRUD operations and quantity updates
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun InventoryScreen(
-    category: Category,
+    displayCategory: DisplayCategory,
     onBackPressed: () -> Unit,
     onAddItem: () -> Unit,
     onEditItem: (InventoryItem) -> Unit,
@@ -37,8 +38,8 @@ fun InventoryScreen(
     var itemToDelete by remember { mutableStateOf<InventoryItem?>(null) }
 
     // Load items when screen opens
-    LaunchedEffect(category) {
-        viewModel.loadItems(category)
+    LaunchedEffect(displayCategory) {
+        viewModel.loadItems(displayCategory)
     }
 
     // Handle messages
@@ -70,7 +71,7 @@ fun InventoryScreen(
         TopAppBar(
             title = {
                 Text(
-                    text = stringResource(category.titleRes),
+                    text = stringResource(displayCategory.titleRes()),
                     fontWeight = FontWeight.Bold
                 )
             },
@@ -105,7 +106,7 @@ fun InventoryScreen(
 
             state.items.isEmpty() -> {
                 EmptyState(
-                    category = category,
+                    displayCategory = displayCategory,
                     onAddClick = onAddItem
                 )
             }
@@ -119,9 +120,9 @@ fun InventoryScreen(
                     items(state.items, key = { it.id }) { item ->
                         InventoryItemCard(
                             item = item,
-                            displayCategory = category,
+                            displayCategory = displayCategory,
                             onQuantityChange = { newQuantity ->
-                                viewModel.updateQuantity(item.id, newQuantity, category)
+                                viewModel.updateQuantity(item.id, newQuantity, displayCategory)
                             },
                             onDelete = { itemToDelete = item },
                             onEdit = { onEditItem(item) },
@@ -139,7 +140,7 @@ fun InventoryScreen(
  */
 @Composable
 private fun EmptyState(
-    category: Category,
+    displayCategory: DisplayCategory,
     onAddClick: () -> Unit
 ) {
     Box(
@@ -152,11 +153,10 @@ private fun EmptyState(
             modifier = Modifier.padding(48.dp)
         ) {
             Text(
-                text = when (category) {
-                    is Category.Availability -> "Немає предметів в наявності"
-                    is Category.Ammunition -> "Немає БК"
-                    is Category.Needs -> "Немає потреб"
-                    else -> "Пусто"
+                text = when (displayCategory) {
+                    DisplayCategory.AVAILABILITY -> "Немає предметів в наявності"
+                    DisplayCategory.AMMUNITION -> "Немає БК"
+                    DisplayCategory.NEEDS -> "Немає потреб"
                 },
                 style = MaterialTheme.typography.headlineSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -165,8 +165,8 @@ private fun EmptyState(
             )
 
             Text(
-                text = when (category) {
-                    is Category.Needs -> "Додайте предмети з потрібною кількістю"
+                text = when (displayCategory) {
+                    DisplayCategory.NEEDS -> "Додайте предмети з потрібною кількістю"
                     else -> "Натисніть + щоб додати"
                 },
                 style = MaterialTheme.typography.bodyLarge,

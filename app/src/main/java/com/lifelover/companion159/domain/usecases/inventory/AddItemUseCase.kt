@@ -1,10 +1,10 @@
 package com.lifelover.companion159.domain.usecases.inventory
 
 import com.lifelover.companion159.data.repository.InventoryRepository
-import com.lifelover.companion159.domain.models.Category
+import com.lifelover.companion159.domain.models.DisplayCategory
 import com.lifelover.companion159.domain.models.InventoryItem
 import com.lifelover.companion159.domain.models.InventoryResult
-import com.lifelover.companion159.domain.models.toStorageCategory
+import com.lifelover.companion159.domain.models.StorageCategory
 import javax.inject.Inject
 
 /**
@@ -18,7 +18,7 @@ class AddItemUseCase @Inject constructor(
         name: String,
         availableQuantity: Int,
         neededQuantity: Int,
-        displayCategory: Category
+        displayCategory: DisplayCategory
     ): InventoryResult {
         // Validation
         if (name.isBlank()) {
@@ -30,8 +30,12 @@ class AddItemUseCase @Inject constructor(
         }
 
         return try {
-            // Determine storage category
-            val storageCategory = displayCategory.toStorageCategory()
+            // Determine storage category based on DisplayCategory
+            val storageCategory = when (displayCategory) {
+                DisplayCategory.AMMUNITION -> StorageCategory.AMMUNITION
+                DisplayCategory.AVAILABILITY,
+                DisplayCategory.NEEDS -> StorageCategory.EQUIPMENT
+            }
 
             val item = InventoryItem(
                 id = 0,

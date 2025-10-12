@@ -1,8 +1,6 @@
 package com.lifelover.companion159.presentation.ui.components
 
 import androidx.compose.foundation.layout.*
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -10,8 +8,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import com.lifelover.companion159.R
-import com.lifelover.companion159.data.sync.SyncStatus // Використовуємо правильний SyncStatus
+import com.lifelover.companion159.presentation.viewmodels.SyncStatus
 
+/**
+ * Sync status indicator component
+ * Kept for UI compatibility - will be functional when sync is re-implemented
+ */
 @Composable
 fun SyncStatusIndicator(
     status: SyncStatus,
@@ -25,7 +27,7 @@ fun SyncStatusIndicator(
         when (status) {
             SyncStatus.SUCCESS -> {
                 Icon(
-                    painter = painterResource(R.drawable.sync_attention),
+                    painter = painterResource(R.drawable.sync_check),
                     contentDescription = "Синхронізовано",
                     modifier = Modifier.size(16.dp),
                     tint = MaterialTheme.colorScheme.primary
