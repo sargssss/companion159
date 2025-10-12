@@ -26,9 +26,7 @@ class BootReceiver : BroadcastReceiver() {
                     val autoSyncManager = ServiceLocator.getAutoSyncManager(context)
                     autoSyncManager.initialize()
 
-                    // Перевірка чи є незсинхронізовані дані
                     val syncService = ServiceLocator.getSyncService(context)
-                    // Запускаємо в корутині
                     kotlinx.coroutines.GlobalScope.launch {
                         if (syncService.hasUnsyncedChanges()) {
                             autoSyncManager.triggerImmediateSync()

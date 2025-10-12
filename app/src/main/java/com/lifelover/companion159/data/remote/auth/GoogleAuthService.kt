@@ -38,9 +38,6 @@ class GoogleAuthService @Inject constructor(
      */
     suspend fun signInWithGoogle(activityContext: Context): Result<GoogleSignInResult> = withContext(Dispatchers.Main) {
         try {
-            Log.d(TAG, "=== Starting Google Sign-In ===")
-            Log.d(TAG, "Web Client ID: ${BuildConfig.GOOGLE_WEB_CLIENT_ID}")
-
             // Check if Web Client ID is configured
             if (BuildConfig.GOOGLE_WEB_CLIENT_ID.isEmpty() ||
                 BuildConfig.GOOGLE_WEB_CLIENT_ID == "\"\"") {
@@ -51,39 +48,25 @@ class GoogleAuthService @Inject constructor(
             }
 
             // Configure Google ID option
-            Log.d(TAG, "Creating GetGoogleIdOption...")
             val googleIdOption = GetGoogleIdOption.Builder()
                 .setServerClientId(BuildConfig.GOOGLE_WEB_CLIENT_ID)
-                .setFilterByAuthorizedAccounts(false) // Allow account picker
-                .setAutoSelectEnabled(false) // Always show account picker
+                .setFilterByAuthorizedAccounts(false)
+                .setAutoSelectEnabled(false)
                 .build()
 
-            Log.d(TAG, "GetGoogleIdOption created successfully")
-
             // Create credential request
-            Log.d(TAG, "Creating GetCredentialRequest...")
             val request = GetCredentialRequest.Builder()
                 .addCredentialOption(googleIdOption)
                 .build()
 
-            Log.d(TAG, "GetCredentialRequest created successfully")
-
             // Get Google credential
-            Log.d(TAG, "Requesting credentials from CredentialManager...")
             val result = credentialManager.getCredential(
                 request = request,
                 context = activityContext // Use Activity context instead of Application context
             )
 
-            Log.d(TAG, "Credential received, type: ${result.credential.type}")
-
             // Parse Google ID token
-            Log.d(TAG, "Parsing Google ID token...")
             val credential = GoogleIdTokenCredential.createFrom(result.credential.data)
-
-            Log.d(TAG, "Google ID token parsed successfully")
-            Log.d(TAG, "Display name: ${credential.displayName}")
-            Log.d(TAG, "Email: ${credential.id}")
 
             val signInResult = GoogleSignInResult(
                 idToken = credential.idToken,
@@ -96,23 +79,12 @@ class GoogleAuthService @Inject constructor(
             Result.success(signInResult)
 
         } catch (e: GetCredentialException) {
-            Log.e(TAG, "=== GetCredentialException ===")
-            Log.e(TAG, "Exception type: ${e.javaClass.simpleName}")
-            Log.e(TAG, "Exception message: ${e.message}")
-            Log.e(TAG, "Stack trace:", e)
             Result.failure(Exception("Google Sign-In failed: ${e.message}"))
 
         } catch (e: GoogleIdTokenParsingException) {
-            Log.e(TAG, "=== GoogleIdTokenParsingException ===")
-            Log.e(TAG, "Exception message: ${e.message}")
-            Log.e(TAG, "Stack trace:", e)
             Result.failure(Exception("Invalid Google token: ${e.message}"))
 
         } catch (e: Exception) {
-            Log.e(TAG, "=== Unexpected Exception ===")
-            Log.e(TAG, "Exception type: ${e.javaClass.simpleName}")
-            Log.e(TAG, "Exception message: ${e.message}")
-            Log.e(TAG, "Stack trace:", e)
             Result.failure(Exception("Authentication error: ${e.message}"))
         }
     }
@@ -122,11 +94,9 @@ class GoogleAuthService @Inject constructor(
      */
     suspend fun signOut(): Result<Unit> = withContext(Dispatchers.IO) {
         try {
-            Log.d(TAG, "Signing out from Google")
             // Credential Manager handles sign out automatically
             Result.success(Unit)
         } catch (e: Exception) {
-            Log.e(TAG, "Sign out error", e)
             Result.failure(e)
         }
     }

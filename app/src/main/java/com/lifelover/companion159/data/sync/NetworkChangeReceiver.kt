@@ -35,7 +35,6 @@ class NetworkChangeReceiver : BroadcastReceiver() {
                             val syncService = com.lifelover.companion159.di.ServiceLocator
                                 .getSyncService(context)
 
-                            // ЗМІНЕНО: Використовуємо getUserIdForSync()
                             val userId = authService.getUserIdForSync()
                             val currentUser = authService.getCurrentUser()
 

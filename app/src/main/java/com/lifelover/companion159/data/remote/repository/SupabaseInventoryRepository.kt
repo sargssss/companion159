@@ -30,14 +30,13 @@ class SupabaseInventoryRepository @Inject constructor() {
                 val items = client.from(TABLE_NAME)
                     .select(columns = Columns.ALL) {
                         filter {
-                            eq("tenant_id", 0)  // FIXED: snake_case
+                            //eq("tenant_id", 0)  // FIXED: snake_case
                             eq("crew_name", crewName)
                             eq("is_active", true)
                         }
                     }
                     .decodeList<CrewInventoryItem>()
 
-                Log.d(TAG, "✅ Fetched ${items.size} items from server")
                 items
             } catch (e: Exception) {
                 Log.e(TAG, "❌ Error fetching items", e)
@@ -85,13 +84,13 @@ class SupabaseInventoryRepository @Inject constructor() {
                 .update({
                     set("item_name", localItem.itemName)
                     set("available_quantity", localItem.availableQuantity)
-                    set("needed_quantity", localItem.neededQuantity)  // NEW
+                    set("needed_quantity", localItem.neededQuantity)
                     set("crew_name", localItem.crewName)
                     set("is_active", localItem.isActive)
                 }) {
                     filter {
                         eq("id", supabaseId)
-                        eq("tenant_id", 0)  // FIXED: snake_case
+                        //eq("tenant_id", 0)
                     }
                     select()
                 }
@@ -114,15 +113,13 @@ class SupabaseInventoryRepository @Inject constructor() {
 
     suspend fun deleteItem(supabaseId: Long): Boolean = withContext(Dispatchers.IO) {
         try {
-            Log.d(TAG, "Deleting item with server ID: $supabaseId")
-
             val deletedItems = client.from(TABLE_NAME)
                 .update({
                     set("is_active", false)
                 }) {
                     filter {
                         eq("id", supabaseId)
-                        eq("tenant_id", 0)  // FIXED: snake_case
+                        eq("tenant_id", 0)
                     }
                     select()
                 }

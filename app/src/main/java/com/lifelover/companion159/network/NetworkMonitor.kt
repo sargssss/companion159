@@ -10,8 +10,6 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import javax.inject.Inject
@@ -30,7 +28,6 @@ class NetworkMonitor @Inject constructor(
 
     // StateFlow for immediate access to current state
     private val _isOnlineState = MutableStateFlow(getCurrentNetworkStatus())
-    val isOnlineState: StateFlow<Boolean> = _isOnlineState.asStateFlow()
 
     /**
      * Current network status - synchronous access
@@ -146,35 +143,4 @@ class NetworkMonitor @Inject constructor(
         return capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
                 capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
     }
-
-    /**
-     * Check if device has any network connection (even without internet)
-     */
-    fun hasNetworkConnection(): Boolean {
-        val activeNetwork = connectivityManager.activeNetwork ?: return false
-        val capabilities = connectivityManager.getNetworkCapabilities(activeNetwork) ?: return false
-
-        return capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) ||
-                capabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) ||
-                capabilities.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET)
-    }
-
-    /**
-     * Get current network type
-     */
-    fun getNetworkType(): NetworkType {
-        val activeNetwork = connectivityManager.activeNetwork ?: return NetworkType.NONE
-        val capabilities = connectivityManager.getNetworkCapabilities(activeNetwork) ?: return NetworkType.NONE
-
-        return when {
-            capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) -> NetworkType.WIFI
-            capabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) -> NetworkType.CELLULAR
-            capabilities.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) -> NetworkType.ETHERNET
-            else -> NetworkType.OTHER
-        }
-    }
-}
-
-enum class NetworkType {
-    WIFI, CELLULAR, ETHERNET, OTHER, NONE
 }

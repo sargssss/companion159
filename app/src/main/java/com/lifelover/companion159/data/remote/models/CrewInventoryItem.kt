@@ -48,8 +48,7 @@ data class CrewInventoryItem(
     @SerialName("updated_by")
     val updatedBy: Long? = null,
 
-    // FIXED: Use JsonObject or remove entirely
-    val metadata: JsonObject? = null,  // Changed from Map<String, Any>?
+    val metadata: JsonObject? = null,
 
     @SerialName("is_active")
     val isActive: Boolean = true,

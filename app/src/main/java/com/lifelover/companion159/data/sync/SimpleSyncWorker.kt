@@ -23,10 +23,8 @@ class SimpleSyncWorker(
         try {
             Log.d(TAG, "🔄 SimpleSyncWorker started")
 
-            // Отримуємо SyncService через ServiceLocator
             val syncService = ServiceLocator.getSyncService(applicationContext)
 
-            // Виконуємо синхронізацію (перевірка userId всередині SyncService)
             val result = syncService.performSync()
 
             result.fold(
@@ -43,7 +41,7 @@ class SimpleSyncWorker(
                         }
                         error.message?.contains("No user", ignoreCase = true) == true -> {
                             Log.d(TAG, "⚠️ No user available - cannot sync")
-                            Result.success() // Не повторювати
+                            Result.success()
                         }
                         else -> Result.failure()
                     }

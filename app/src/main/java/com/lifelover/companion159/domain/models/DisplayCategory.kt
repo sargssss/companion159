@@ -7,9 +7,9 @@ import com.lifelover.companion159.R
  * These are separate from internal InventoryCategory
  */
 enum class DisplayCategory {
-    AVAILABILITY,  // Наявність: items with available_quantity > 0 (except БК)
-    AMMUNITION,    // БК: items with category == AMMUNITION
-    NEEDS         // Потреба: items with needed_quantity > 0 (except БК)
+    AVAILABILITY,
+    AMMUNITION,
+    NEEDS
 }
 
 fun DisplayCategory.titleRes(): Int = when (this) {

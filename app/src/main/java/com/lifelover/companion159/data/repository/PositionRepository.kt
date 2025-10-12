@@ -8,6 +8,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import javax.inject.Inject
 import javax.inject.Singleton
+import androidx.core.content.edit
 
 @Singleton
 class PositionRepository @Inject constructor(
@@ -44,16 +45,8 @@ class PositionRepository @Inject constructor(
      * Save position to SharedPreferences
      */
     fun savePosition(position: String) {
-        prefs.edit().putString(KEY_POSITION, position.trim()).apply()
+        prefs.edit { putString(KEY_POSITION, position.trim()) }
         _currentPosition.value = position.trim()
-    }
-
-    /**
-     * Clear saved position
-     */
-    fun clearPosition() {
-        prefs.edit().remove(KEY_POSITION).apply()
-        _currentPosition.value = null
     }
 
     /**

@@ -8,7 +8,7 @@ data class InventoryItem(
     val id: Long = 0,
     val itemName: String,
     val availableQuantity: Int = 0,
-    val neededQuantity: Int = 0,  // NEW
+    val neededQuantity: Int = 0,
     val category: InventoryCategory,
     val crewName: String,
     val lastModified: Date = Date(),
@@ -21,7 +21,7 @@ fun InventoryItemEntity.toDomainModel(): InventoryItem {
         id = id,
         itemName = itemName,
         availableQuantity = availableQuantity,
-        neededQuantity = neededQuantity,  // NEW
+        neededQuantity = neededQuantity,
         category = category,
         crewName = crewName,
         lastModified = lastModified,
@@ -34,7 +34,7 @@ fun InventoryItem.toEntity(): InventoryItemEntity {
         id = id,
         itemName = itemName,
         availableQuantity = availableQuantity,
-        neededQuantity = neededQuantity,  // NEW
+        neededQuantity = neededQuantity,
         category = category,
         crewName = crewName,
         supabaseId = null,

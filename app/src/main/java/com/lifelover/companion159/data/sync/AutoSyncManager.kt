@@ -23,7 +23,7 @@ class AutoSyncManager @Inject constructor(
     private val syncService: SyncService,
     private val networkMonitor: NetworkMonitor,
     private val authService: SupabaseAuthService,
-    private val userPreferences: UserPreferences // НОВИЙ
+    private val userPreferences: UserPreferences
 ) {
     companion object {
         private const val TAG = "AutoSyncManager"
@@ -55,15 +55,10 @@ class AutoSyncManager @Inject constructor(
                     isOnline to isAuthenticated
                 }.collectLatest { (isOnline, isAuthenticated) ->
 
-                    // Перевіряємо чи є взагалі користувач (поточний або останній)
                     val hasUser = isAuthenticated || userPreferences.hasLastUser()
 
-                    Log.d(TAG, "📡 State - Online: $isOnline, Current auth: $isAuthenticated, Has user: $hasUser")
-
-                    // Виявляємо щойно автентифікованого користувача
                     val justAuthenticated = isAuthenticated && !wasAuthenticated
                     if (justAuthenticated) {
-                        Log.d(TAG, "🎉 User just authenticated! Checking for offline data...")
                         wasAuthenticated = true
                         onUserAuthenticated()
                     } else if (!isAuthenticated) {
@@ -201,17 +196,6 @@ class AutoSyncManager @Inject constructor(
         }
     }
 
-    fun cancelAllSync() {
-        try {
-            Log.d(TAG, "🛑 Cancelling all sync operations")
-            val workManager = WorkManager.getInstance(context)
-            workManager.cancelAllWorkByTag(IMMEDIATE_SYNC_TAG)
-            workManager.cancelAllWorkByTag(PERIODIC_SYNC_TAG)
-        } catch (e: Exception) {
-            Log.e(TAG, "❌ Error cancelling all sync", e)
-        }
-    }
-
     private fun createSyncConstraints(): Constraints {
         return Constraints.Builder()
             .setRequiredNetworkType(NetworkType.CONNECTED)
@@ -220,13 +204,5 @@ class AutoSyncManager @Inject constructor(
             .setRequiresDeviceIdle(false)
             .setRequiresStorageNotLow(true)
             .build()
-    }
-
-    fun getSyncWorkInfo() = try {
-        val workManager = WorkManager.getInstance(context)
-        workManager.getWorkInfosByTagLiveData(IMMEDIATE_SYNC_TAG)
-    } catch (e: Exception) {
-        Log.e(TAG, "❌ Error getting sync work info", e)
-        null
     }
 }

@@ -142,10 +142,6 @@ interface InventoryDao {
         timestamp: Date = Date()
     ): Int
 
-    // Get Supabase ID
-    @Query("SELECT supabaseId FROM inventory_items WHERE id = :localId")
-    suspend fun getSupabaseId(localId: Long): Long?  // Changed from String? to Long?
-
     // Update from server (during sync PULL)
     @Query("""
         UPDATE inventory_items 

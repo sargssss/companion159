@@ -1,21 +1,19 @@
 package com.lifelover.companion159.presentation.navigation
 
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.toRoute
-import com.lifelover.companion159.data.local.entities.InventoryCategory
 import com.lifelover.companion159.data.remote.config.SupabaseConfig
+import com.lifelover.companion159.domain.models.DisplayCategory
 import com.lifelover.companion159.presentation.ui.auth.LoginScreen
+import com.lifelover.companion159.presentation.ui.inventory.AddEditItemScreen
 import com.lifelover.companion159.presentation.ui.inventory.InventoryScreen
 import com.lifelover.companion159.presentation.ui.main.MainMenuScreen
 import com.lifelover.companion159.presentation.ui.position.PositionScreen
-import androidx.hilt.navigation.compose.hiltViewModel
-import com.lifelover.companion159.domain.models.DisplayCategory
-import com.lifelover.companion159.domain.models.InventoryItem
 import com.lifelover.companion159.presentation.viewmodels.InventoryViewModel
-import com.lifelover.companion159.presentation.ui.inventory.AddEditItemScreen
 import kotlinx.serialization.Serializable
 
 @Serializable
@@ -28,18 +26,17 @@ object Position
 object MainMenu
 
 @Serializable
-data class InventoryDetail(val displayCategory: String)  // CHANGED: use String for DisplayCategory
-
+data class InventoryDetail(val displayCategory: String)
 @Serializable
-data class AddItem(val displayCategory: String)  // CHANGED
+data class AddItem(val displayCategory: String)
 
 @Serializable
 data class EditItem(
-    val displayCategory: String,  // CHANGED
+    val displayCategory: String,
     val itemId: Long,
     val itemName: String,
     val availableQuantity: Int,
-    val neededQuantity: Int  // NEW
+    val neededQuantity: Int
 )
 
 @Composable

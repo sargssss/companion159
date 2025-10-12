@@ -50,17 +50,13 @@ class SyncForegroundService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        Log.d(TAG, "Service started (startId: $startId)")
-
         if (isRunning) {
-            Log.d(TAG, "Sync already running, ignoring duplicate request")
             return START_NOT_STICKY
         }
 
         isRunning = true
 
         try {
-            // Запускаємо foreground notification
             val notification = createNotification()
             startForeground(NOTIFICATION_ID, notification)
             Log.d(TAG, "Foreground service started with notification")
@@ -70,7 +66,6 @@ class SyncForegroundService : Service() {
             return START_NOT_STICKY
         }
 
-        // Виконуємо синхронізацію
         serviceScope.launch {
             try {
                 Log.d(TAG, "Starting sync in foreground service")

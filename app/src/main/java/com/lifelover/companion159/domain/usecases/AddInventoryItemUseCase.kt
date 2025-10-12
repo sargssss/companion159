@@ -7,7 +7,7 @@ import javax.inject.Inject
 class AddInventoryItemUseCase @Inject constructor(
     private val repository: InventoryRepository
 ) {
-    suspend operator fun invoke(item: InventoryItem) { // Змініть повернення типу
+    suspend operator fun invoke(item: InventoryItem) {
         return repository.addItem(item)
     }
 }

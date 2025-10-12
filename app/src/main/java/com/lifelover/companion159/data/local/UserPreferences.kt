@@ -44,16 +44,6 @@ class UserPreferences @Inject constructor(
     }
 
     /**
-     * Очищає збережену інформацію про користувача
-     */
-    fun clearLastUser() {
-        prefs.edit()
-            .remove(KEY_LAST_USER_ID)
-            .remove(KEY_LAST_USER_EMAIL)
-            .apply()
-    }
-
-    /**
      * Перевіряє чи є збережений користувач
      */
     fun hasLastUser(): Boolean {

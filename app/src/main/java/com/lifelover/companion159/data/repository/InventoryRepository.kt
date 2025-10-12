@@ -25,14 +25,10 @@ sealed class SyncResult {
     object NetworkError : SyncResult()
 }
 interface InventoryRepository {
-    // NEW: Methods for display categories
     fun getAvailabilityItems(): Flow<List<InventoryItem>>
     fun getAmmunitionItems(): Flow<List<InventoryItem>>
     fun getNeedsItems(): Flow<List<InventoryItem>>
-
-    // OLD: Keep for internal use
     fun getItemsByCategory(category: InventoryCategory): Flow<List<InventoryItem>>
-
     suspend fun addItem(item: InventoryItem)
     suspend fun updateItem(item: InventoryItem)
     suspend fun updateNeededQuantity(itemId: Long, quantity: Int)  // NEW
@@ -56,7 +52,6 @@ class InventoryRepositoryImpl @Inject constructor(
 
     private val backgroundScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
-    // NEW: Display category methods
     override fun getAvailabilityItems(): Flow<List<InventoryItem>> {
         val userId = authService.getUserId()
         return localDao.getAvailabilityItems(userId)
@@ -75,7 +70,6 @@ class InventoryRepositoryImpl @Inject constructor(
             .map { entities -> entities.map { it.toDomainModel() } }
     }
 
-    // OLD: Keep for backward compatibility
     override fun getItemsByCategory(category: InventoryCategory): Flow<List<InventoryItem>> {
         val userId = authService.getUserId()
         return if (userId != null) {
@@ -90,8 +84,6 @@ class InventoryRepositoryImpl @Inject constructor(
     override suspend fun addItem(item: InventoryItem) {
         val userId = authService.getUserId()
         val crewName = positionRepository.getPosition() ?: "Default"
-
-        Log.d(TAG, "Creating new item: ${item.itemName}, userId: $userId, crew: $crewName")
 
         val entity = item.toEntity().copy(
             id = 0,
@@ -115,34 +107,15 @@ class InventoryRepositoryImpl @Inject constructor(
         val userId = authService.getUserId()
         val crewName = positionRepository.getPosition() ?: "Default"
 
-        Log.d(TAG, "═══════════════════════════════════")
-        Log.d(TAG, "🔄 UPDATING ITEM")
-        Log.d(TAG, "═══════════════════════════════════")
-        Log.d(TAG, "Item ID: ${item.id}")
-        Log.d(TAG, "Item name: ${item.itemName}")
-        Log.d(TAG, "Available quantity: ${item.availableQuantity}")
-        Log.d(TAG, "Needed quantity: ${item.neededQuantity}")
-        Log.d(TAG, "Category: ${item.category}")
-        Log.d(TAG, "Crew name: $crewName")
-        Log.d(TAG, "User ID: $userId")
-
         val existingItem = localDao.getItemById(item.id)
         if (existingItem == null) {
-            Log.e(TAG, "❌ Item with ID ${item.id} does NOT exist in database")
             throw IllegalArgumentException("Item with ID ${item.id} does not exist")
         }
 
-        Log.d(TAG, "✅ Existing item found in database")
-        Log.d(TAG, "   Old name: ${existingItem.itemName}")
-        Log.d(TAG, "   Old available: ${existingItem.availableQuantity}")
-        Log.d(TAG, "   Old needed: ${existingItem.neededQuantity}")
-
         if (existingItem.userId != null && existingItem.userId != userId) {
-            Log.e(TAG, "❌ Cannot update item: belongs to different user")
             throw IllegalArgumentException("Cannot update item of another user")
         }
 
-        Log.d(TAG, "📝 Executing DAO update...")
         val updatedRows = localDao.updateItemWithNeeds(
             id = item.id,
             name = item.itemName.trim(),
@@ -162,15 +135,10 @@ class InventoryRepositoryImpl @Inject constructor(
             Log.d(TAG, "🔄 Triggering background sync...")
             triggerBackgroundSync()
         }
-
-        Log.d(TAG, "═══════════════════════════════════")
     }
 
-    // NEW: Update needed quantity
     override suspend fun updateNeededQuantity(itemId: Long, quantity: Int) {
         val userId = authService.getUserId()
-
-        Log.d(TAG, "📝 Updating needed quantity for item ID: $itemId to $quantity")
 
         val existingItem = localDao.getItemById(itemId)
         if (existingItem == null) {
@@ -183,7 +151,6 @@ class InventoryRepositoryImpl @Inject constructor(
             return
         }
 
-        // IMPORTANT: Update the value
         val updatedRows = localDao.updateNeededQuantity(itemId, quantity)
 
         if (updatedRows > 0) {
@@ -200,8 +167,6 @@ class InventoryRepositoryImpl @Inject constructor(
 
     suspend fun updateItemQuantity(itemId: Long, newQuantity: Int) {
         val userId = authService.getUserId()
-
-        Log.d(TAG, "Quantity update for item ID: $itemId to $newQuantity")
 
         val existingItem = localDao.getItemById(itemId)
         if (existingItem == null) {
@@ -227,8 +192,6 @@ class InventoryRepositoryImpl @Inject constructor(
 
     override suspend fun deleteItem(id: Long) {
         val userId = authService.getUserId()
-
-        Log.d(TAG, "Deleting item with ID: $id")
 
         val existingItem = localDao.getItemById(id)
         if (existingItem == null) {
@@ -274,8 +237,6 @@ class InventoryRepositoryImpl @Inject constructor(
     }
 
     private fun triggerBackgroundSync() {
-        Log.d(TAG, "Triggering background sync (non-blocking)")
-
         if (networkMonitor.isOnline) {
             backgroundScope.launch {
                 try {

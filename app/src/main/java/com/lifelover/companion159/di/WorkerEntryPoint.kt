@@ -49,21 +49,4 @@ object ServiceLocator {
         )
         return entryPoint.supabaseAuthService()
     }
-
-    fun getInventoryDatabase(context: Context): InventoryDatabase {
-        val entryPoint = EntryPointAccessors.fromApplication(
-            context.applicationContext,
-            WorkerEntryPoint::class.java
-        )
-        return entryPoint.inventoryDatabase()
-    }
-
-    // НОВИЙ метод (якщо потрібно)
-    fun getUserPreferences(context: Context): UserPreferences {
-        val entryPoint = EntryPointAccessors.fromApplication(
-            context.applicationContext,
-            WorkerEntryPoint::class.java
-        )
-        return entryPoint.userPreferences()
-    }
 }
