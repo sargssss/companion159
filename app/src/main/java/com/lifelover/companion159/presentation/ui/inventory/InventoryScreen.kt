@@ -16,15 +16,18 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.lifelover.companion159.R
-import com.lifelover.companion159.domain.models.DisplayCategory
+import com.lifelover.companion159.domain.models.Category
 import com.lifelover.companion159.domain.models.InventoryItem
-import com.lifelover.companion159.domain.models.titleRes
 import com.lifelover.companion159.presentation.viewmodels.InventoryViewModel
 
+/**
+ * Screen for displaying inventory items filtered by category
+ * Supports CRUD operations and quantity updates
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun InventoryScreen(
-    displayCategory: DisplayCategory,  // CHANGED
+    category: Category,
     onBackPressed: () -> Unit,
     onAddItem: () -> Unit,
     onEditItem: (InventoryItem) -> Unit,
@@ -34,8 +37,8 @@ fun InventoryScreen(
     var itemToDelete by remember { mutableStateOf<InventoryItem?>(null) }
 
     // Load items when screen opens
-    LaunchedEffect(displayCategory) {
-        viewModel.loadItemsForDisplay(displayCategory)
+    LaunchedEffect(category) {
+        viewModel.loadItems(category)
     }
 
     // Handle messages
@@ -57,7 +60,7 @@ fun InventoryScreen(
             item = item,
             onDismiss = { itemToDelete = null },
             onConfirm = {
-                viewModel.deleteItemById(item.id)
+                viewModel.deleteItem(item.id)
                 itemToDelete = null
             }
         )
@@ -67,7 +70,7 @@ fun InventoryScreen(
         TopAppBar(
             title = {
                 Text(
-                    text = stringResource(displayCategory.titleRes()),
+                    text = stringResource(category.titleRes),
                     fontWeight = FontWeight.Bold
                 )
             },
@@ -102,7 +105,7 @@ fun InventoryScreen(
 
             state.items.isEmpty() -> {
                 EmptyState(
-                    displayCategory = displayCategory,
+                    category = category,
                     onAddClick = onAddItem
                 )
             }
@@ -116,28 +119,12 @@ fun InventoryScreen(
                     items(state.items, key = { it.id }) { item ->
                         InventoryItemCard(
                             item = item,
-                            displayCategory = displayCategory,
+                            displayCategory = category,
                             onQuantityChange = { newQuantity ->
-                                // CHANGED: Different logic based on category
-                                when (displayCategory) {
-                                    DisplayCategory.NEEDS -> {
-                                        // In NEEDS, always update needed quantity
-                                        viewModel.updateNeededQuantity(item, newQuantity)
-                                    }
-                                    DisplayCategory.AMMUNITION -> {
-                                        // In БК, update available quantity
-                                        viewModel.updateAvailableQuantity(item, newQuantity)
-                                    }
-                                    DisplayCategory.AVAILABILITY -> {
-                                        // In AVAILABILITY, update available quantity
-                                        viewModel.updateAvailableQuantity(item, newQuantity)
-                                    }
-                                }
+                                viewModel.updateQuantity(item.id, newQuantity, category)
                             },
                             onDelete = { itemToDelete = item },
-                            onEdit = {
-                                onEditItem(item)
-                            },
+                            onEdit = { onEditItem(item) },
                             showSyncStatus = !item.isSynced
                         )
                     }
@@ -147,9 +134,12 @@ fun InventoryScreen(
     }
 }
 
+/**
+ * Empty state when no items match filter
+ */
 @Composable
 private fun EmptyState(
-    displayCategory: DisplayCategory,
+    category: Category,
     onAddClick: () -> Unit
 ) {
     Box(
@@ -162,10 +152,11 @@ private fun EmptyState(
             modifier = Modifier.padding(48.dp)
         ) {
             Text(
-                text = when (displayCategory) {
-                    DisplayCategory.AVAILABILITY -> "Немає предметів в наявності"
-                    DisplayCategory.AMMUNITION -> "Немає БК"
-                    DisplayCategory.NEEDS -> "Немає потреб"  // Works for both regular and ammunition
+                text = when (category) {
+                    is Category.Availability -> "Немає предметів в наявності"
+                    is Category.Ammunition -> "Немає БК"
+                    is Category.Needs -> "Немає потреб"
+                    else -> "Пусто"
                 },
                 style = MaterialTheme.typography.headlineSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -174,8 +165,8 @@ private fun EmptyState(
             )
 
             Text(
-                text = when (displayCategory) {
-                    DisplayCategory.NEEDS -> "Додайте предмети з потрібною кількістю"
+                text = when (category) {
+                    is Category.Needs -> "Додайте предмети з потрібною кількістю"
                     else -> "Натисніть + щоб додати"
                 },
                 style = MaterialTheme.typography.bodyLarge,

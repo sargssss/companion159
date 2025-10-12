@@ -14,19 +14,21 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.lifelover.companion159.R
 import com.lifelover.companion159.data.sync.SyncStatus
-import com.lifelover.companion159.data.local.entities.InventoryCategory
+import com.lifelover.companion159.domain.models.Category
 import com.lifelover.companion159.domain.models.DisplayCategory
 import com.lifelover.companion159.domain.models.titleRes
 import com.lifelover.companion159.presentation.ui.auth.AuthViewModel
-import com.lifelover.companion159.presentation.ui.inventory.InventoryMenuButton
 import com.lifelover.companion159.presentation.viewmodels.InventoryViewModel
 import java.text.SimpleDateFormat
 import java.util.*
 
+/**
+ * Main menu screen with category buttons and sync status
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainMenuScreen(
-    onDisplayCategorySelected: (DisplayCategory) -> Unit = {},  // CHANGED
+    onCategorySelected: (Category) -> Unit = {},
     onLogout: () -> Unit = {},
     onChangePosition: () -> Unit = {},
     authViewModel: AuthViewModel = hiltViewModel(),
@@ -38,6 +40,7 @@ fun MainMenuScreen(
     var showUserMenu by remember { mutableStateOf(false) }
     var showLogoutDialog by remember { mutableStateOf(false) }
 
+    // Handle logout
     LaunchedEffect(authState.hasExplicitlyLoggedOut) {
         if (authState.hasExplicitlyLoggedOut) {
             authViewModel.clearLogoutFlag()
@@ -54,6 +57,7 @@ fun MainMenuScreen(
                 )
             },
             actions = {
+                // Sync status indicator
                 when (inventoryState.syncStatus) {
                     SyncStatus.SYNCING -> {
                         CircularProgressIndicator(
@@ -63,6 +67,7 @@ fun MainMenuScreen(
                             strokeWidth = 2.dp
                         )
                     }
+
                     SyncStatus.SUCCESS -> {
                         Icon(
                             painter = painterResource(R.drawable.sync_check),
@@ -73,6 +78,7 @@ fun MainMenuScreen(
                                 .padding(end = 12.dp)
                         )
                     }
+
                     SyncStatus.ERROR -> {
                         Icon(
                             painter = painterResource(R.drawable.sync_attention),
@@ -81,12 +87,14 @@ fun MainMenuScreen(
                             modifier = Modifier.size(40.dp)
                         )
                     }
+
                     else -> {}
                 }
 
+                // Sync button
                 if (authState.isAuthenticated && !authState.isOffline) {
                     IconButton(
-                        onClick = { inventoryViewModel.syncData() },
+                        onClick = { inventoryViewModel.sync() },
                         enabled = inventoryState.syncStatus != SyncStatus.SYNCING
                     ) {
                         Icon(
@@ -99,6 +107,7 @@ fun MainMenuScreen(
                     }
                 }
 
+                // User menu
                 if (authState.isAuthenticated) {
                     Box {
                         IconButton(onClick = { showUserMenu = true }) {
@@ -175,6 +184,7 @@ fun MainMenuScreen(
             }
         )
 
+        // Status card
         when {
             authState.isAuthenticated && !authState.isOffline -> {
                 StatusCard(
@@ -183,6 +193,7 @@ fun MainMenuScreen(
                     isOffline = false
                 )
             }
+
             authState.isAuthenticated && authState.isOffline -> {
                 StatusCard(
                     userEmail = authState.userEmail,
@@ -190,15 +201,16 @@ fun MainMenuScreen(
                     isOffline = true
                 )
             }
+
             !authState.isAuthenticated && authState.isOffline -> {
                 OfflineStatusCard(message = "Офлайн режим (без аккаунта)")
             }
+
             else -> {
                 OfflineStatusCard(message = "Режим без аккаунта")
             }
         }
 
-        // NEW: Simple 3-button menu without icons
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -230,6 +242,7 @@ fun MainMenuScreen(
             }
         }
 
+        // Error handling
         inventoryState.error?.let { error ->
             LaunchedEffect(error) {
                 // Show Snackbar or Toast
@@ -237,6 +250,7 @@ fun MainMenuScreen(
         }
     }
 
+    // Logout confirmation dialog
     if (showLogoutDialog) {
         LogoutConfirmationDialog(
             userEmail = authState.userEmail,
@@ -249,6 +263,9 @@ fun MainMenuScreen(
     }
 }
 
+/**
+ * Logout confirmation dialog
+ */
 @Composable
 private fun LogoutConfirmationDialog(
     userEmail: String?,
@@ -302,6 +319,9 @@ private fun LogoutConfirmationDialog(
     )
 }
 
+/**
+ * Status card showing user and sync info
+ */
 @Composable
 private fun StatusCard(
     userEmail: String?,
@@ -371,49 +391,9 @@ private fun StatusCard(
     }
 }
 
-// У MainMenuScreen.kt додайте цей код після StatusCard:
-
-@Composable
-private fun OfflineModeCard() {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.secondaryContainer
-        )
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Icon(
-                    painter = painterResource(R.drawable.offline),
-                    contentDescription = null,
-                    modifier = Modifier.size(24.dp)
-                )
-                Text(
-                    text = "Офлайн режим",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-
-            Text(
-                text = "Ви працюєте без облікового запису. Всі зміни зберігаються локально і будуть синхронізовані після входу.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSecondaryContainer
-            )
-        }
-    }
-}
-
+/**
+ * Offline status card
+ */
 @Composable
 private fun OfflineStatusCard(message: String = "Офлайн режим") {
     Card(
@@ -439,72 +419,6 @@ private fun OfflineStatusCard(message: String = "Офлайн режим") {
             Spacer(modifier = Modifier.width(8.dp))
             Text(
                 text = message,
-                style = MaterialTheme.typography.bodyMedium
-            )
-        }
-    }
-}
-
-@Composable
-private fun StatusCard(
-    userEmail: String?,
-    lastSyncTime: Long?
-) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.primaryContainer
-        )
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(12.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = "Користувач: ${userEmail ?: "Невідомий"}",
-                style = MaterialTheme.typography.bodyMedium
-            )
-
-            lastSyncTime?.let { time ->
-                val formatter = SimpleDateFormat("HH:mm", Locale.getDefault())
-                Text(
-                    text = "Синхр.: ${formatter.format(Date(time))}",
-                    style = MaterialTheme.typography.bodySmall
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun OfflineStatusCard() {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.secondaryContainer
-        )
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(12.dp),
-            horizontalArrangement = Arrangement.Center
-        ) {
-            Icon(
-                imageVector = Icons.Default.Face,
-                contentDescription = null,
-                modifier = Modifier.size(20.dp)
-            )
-            Spacer(modifier = Modifier.width(8.dp))
-            Text(
-                text = "Офлайн режим",
                 style = MaterialTheme.typography.bodyMedium
             )
         }

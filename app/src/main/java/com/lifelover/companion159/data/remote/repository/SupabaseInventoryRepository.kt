@@ -4,7 +4,6 @@ import android.util.Log
 import com.lifelover.companion159.data.local.entities.InventoryItemEntity
 import com.lifelover.companion159.data.remote.client.SupabaseClient
 import com.lifelover.companion159.data.remote.models.CrewInventoryItem
-import com.lifelover.companion159.data.sync.toCrewInventoryItem
 import io.github.jan.supabase.postgrest.from
 import io.github.jan.supabase.postgrest.query.Columns
 import kotlinx.coroutines.Dispatchers
@@ -139,4 +138,30 @@ class SupabaseInventoryRepository @Inject constructor() {
             false
         }
     }
+}
+
+/**
+ * Convert local entity to server model for API calls
+ */
+private fun InventoryItemEntity.toCrewInventoryItem(): CrewInventoryItem {
+    return CrewInventoryItem(
+        id = supabaseId,
+        tenantId = 0,
+        crewName = crewName,
+        crewType = null,
+        itemName = itemName,
+        itemCategory = null,
+        unit = "шт",
+        availableQuantity = availableQuantity,
+        neededQuantity = neededQuantity,
+        priority = "medium",
+        description = null,
+        notes = null,
+        lastNeedUpdatedAt = null,
+        neededBy = null,
+        createdBy = null,
+        updatedBy = null,
+        metadata = null,
+        isActive = isActive
+    )
 }

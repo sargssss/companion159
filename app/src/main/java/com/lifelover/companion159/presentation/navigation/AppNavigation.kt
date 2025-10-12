@@ -27,6 +27,7 @@ object MainMenu
 
 @Serializable
 data class InventoryDetail(val displayCategory: String)
+
 @Serializable
 data class AddItem(val displayCategory: String)
 

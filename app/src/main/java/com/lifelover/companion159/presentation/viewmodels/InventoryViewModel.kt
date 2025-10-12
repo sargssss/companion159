@@ -8,7 +8,6 @@ import com.lifelover.companion159.data.local.entities.InventoryCategory
 import com.lifelover.companion159.data.sync.SyncStatus
 import com.lifelover.companion159.domain.models.InventoryItem
 import com.lifelover.companion159.domain.models.DisplayCategory
-import com.lifelover.companion159.domain.usecases.*
 import com.lifelover.companion159.data.repository.InventoryRepositoryImpl
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
@@ -62,8 +61,9 @@ class InventoryViewModel @Inject constructor(
 
     /**
      * Load items based on DisplayCategory
+     * This method is called from InventoryScreen
      */
-    fun loadItemsForDisplay(displayCategory: DisplayCategory) {
+    fun loadItems(displayCategory: DisplayCategory) {
         viewModelScope.launch {
             _state.update { it.copy(
                 isLoading = true,
@@ -108,18 +108,12 @@ class InventoryViewModel @Inject constructor(
                 Log.d(TAG, "   Display category: $displayCategory")
 
                 // Determine internal category
-                val internalCategory = when (displayCategory) {
+                val internalCategory: InventoryCategory = when (displayCategory) {
                     DisplayCategory.AMMUNITION -> {
-                        // Creating from БК screen -> always AMMUNITION
                         InventoryCategory.AMMUNITION
                     }
                     DisplayCategory.NEEDS -> {
-                        // Creating from Потреба screen
-                        // Check if item already exists as ammunition
-                        val existingItem = _state.value.items.find {
-                            it.itemName.equals(name.trim(), ignoreCase = true)
-                        }
-                        existingItem?.category ?: InventoryCategory.EQUIPMENT
+                        InventoryCategory.EQUIPMENT
                     }
                     else -> {
                         // Creating from Наявність -> always EQUIPMENT
@@ -251,6 +245,7 @@ class InventoryViewModel @Inject constructor(
             }
         }
     }
+
     /**
      * Delete item
      */

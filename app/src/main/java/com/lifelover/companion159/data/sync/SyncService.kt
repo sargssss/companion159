@@ -4,6 +4,7 @@ import android.util.Log
 import com.lifelover.companion159.data.local.dao.InventoryDao
 import com.lifelover.companion159.data.local.entities.InventoryCategory
 import com.lifelover.companion159.data.local.entities.InventoryItemEntity
+import com.lifelover.companion159.data.mappers.InventoryMapper
 import com.lifelover.companion159.data.remote.auth.SupabaseAuthService
 import com.lifelover.companion159.data.remote.models.CrewInventoryItem
 import com.lifelover.companion159.data.remote.repository.SupabaseInventoryRepository
@@ -13,10 +14,12 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.withContext
-import java.util.Date
 import javax.inject.Inject
 import javax.inject.Singleton
 
+/**
+ * Sync status states
+ */
 enum class SyncStatus {
     IDLE,
     SYNCING,
@@ -25,6 +28,19 @@ enum class SyncStatus {
     OFFLINE
 }
 
+/**
+ * Service for synchronizing inventory data between local database and Supabase
+ *
+ * Sync flow:
+ * 1. Assign userId to offline items
+ * 2. PUSH: Upload local changes to server
+ * 3. PULL: Download server changes to local
+ *
+ * Business rules:
+ * - Category is stored locally only (not synced to server)
+ * - Server's item_category field is nullable and not enforced
+ * - Local category is preserved during sync operations
+ */
 @Singleton
 class SyncService @Inject constructor(
     private val localDao: InventoryDao,
@@ -34,7 +50,7 @@ class SyncService @Inject constructor(
 ) {
     companion object {
         private const val TAG = "SyncService"
-        private val DEFAULT_CATEGORY = InventoryCategory.EQUIPMENT  // "інвентар"
+        private val DEFAULT_CATEGORY = InventoryCategory.EQUIPMENT
     }
 
     private val _syncStatus = MutableStateFlow(SyncStatus.IDLE)
@@ -43,6 +59,9 @@ class SyncService @Inject constructor(
     private val _lastSyncTime = MutableStateFlow<Long?>(null)
     val lastSyncTime: StateFlow<Long?> = _lastSyncTime.asStateFlow()
 
+    /**
+     * Check if there are offline items (items without userId)
+     */
     suspend fun hasOfflineItems(): Boolean = withContext(Dispatchers.IO) {
         try {
             val offlineItems = localDao.getOfflineItems()
@@ -55,11 +74,16 @@ class SyncService @Inject constructor(
         }
     }
 
+    /**
+     * Main sync operation
+     * Synchronizes local changes with server and pulls server updates
+     */
     suspend fun performSync(): Result<Unit> = withContext(Dispatchers.IO) {
         try {
             Log.d(TAG, "🔄 Starting sync...")
             _syncStatus.value = SyncStatus.SYNCING
 
+            // Get user ID
             val userId = authService.getUserIdForSync()
             if (userId == null) {
                 Log.w(TAG, "⚠️ No user found - cannot sync")
@@ -67,6 +91,7 @@ class SyncService @Inject constructor(
                 return@withContext Result.failure(Exception("No user available for sync"))
             }
 
+            // Get crew name (position)
             val crewName = positionRepository.getPosition()
             if (crewName.isNullOrBlank()) {
                 Log.w(TAG, "⚠️ No crew name (position) set - cannot sync")
@@ -110,6 +135,7 @@ class SyncService @Inject constructor(
                 }
 
                 when {
+                    // CREATE: New item not yet on server
                     localItem.supabaseId == null && localItem.isActive -> {
                         Log.d(TAG, "➕ Creating new item: ${localItem.itemName}")
                         val newSupabaseId = remoteRepository.createItem(itemWithCrew)
@@ -121,6 +147,7 @@ class SyncService @Inject constructor(
                         }
                     }
 
+                    // DELETE: Item marked as deleted on server
                     localItem.supabaseId != null && !localItem.isActive -> {
                         Log.d(TAG, "🗑️ Deleting on server: ${localItem.itemName}")
                         val deleted = remoteRepository.deleteItem(localItem.supabaseId)
@@ -132,6 +159,7 @@ class SyncService @Inject constructor(
                         }
                     }
 
+                    // UPDATE: Existing active item
                     localItem.supabaseId != null && localItem.isActive -> {
                         Log.d(TAG, "✏️ Updating on server: ${localItem.itemName}")
                         val updated = remoteRepository.updateItem(localItem.supabaseId, itemWithCrew)
@@ -143,6 +171,7 @@ class SyncService @Inject constructor(
                         }
                     }
 
+                    // SKIP: Deleted new item (never synced)
                     localItem.supabaseId == null && !localItem.isActive -> {
                         Log.d(TAG, "🗑️ Marking deleted new item as synced: ${localItem.itemName}")
                         localDao.markAsSynced(localItem.id)
@@ -171,18 +200,20 @@ class SyncService @Inject constructor(
                 val existingLocalItem = localItemsBySupabaseId[remoteItem.id]
 
                 when {
+                    // CREATE: New item from server
                     existingLocalItem == null -> {
                         if (remoteItem.isActive) {
                             Log.d(TAG, "⬇️ Creating new local item from server: ${remoteItem.itemName}")
-
-                            val newEntity = remoteItem.toEntity(
-                                localCategory = DEFAULT_CATEGORY,
-                                userId = userId
+                            val newEntity = InventoryMapper.fromApi(
+                                api = remoteItem,
+                                userId = userId,
+                                existingCategory = DEFAULT_CATEGORY
                             )
                             localDao.insertItem(newEntity)
                         }
                     }
 
+                    // UPDATE: Existing item without local changes
                     !existingLocalItem.needsSync -> {
                         if (remoteItem.isActive && !existingLocalItem.isActive) {
                             Log.d(TAG, "♻️ Restoring from server: ${remoteItem.itemName}")
@@ -191,7 +222,7 @@ class SyncService @Inject constructor(
                                 userId = userId,
                                 name = remoteItem.itemName,
                                 quantity = remoteItem.availableQuantity,
-                                neededQuantity = remoteItem.neededQuantity,  // NEW
+                                neededQuantity = remoteItem.neededQuantity,
                                 category = existingLocalItem.category,
                                 crewName = remoteItem.crewName,
                                 isActive = true
@@ -202,7 +233,7 @@ class SyncService @Inject constructor(
                         } else if (remoteItem.isActive) {
                             val needsUpdate = existingLocalItem.itemName != remoteItem.itemName ||
                                     existingLocalItem.availableQuantity != remoteItem.availableQuantity ||
-                                    existingLocalItem.neededQuantity != remoteItem.neededQuantity ||  // NEW
+                                    existingLocalItem.neededQuantity != remoteItem.neededQuantity ||
                                     existingLocalItem.crewName != remoteItem.crewName
 
                             if (needsUpdate) {
@@ -212,7 +243,7 @@ class SyncService @Inject constructor(
                                     userId = userId,
                                     name = remoteItem.itemName,
                                     quantity = remoteItem.availableQuantity,
-                                    neededQuantity = remoteItem.neededQuantity,  // NEW
+                                    neededQuantity = remoteItem.neededQuantity,
                                     category = existingLocalItem.category,
                                     crewName = remoteItem.crewName,
                                     isActive = remoteItem.isActive
@@ -223,6 +254,7 @@ class SyncService @Inject constructor(
                         }
                     }
 
+                    // SKIP: Item has local changes, keep them
                     else -> {
                         Log.d(TAG, "📝 Keeping local changes for: ${existingLocalItem.itemName}")
                     }
@@ -241,6 +273,9 @@ class SyncService @Inject constructor(
         }
     }
 
+    /**
+     * Check if there are unsynced changes
+     */
     suspend fun hasUnsyncedChanges(): Boolean = withContext(Dispatchers.IO) {
         val userId = authService.getUserIdForSync() ?: return@withContext false
         val count = localDao.getItemsNeedingSync(userId).size
@@ -248,34 +283,12 @@ class SyncService @Inject constructor(
         count > 0
     }
 
+    /**
+     * Reset sync status to idle
+     */
     fun resetSyncStatus() {
         _syncStatus.value = SyncStatus.IDLE
     }
-}
-
-/**
- * Convert server model to local entity
- * Preserves local category, maps quantities
- */
-fun CrewInventoryItem.toEntity(
-    localCategory: InventoryCategory = InventoryCategory.EQUIPMENT,
-    userId: String? = null
-): InventoryItemEntity {
-    return InventoryItemEntity(
-        id = 0,
-        itemName = itemName,
-        availableQuantity = availableQuantity,
-        neededQuantity = neededQuantity,  // NEW: map from server
-        category = localCategory,
-        userId = userId,
-        crewName = crewName,
-        supabaseId = id,
-        createdAt = Date(),
-        lastModified = Date(),
-        lastSynced = Date(),
-        needsSync = false,
-        isActive = isActive
-    )
 }
 
 /**
@@ -292,7 +305,7 @@ fun InventoryItemEntity.toCrewInventoryItem(): CrewInventoryItem {
         itemCategory = null,
         unit = "шт",
         availableQuantity = availableQuantity,
-        neededQuantity = neededQuantity,  // NEW: include in sync
+        neededQuantity = neededQuantity,
         priority = "medium",
         description = null,
         notes = null,
