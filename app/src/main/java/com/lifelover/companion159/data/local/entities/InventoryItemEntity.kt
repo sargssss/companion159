@@ -12,18 +12,19 @@ data class InventoryItemEntity(
     val id: Long = 0,
 
     // Basic item info
-    val itemName: String,  // Renamed from 'name'
-    val availableQuantity: Int = 0,  // Renamed from 'quantity'
+    val itemName: String,
+    val availableQuantity: Int = 0,
+    val neededQuantity: Int = 0,
 
-    // Category stored LOCALLY only (not synced to server)
-    val category: InventoryCategory,  // KEEP for local filtering
+    // Category stored LOCALLY only
+    val category: InventoryCategory,
 
     // User/Position context
-    val userId: String? = null,  // Keep for local auth check
-    val crewName: String,  // Renamed from 'position', REQUIRED
+    val userId: String? = null,
+    val crewName: String,
 
     // Server sync fields
-    val supabaseId: Long? = null,  // Changed from String to Long!
+    val supabaseId: Long? = null,
 
     // Timestamps
     val createdAt: Date = Date(),
@@ -32,9 +33,8 @@ data class InventoryItemEntity(
 
     // Sync status
     val needsSync: Boolean = true,
-    val isActive: Boolean = true  // Renamed from 'isDeleted' with inverted logic
+    val isActive: Boolean = true
 )
-
 // Keep existing enum for LOCAL use
 enum class InventoryCategory {
     SHIPS, AMMUNITION, EQUIPMENT, PROVISIONS

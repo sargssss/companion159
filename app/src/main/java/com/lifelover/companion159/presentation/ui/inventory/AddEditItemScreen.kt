@@ -1,5 +1,6 @@
 package com.lifelover.companion159.presentation.ui.inventory
 
+import android.util.Log
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -16,34 +17,44 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.lifelover.companion159.R
-import com.lifelover.companion159.data.local.entities.InventoryCategory
-import com.lifelover.companion159.data.local.entities.iconRes
-import com.lifelover.companion159.data.local.entities.titleRes
+import com.lifelover.companion159.domain.models.DisplayCategory
+import com.lifelover.companion159.domain.models.titleRes
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddEditItemScreen(
-    category: InventoryCategory,
-    itemId: Long? = null, // null = create mode, non-null = edit mode
+    displayCategory: DisplayCategory,
+    itemId: Long? = null,
     itemName: String? = null,
-    itemQuantity: Int? = null,
+    availableQuantity: Int? = null,
+    neededQuantity: Int? = null,
     onBackPressed: () -> Unit,
-    onSave: (name: String, quantity: Int) -> Unit
+    onSave: (name: String, availableQty: Int, neededQty: Int) -> Unit
 ) {
-    // Determine mode
     val isEditMode = itemId != null
 
-    // State
     var name by remember { mutableStateOf(itemName ?: "") }
-    var quantity by remember { mutableIntStateOf(itemQuantity ?: 1) }
+    var availableQty by remember { mutableIntStateOf(availableQuantity ?: 0) }
+    var neededQty by remember { mutableIntStateOf(neededQuantity ?: 0) }
     var showError by remember { mutableStateOf(false) }
+
+    // Log initial values
+    LaunchedEffect(Unit) {
+        Log.d("AddEditItemScreen", "═══════════════════════════════════")
+        Log.d("AddEditItemScreen", if (isEditMode) "EDIT MODE" else "CREATE MODE")
+        Log.d("AddEditItemScreen", "Item ID: $itemId")
+        Log.d("AddEditItemScreen", "Initial name: $itemName")
+        Log.d("AddEditItemScreen", "Initial available: $availableQuantity")
+        Log.d("AddEditItemScreen", "Initial needed: $neededQuantity")
+        Log.d("AddEditItemScreen", "Display category: $displayCategory")
+        Log.d("AddEditItemScreen", "═══════════════════════════════════")
+    }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .imePadding() // Adjust for keyboard
+            .imePadding()
     ) {
-        // Top App Bar
         TopAppBar(
             title = {
                 Text(
@@ -60,13 +71,16 @@ fun AddEditItemScreen(
                 }
             },
             actions = {
-                // Save button in app bar
                 IconButton(
                     onClick = {
                         if (name.isBlank()) {
                             showError = true
                         } else {
-                            onSave(name.trim(), quantity)
+                            Log.d("AddEditItemScreen", "Save clicked")
+                            Log.d("AddEditItemScreen", "   Name: $name")
+                            Log.d("AddEditItemScreen", "   Available: $availableQty")
+                            Log.d("AddEditItemScreen", "   Needed: $neededQty")
+                            onSave(name.trim(), availableQty, neededQty)
                         }
                     },
                     enabled = name.isNotBlank()
@@ -83,42 +97,26 @@ fun AddEditItemScreen(
             }
         )
 
-        // Content
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(24.dp),
-            verticalArrangement = Arrangement.spacedBy(32.dp)
+            verticalArrangement = Arrangement.spacedBy(24.dp)
         ) {
-            // Category header with large icon
-            Row(
+            // Category header
+            Text(
+                text = stringResource(displayCategory.titleRes()),
+                style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.Bold,
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.Center,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(
-                    painter = painterResource(category.iconRes()),
-                    contentDescription = null,
-                    modifier = Modifier.size(64.dp),
-                    tint = MaterialTheme.colorScheme.primary
-                )
-                Spacer(modifier = Modifier.width(16.dp))
-                Text(
-                    text = stringResource(category.titleRes()),
-                    style = MaterialTheme.typography.headlineMedium,
-                    fontWeight = FontWeight.Bold
-                )
-            }
+                textAlign = TextAlign.Center
+            )
 
-            Spacer(modifier = Modifier.height(8.dp))
-
-            // Name input section
-            Column(
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
+            // Name input
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(
                     text = "Назва",
-                    style = MaterialTheme.typography.titleLarge,
+                    style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Medium
                 )
 
@@ -129,125 +127,143 @@ fun AddEditItemScreen(
                         showError = false
                     },
                     modifier = Modifier.fillMaxWidth(),
-                    placeholder = { Text("Введіть назву предмету") },
+                    placeholder = { Text("Введіть назву") },
                     isError = showError,
                     supportingText = if (showError) {
-                        { Text("Назва не може бути порожньою") }
-                    } else null,
-                    textStyle = MaterialTheme.typography.bodyLarge,
-                    shape = MaterialTheme.shapes.large
+                        { Text("Назва обов'язкова") }
+                    } else null
                 )
             }
 
-            // Quantity section with large controls
-            Column(
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                Text(
-                    text = "Кількість",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Medium
-                )
-
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant
-                    )
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(24.dp),
-                        horizontalArrangement = Arrangement.Center,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        // Decrease button
-                        FilledIconButton(
-                            onClick = { if (quantity > 1) quantity-- },
-                            enabled = quantity > 1,
-                            modifier = Modifier.size(64.dp),
-                            colors = IconButtonDefaults.filledIconButtonColors(
-                                containerColor = MaterialTheme.colorScheme.primaryContainer,
-                                disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant
-                            )
-                        ) {
-                            Icon(
-                                painter = painterResource(R.drawable.minus),
-                                contentDescription = "Зменшити",
-                                modifier = Modifier.size(32.dp)
-                            )
-                        }
-
-                        Spacer(modifier = Modifier.width(24.dp))
-
-                        // Quantity display/input
-                        OutlinedTextField(
-                            value = quantity.toString(),
-                            onValueChange = { value ->
-                                value.toIntOrNull()?.let { newQuantity ->
-                                    if (newQuantity >= 1) {
-                                        quantity = newQuantity
-                                    }
-                                }
-                            },
-                            modifier = Modifier.width(120.dp),
-                            singleLine = true,
-                            textStyle = MaterialTheme.typography.displaySmall.copy(
-                                fontWeight = FontWeight.Bold,
-                                textAlign = TextAlign.Center
-                            ),
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                            shape = MaterialTheme.shapes.large
-                        )
-
-                        Spacer(modifier = Modifier.width(24.dp))
-
-                        // Increase button
-                        FilledIconButton(
-                            onClick = { quantity++ },
-                            modifier = Modifier.size(64.dp),
-                            colors = IconButtonDefaults.filledIconButtonColors(
-                                containerColor = MaterialTheme.colorScheme.primaryContainer
-                            )
-                        ) {
-                            Icon(
-                                painter = painterResource(R.drawable.plus_large),
-                                contentDescription = "Збільшити",
-                                modifier = Modifier.size(32.dp)
-                            )
-                        }
+            // CHANGED: Show available quantity for AMMUNITION and AVAILABILITY
+            if (displayCategory == DisplayCategory.AMMUNITION ||
+                displayCategory == DisplayCategory.AVAILABILITY) {
+                QuantitySection(
+                    title = "Наявна кількість",
+                    quantity = availableQty,
+                    onQuantityChange = {
+                        Log.d("AddEditItemScreen", "Available quantity changed: $it")
+                        availableQty = it
                     }
-                }
+                )
+            }
+
+            // CHANGED: Show needed quantity for AMMUNITION and NEEDS
+            if (displayCategory == DisplayCategory.AMMUNITION ||
+                displayCategory == DisplayCategory.NEEDS) {
+                QuantitySection(
+                    title = "Потрібна кількість",
+                    quantity = neededQty,
+                    onQuantityChange = {
+                        Log.d("AddEditItemScreen", "Needed quantity changed: $it")
+                        neededQty = it
+                    }
+                )
             }
 
             Spacer(modifier = Modifier.weight(1f))
 
-            // Large save button at bottom
+            // Save button
             Button(
                 onClick = {
                     if (name.isBlank()) {
                         showError = true
                     } else {
-                        onSave(name.trim(), quantity)
+                        Log.d("AddEditItemScreen", "Bottom save button clicked")
+                        Log.d("AddEditItemScreen", "   Name: $name")
+                        Log.d("AddEditItemScreen", "   Available: $availableQty")
+                        Log.d("AddEditItemScreen", "   Needed: $neededQty")
+                        onSave(name.trim(), availableQty, neededQty)
                     }
                 },
+                enabled = name.isNotBlank(),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(64.dp),
-                enabled = name.isNotBlank(),
-                shape = MaterialTheme.shapes.large
+                    .height(56.dp)
             ) {
                 Icon(
                     imageVector = Icons.Default.Check,
                     contentDescription = null,
-                    modifier = Modifier.size(24.dp)
+                    modifier = Modifier.size(20.dp)
                 )
-                Spacer(modifier = Modifier.width(12.dp))
+                Spacer(modifier = Modifier.width(8.dp))
                 Text(
-                    text = if (isEditMode) "Зберегти зміни" else "Додати предмет",
-                    style = MaterialTheme.typography.titleLarge
+                    text = if (isEditMode) "Зберегти" else "Додати",
+                    style = MaterialTheme.typography.titleMedium
                 )
+            }
+        }
+    }
+}
+
+@Composable
+private fun QuantitySection(
+    title: String,
+    quantity: Int,
+    onQuantityChange: (Int) -> Unit
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Medium
+        )
+
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceVariant
+            )
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                FilledIconButton(
+                    onClick = { if (quantity > 0) onQuantityChange(quantity - 1) },
+                    enabled = quantity > 0,
+                    modifier = Modifier.size(48.dp)
+                ) {
+                    Icon(
+                        painter = painterResource(R.drawable.minus),
+                        contentDescription = "Зменшити",
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+
+                Spacer(modifier = Modifier.width(16.dp))
+
+                OutlinedTextField(
+                    value = quantity.toString(),
+                    onValueChange = { value ->
+                        value.toIntOrNull()?.let { newQty ->
+                            if (newQty >= 0) onQuantityChange(newQty)
+                        }
+                    },
+                    modifier = Modifier.width(100.dp),
+                    singleLine = true,
+                    textStyle = MaterialTheme.typography.headlineMedium.copy(
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center
+                    ),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                )
+
+                Spacer(modifier = Modifier.width(16.dp))
+
+                FilledIconButton(
+                    onClick = { onQuantityChange(quantity + 1) },
+                    modifier = Modifier.size(48.dp)
+                ) {
+                    Icon(
+                        painter = painterResource(R.drawable.plus_large),
+                        contentDescription = "Збільшити",
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
             }
         }
     }

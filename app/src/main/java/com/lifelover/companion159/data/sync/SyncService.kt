@@ -175,7 +175,6 @@ class SyncService @Inject constructor(
                         if (remoteItem.isActive) {
                             Log.d(TAG, "⬇️ Creating new local item from server: ${remoteItem.itemName}")
 
-                            // FIXED: Use default category
                             val newEntity = remoteItem.toEntity(
                                 localCategory = DEFAULT_CATEGORY,
                                 userId = userId
@@ -192,6 +191,7 @@ class SyncService @Inject constructor(
                                 userId = userId,
                                 name = remoteItem.itemName,
                                 quantity = remoteItem.availableQuantity,
+                                neededQuantity = remoteItem.neededQuantity,  // NEW
                                 category = existingLocalItem.category,
                                 crewName = remoteItem.crewName,
                                 isActive = true
@@ -202,6 +202,7 @@ class SyncService @Inject constructor(
                         } else if (remoteItem.isActive) {
                             val needsUpdate = existingLocalItem.itemName != remoteItem.itemName ||
                                     existingLocalItem.availableQuantity != remoteItem.availableQuantity ||
+                                    existingLocalItem.neededQuantity != remoteItem.neededQuantity ||  // NEW
                                     existingLocalItem.crewName != remoteItem.crewName
 
                             if (needsUpdate) {
@@ -211,6 +212,7 @@ class SyncService @Inject constructor(
                                     userId = userId,
                                     name = remoteItem.itemName,
                                     quantity = remoteItem.availableQuantity,
+                                    neededQuantity = remoteItem.neededQuantity,  // NEW
                                     category = existingLocalItem.category,
                                     crewName = remoteItem.crewName,
                                     isActive = remoteItem.isActive
@@ -251,15 +253,19 @@ class SyncService @Inject constructor(
     }
 }
 
-// FIXED: Extension function for conversion with default category
+/**
+ * Convert server model to local entity
+ * Preserves local category, maps quantities
+ */
 fun CrewInventoryItem.toEntity(
-    localCategory: InventoryCategory = InventoryCategory.EQUIPMENT,  // Default "інвентар"
+    localCategory: InventoryCategory = InventoryCategory.EQUIPMENT,
     userId: String? = null
 ): InventoryItemEntity {
     return InventoryItemEntity(
         id = 0,
         itemName = itemName,
         availableQuantity = availableQuantity,
+        neededQuantity = neededQuantity,  // NEW: map from server
         category = localCategory,
         userId = userId,
         crewName = crewName,
@@ -272,18 +278,21 @@ fun CrewInventoryItem.toEntity(
     )
 }
 
-// FIXED: Extension function for converting entity to server model - explicitly set tenantId
+/**
+ * Convert local entity to server model
+ * Maps all quantities for sync
+ */
 fun InventoryItemEntity.toCrewInventoryItem(): CrewInventoryItem {
     return CrewInventoryItem(
         id = supabaseId,
-        tenantId = 0,  // CRITICAL FIX: Always set to 0 (required NOT NULL field in database)
+        tenantId = 0,
         crewName = crewName,
         crewType = null,
         itemName = itemName,
         itemCategory = null,
         unit = "шт",
         availableQuantity = availableQuantity,
-        neededQuantity = 0,
+        neededQuantity = neededQuantity,  // NEW: include in sync
         priority = "medium",
         description = null,
         notes = null,

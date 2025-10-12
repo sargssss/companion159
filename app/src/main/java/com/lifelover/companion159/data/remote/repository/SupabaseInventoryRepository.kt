@@ -4,7 +4,7 @@ import android.util.Log
 import com.lifelover.companion159.data.local.entities.InventoryItemEntity
 import com.lifelover.companion159.data.remote.client.SupabaseClient
 import com.lifelover.companion159.data.remote.models.CrewInventoryItem
-import com.lifelover.companion159.data.sync.toCrewInventoryItem  // Import extension
+import com.lifelover.companion159.data.sync.toCrewInventoryItem
 import io.github.jan.supabase.postgrest.from
 import io.github.jan.supabase.postgrest.query.Columns
 import kotlinx.coroutines.Dispatchers
@@ -30,7 +30,7 @@ class SupabaseInventoryRepository @Inject constructor() {
                 val items = client.from(TABLE_NAME)
                     .select(columns = Columns.ALL) {
                         filter {
-                            eq("tenant_id", 0)
+                            eq("tenant_id", 0)  // FIXED: snake_case
                             eq("crew_name", crewName)
                             eq("is_active", true)
                         }
@@ -51,10 +51,8 @@ class SupabaseInventoryRepository @Inject constructor() {
         try {
             Log.d(TAG, "Creating item: ${localItem.itemName} for crew: ${localItem.crewName}")
 
-            val crewItem = localItem.toCrewInventoryItem()  // Use extension function
+            val crewItem = localItem.toCrewInventoryItem()
 
-            // CRITICAL FIX: Don't specify columns parameter - let Supabase send ALL fields
-            // This ensures tenant_id is included in the request
             val createdItems = client.from(TABLE_NAME)
                 .insert(crewItem) {
                     select()
@@ -87,12 +85,13 @@ class SupabaseInventoryRepository @Inject constructor() {
                 .update({
                     set("item_name", localItem.itemName)
                     set("available_quantity", localItem.availableQuantity)
+                    set("needed_quantity", localItem.neededQuantity)  // NEW
                     set("crew_name", localItem.crewName)
                     set("is_active", localItem.isActive)
                 }) {
                     filter {
                         eq("id", supabaseId)
-                        eq("tenant_id", 0)
+                        eq("tenant_id", 0)  // FIXED: snake_case
                     }
                     select()
                 }
@@ -123,7 +122,7 @@ class SupabaseInventoryRepository @Inject constructor() {
                 }) {
                     filter {
                         eq("id", supabaseId)
-                        eq("tenant_id", 0)
+                        eq("tenant_id", 0)  // FIXED: snake_case
                     }
                     select()
                 }

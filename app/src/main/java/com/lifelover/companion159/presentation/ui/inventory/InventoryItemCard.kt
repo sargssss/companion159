@@ -1,7 +1,6 @@
 package com.lifelover.companion159.presentation.ui.inventory
 
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
@@ -15,16 +14,24 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.lifelover.companion159.R
+import com.lifelover.companion159.domain.models.DisplayCategory
 import com.lifelover.companion159.domain.models.InventoryItem
 
 @Composable
 fun InventoryItemCard(
     item: InventoryItem,
+    displayCategory: DisplayCategory,
     onQuantityChange: (Int) -> Unit,
     onDelete: () -> Unit,
     onEdit: () -> Unit,
     showSyncStatus: Boolean = false
 ) {
+    // Determine which quantity to display based on category
+    val displayedQuantity = when (displayCategory) {
+        DisplayCategory.NEEDS -> item.neededQuantity
+        else -> item.availableQuantity
+    }
+
     Card(
         modifier = Modifier.fillMaxWidth(),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
@@ -34,7 +41,7 @@ fun InventoryItemCard(
                 .fillMaxWidth()
                 .padding(12.dp)
         ) {
-            // Name section (full width, multi-line) - FIXED: Use itemName
+            // Name section
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -61,35 +68,35 @@ fun InventoryItemCard(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // Controls section (quantity + actions in one row)
+            // Controls section
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Quantity controls (left side) - FIXED: Use availableQuantity
+                // Quantity controls
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(4.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     IconButton(
                         onClick = {
-                            if (item.availableQuantity > 0) {
-                                onQuantityChange(item.availableQuantity - 1)
+                            if (displayedQuantity > 0) {
+                                onQuantityChange(displayedQuantity - 1)
                             }
                         },
-                        enabled = item.availableQuantity > 0,
+                        enabled = displayedQuantity > 0,
                         modifier = Modifier.size(32.dp)
                     ) {
                         Icon(
                             modifier = Modifier.size(20.dp),
                             painter = painterResource(R.drawable.minus_circle),
-                            contentDescription = stringResource(id = R.string.decrease_quantity)
+                            contentDescription = "Зменшити"
                         )
                     }
 
                     Text(
-                        text = item.availableQuantity.toString(),
+                        text = displayedQuantity.toString(),
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                         modifier = Modifier.widthIn(min = 32.dp),
@@ -97,18 +104,18 @@ fun InventoryItemCard(
                     )
 
                     IconButton(
-                        onClick = { onQuantityChange(item.availableQuantity + 1) },
+                        onClick = { onQuantityChange(displayedQuantity + 1) },
                         modifier = Modifier.size(32.dp)
                     ) {
                         Icon(
                             modifier = Modifier.size(20.dp),
                             painter = painterResource(R.drawable.plus_circle),
-                            contentDescription = stringResource(id = R.string.increase_quantity)
+                            contentDescription = "Збільшити"
                         )
                     }
                 }
 
-                // Action buttons (right side)
+                // Action buttons
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(0.dp)
                 ) {

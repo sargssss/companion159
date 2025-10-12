@@ -16,4 +16,6 @@
     <string name="naming">Найменування</string>
     <string name="enter_title">Введіть назву...</string>
     <string name="cancel">Скасувати</string>
+    <string name="availability">Наявність</string>
+    <string name="needs">Потреба</string>
 </resources>

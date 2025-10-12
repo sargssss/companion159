@@ -151,6 +151,7 @@ interface InventoryDao {
         UPDATE inventory_items 
         SET itemName = :name,
             availableQuantity = :quantity,
+            neededQuantity = :neededQuantity,
             category = :category,
             crewName = :crewName,
             isActive = :isActive,
@@ -160,13 +161,81 @@ interface InventoryDao {
         WHERE supabaseId = :supabaseId
     """)
     suspend fun updateFromServer(
-        supabaseId: Long,  // Changed from String to Long
+        supabaseId: Long,
         userId: String,
         name: String,
         quantity: Int,
+        neededQuantity: Int,
         category: InventoryCategory,
         crewName: String,
         isActive: Boolean,
         timestamp: Date = Date()
     ): Int
+
+    // Update needed quantity
+    @Query("""
+    UPDATE inventory_items 
+    SET neededQuantity = :quantity,
+        needsSync = 1,
+        lastModified = :timestamp
+    WHERE id = :id
+""")
+    suspend fun updateNeededQuantity(
+        id: Long,
+        quantity: Int,
+        timestamp: Date = Date()
+    ): Int
+
+    // Update full item with needed quantity
+    @Query("""
+    UPDATE inventory_items 
+    SET itemName = :name,
+        availableQuantity = :availableQuantity,
+        neededQuantity = :neededQuantity,
+        category = :category,
+        crewName = :crewName,
+        needsSync = 1,
+        lastModified = :timestamp
+    WHERE id = :id
+""")
+    suspend fun updateItemWithNeeds(
+        id: Long,
+        name: String,
+        availableQuantity: Int,
+        neededQuantity: Int,
+        category: InventoryCategory,
+        crewName: String,
+        timestamp: Date = Date()
+    ): Int
+
+    // Get items for AVAILABILITY display (all non-ammunition with available_quantity > 0)
+    @Query("""
+    SELECT * FROM inventory_items 
+    WHERE isActive = 1 
+    AND category != 'AMMUNITION'
+    AND availableQuantity > 0
+    AND (userId = :userId OR userId IS NULL) 
+    ORDER BY createdAt DESC
+""")
+    fun getAvailabilityItems(userId: String?): Flow<List<InventoryItemEntity>>
+
+    // Get items for БК display (ammunition only, show all with available_quantity)
+    @Query("""
+    SELECT * FROM inventory_items 
+    WHERE isActive = 1 
+    AND category = 'AMMUNITION'
+    AND (userId = :userId OR userId IS NULL) 
+    ORDER BY createdAt DESC
+""")
+    fun getAmmunitionItems(userId: String?): Flow<List<InventoryItemEntity>>
+
+    // CHANGED: Get items for NEEDS display (ALL items with needed_quantity > 0, including ammunition)
+    @Query("""
+    SELECT * FROM inventory_items 
+    WHERE isActive = 1 
+    AND neededQuantity > 0
+    AND (userId = :userId OR userId IS NULL) 
+    ORDER BY createdAt DESC
+""")
+    fun getNeedsItems(userId: String?): Flow<List<InventoryItemEntity>>
 }

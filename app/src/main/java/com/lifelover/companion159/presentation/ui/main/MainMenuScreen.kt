@@ -15,6 +15,8 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.lifelover.companion159.R
 import com.lifelover.companion159.data.sync.SyncStatus
 import com.lifelover.companion159.data.local.entities.InventoryCategory
+import com.lifelover.companion159.domain.models.DisplayCategory
+import com.lifelover.companion159.domain.models.titleRes
 import com.lifelover.companion159.presentation.ui.auth.AuthViewModel
 import com.lifelover.companion159.presentation.ui.inventory.InventoryMenuButton
 import com.lifelover.companion159.presentation.viewmodels.InventoryViewModel
@@ -24,7 +26,7 @@ import java.util.*
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainMenuScreen(
-    onInventoryTypeSelected: (InventoryCategory) -> Unit = {},
+    onDisplayCategorySelected: (DisplayCategory) -> Unit = {},  // CHANGED
     onLogout: () -> Unit = {},
     onChangePosition: () -> Unit = {},
     authViewModel: AuthViewModel = hiltViewModel(),
@@ -33,11 +35,9 @@ fun MainMenuScreen(
     val authState by authViewModel.state.collectAsState()
     val inventoryState by inventoryViewModel.state.collectAsState()
 
-    // State for user menu
     var showUserMenu by remember { mutableStateOf(false) }
     var showLogoutDialog by remember { mutableStateOf(false) }
 
-    // FIXED: Only navigate to login if user explicitly logged out
     LaunchedEffect(authState.hasExplicitlyLoggedOut) {
         if (authState.hasExplicitlyLoggedOut) {
             authViewModel.clearLogoutFlag()
@@ -54,7 +54,6 @@ fun MainMenuScreen(
                 )
             },
             actions = {
-                // Sync status indicator
                 when (inventoryState.syncStatus) {
                     SyncStatus.SYNCING -> {
                         CircularProgressIndicator(
@@ -85,7 +84,6 @@ fun MainMenuScreen(
                     else -> {}
                 }
 
-                // Show sync button only when authenticated AND online
                 if (authState.isAuthenticated && !authState.isOffline) {
                     IconButton(
                         onClick = { inventoryViewModel.syncData() },
@@ -101,9 +99,7 @@ fun MainMenuScreen(
                     }
                 }
 
-                // User menu - show for both authenticated and unauthenticated
                 if (authState.isAuthenticated) {
-                    // Authenticated user menu
                     Box {
                         IconButton(onClick = { showUserMenu = true }) {
                             Icon(
@@ -116,16 +112,15 @@ fun MainMenuScreen(
                             expanded = showUserMenu,
                             onDismissRequest = { showUserMenu = false }
                         ) {
-
                             DropdownMenuItem(
                                 text = { Text("Змінити позицію") },
                                 onClick = {
                                     showUserMenu = false
-                                    onChangePosition() // Navigate to position screen
+                                    onChangePosition()
                                 },
                                 leadingIcon = {
                                     Icon(
-                                        imageVector = Icons.Default.Face, // Use appropriate icon
+                                        imageVector = Icons.Default.Face,
                                         contentDescription = null
                                     )
                                 }
@@ -133,12 +128,10 @@ fun MainMenuScreen(
 
                             HorizontalDivider()
 
-                            // Settings
                             DropdownMenuItem(
                                 text = { Text("Налаштування") },
                                 onClick = {
                                     showUserMenu = false
-                                    // TODO: Navigate to settings
                                 },
                                 leadingIcon = {
                                     Icon(
@@ -150,9 +143,6 @@ fun MainMenuScreen(
 
                             HorizontalDivider()
 
-
-
-                            // Logout
                             DropdownMenuItem(
                                 text = {
                                     Text(
@@ -175,7 +165,6 @@ fun MainMenuScreen(
                         }
                     }
                 } else {
-                    // Not authenticated - show login button
                     IconButton(onClick = onLogout) {
                         Icon(
                             imageVector = Icons.Default.AccountCircle,
@@ -186,10 +175,8 @@ fun MainMenuScreen(
             }
         )
 
-        // Status card - show different info based on auth and network status
         when {
             authState.isAuthenticated && !authState.isOffline -> {
-                // Online with account
                 StatusCard(
                     userEmail = authState.userEmail,
                     lastSyncTime = inventoryState.lastSyncTime,
@@ -197,7 +184,6 @@ fun MainMenuScreen(
                 )
             }
             authState.isAuthenticated && authState.isOffline -> {
-                // Offline with account
                 StatusCard(
                     userEmail = authState.userEmail,
                     lastSyncTime = inventoryState.lastSyncTime,
@@ -205,15 +191,14 @@ fun MainMenuScreen(
                 )
             }
             !authState.isAuthenticated && authState.isOffline -> {
-                // Offline without account
                 OfflineStatusCard(message = "Офлайн режим (без аккаунта)")
             }
             else -> {
-                // Online without account
                 OfflineStatusCard(message = "Режим без аккаунта")
             }
         }
 
+        // NEW: Simple 3-button menu without icons
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -221,23 +206,37 @@ fun MainMenuScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Menu buttons for each category
-            InventoryCategory.entries.forEach { category ->
-                InventoryMenuButton(
-                    inventoryType = category,
-                    onClick = { onInventoryTypeSelected(category) }
-                )
+            DisplayCategory.entries.forEach { category ->
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(80.dp),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
+                    onClick = { onDisplayCategorySelected(category) }
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(16.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = stringResource(category.titleRes()),
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                }
             }
         }
 
         inventoryState.error?.let { error ->
             LaunchedEffect(error) {
-                // Show Snackbar or Toast here
+                // Show Snackbar or Toast
             }
         }
     }
 
-    // Logout confirmation dialog
     if (showLogoutDialog) {
         LogoutConfirmationDialog(
             userEmail = authState.userEmail,

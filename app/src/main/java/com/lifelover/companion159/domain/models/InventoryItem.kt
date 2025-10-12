@@ -6,10 +6,11 @@ import java.util.Date
 
 data class InventoryItem(
     val id: Long = 0,
-    val itemName: String,  // FIXED: renamed from 'name'
-    val availableQuantity: Int = 1,  // FIXED: renamed from 'quantity'
+    val itemName: String,
+    val availableQuantity: Int = 0,
+    val neededQuantity: Int = 0,  // NEW
     val category: InventoryCategory,
-    val crewName: String,  // FIXED: added crew name (was position)
+    val crewName: String,
     val lastModified: Date = Date(),
     val isSynced: Boolean = false
 )
@@ -18,10 +19,11 @@ data class InventoryItem(
 fun InventoryItemEntity.toDomainModel(): InventoryItem {
     return InventoryItem(
         id = id,
-        itemName = itemName,  // FIXED
-        availableQuantity = availableQuantity,  // FIXED
+        itemName = itemName,
+        availableQuantity = availableQuantity,
+        neededQuantity = neededQuantity,  // NEW
         category = category,
-        crewName = crewName,  // FIXED
+        crewName = crewName,
         lastModified = lastModified,
         isSynced = !needsSync
     )
@@ -30,10 +32,11 @@ fun InventoryItemEntity.toDomainModel(): InventoryItem {
 fun InventoryItem.toEntity(): InventoryItemEntity {
     return InventoryItemEntity(
         id = id,
-        itemName = itemName,  // FIXED
-        availableQuantity = availableQuantity,  // FIXED
+        itemName = itemName,
+        availableQuantity = availableQuantity,
+        neededQuantity = neededQuantity,  // NEW
         category = category,
-        crewName = crewName,  // FIXED
+        crewName = crewName,
         supabaseId = null,
         lastModified = Date(),
         needsSync = true,

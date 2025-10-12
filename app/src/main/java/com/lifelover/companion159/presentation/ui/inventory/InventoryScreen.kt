@@ -10,34 +10,32 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.lifelover.companion159.R
-import com.lifelover.companion159.data.local.entities.InventoryCategory
-import com.lifelover.companion159.data.local.entities.iconRes
-import com.lifelover.companion159.data.local.entities.titleRes
+import com.lifelover.companion159.domain.models.DisplayCategory
 import com.lifelover.companion159.domain.models.InventoryItem
+import com.lifelover.companion159.domain.models.titleRes
 import com.lifelover.companion159.presentation.viewmodels.InventoryViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun InventoryScreen(
-    inventoryCategory: InventoryCategory,
+    displayCategory: DisplayCategory,  // CHANGED
     onBackPressed: () -> Unit,
-    onAddItem: () -> Unit, // NEW: callback for navigation
-    onEditItem: (InventoryItem) -> Unit, // NEW: callback for navigation
+    onAddItem: () -> Unit,
+    onEditItem: (InventoryItem) -> Unit,
     viewModel: InventoryViewModel = hiltViewModel()
 ) {
     val state by viewModel.state.collectAsState()
     var itemToDelete by remember { mutableStateOf<InventoryItem?>(null) }
 
     // Load items when screen opens
-    LaunchedEffect(inventoryCategory) {
-        viewModel.loadItems(inventoryCategory)
+    LaunchedEffect(displayCategory) {
+        viewModel.loadItemsForDisplay(displayCategory)
     }
 
     // Handle messages
@@ -53,7 +51,7 @@ fun InventoryScreen(
         }
     }
 
-    // Delete confirmation dialog (only this dialog remains)
+    // Delete confirmation dialog
     itemToDelete?.let { item ->
         DeleteConfirmationDialog(
             item = item,
@@ -69,7 +67,7 @@ fun InventoryScreen(
         TopAppBar(
             title = {
                 Text(
-                    text = stringResource(inventoryCategory.titleRes()),
+                    text = stringResource(displayCategory.titleRes()),
                     fontWeight = FontWeight.Bold
                 )
             },
@@ -82,7 +80,7 @@ fun InventoryScreen(
                 }
             },
             actions = {
-                IconButton(onClick = onAddItem) { // CHANGED: navigate instead of dialog
+                IconButton(onClick = onAddItem) {
                     Icon(
                         imageVector = Icons.Default.Add,
                         contentDescription = stringResource(id = R.string.add)
@@ -104,8 +102,8 @@ fun InventoryScreen(
 
             state.items.isEmpty() -> {
                 EmptyState(
-                    category = inventoryCategory,
-                    onAddClick = onAddItem // CHANGED: navigate instead of dialog
+                    displayCategory = displayCategory,
+                    onAddClick = onAddItem
                 )
             }
 
@@ -118,11 +116,28 @@ fun InventoryScreen(
                     items(state.items, key = { it.id }) { item ->
                         InventoryItemCard(
                             item = item,
+                            displayCategory = displayCategory,
                             onQuantityChange = { newQuantity ->
-                                viewModel.updateQuantity(item, newQuantity)
+                                // CHANGED: Different logic based on category
+                                when (displayCategory) {
+                                    DisplayCategory.NEEDS -> {
+                                        // In NEEDS, always update needed quantity
+                                        viewModel.updateNeededQuantity(item, newQuantity)
+                                    }
+                                    DisplayCategory.AMMUNITION -> {
+                                        // In БК, update available quantity
+                                        viewModel.updateAvailableQuantity(item, newQuantity)
+                                    }
+                                    DisplayCategory.AVAILABILITY -> {
+                                        // In AVAILABILITY, update available quantity
+                                        viewModel.updateAvailableQuantity(item, newQuantity)
+                                    }
+                                }
                             },
                             onDelete = { itemToDelete = item },
-                            onEdit = { onEditItem(item) }, // CHANGED: navigate instead of dialog
+                            onEdit = {
+                                onEditItem(item)
+                            },
                             showSyncStatus = !item.isSynced
                         )
                     }
@@ -130,13 +145,11 @@ fun InventoryScreen(
             }
         }
     }
-
-    // REMOVED: All dialog code (showAddDialog, InventoryItemDialog, etc.)
 }
 
 @Composable
 private fun EmptyState(
-    category: InventoryCategory,
+    displayCategory: DisplayCategory,
     onAddClick: () -> Unit
 ) {
     Box(
@@ -148,22 +161,23 @@ private fun EmptyState(
             verticalArrangement = Arrangement.spacedBy(20.dp),
             modifier = Modifier.padding(48.dp)
         ) {
-            Icon(
-                painter = painterResource(category.iconRes()),
-                contentDescription = null,
-                modifier = Modifier.size(80.dp),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
-            )
-
             Text(
-                text = stringResource(id = R.string.empty_list),
+                text = when (displayCategory) {
+                    DisplayCategory.AVAILABILITY -> "Немає предметів в наявності"
+                    DisplayCategory.AMMUNITION -> "Немає БК"
+                    DisplayCategory.NEEDS -> "Немає потреб"  // Works for both regular and ammunition
+                },
                 style = MaterialTheme.typography.headlineSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                fontWeight = FontWeight.Medium
+                fontWeight = FontWeight.Medium,
+                textAlign = TextAlign.Center
             )
 
             Text(
-                text = stringResource(id = R.string.push_plus_to_add),
+                text = when (displayCategory) {
+                    DisplayCategory.NEEDS -> "Додайте предмети з потрібною кількістю"
+                    else -> "Натисніть + щоб додати"
+                },
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center
@@ -179,7 +193,7 @@ private fun EmptyState(
                     modifier = Modifier.size(18.dp)
                 )
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("Додати перший предмет")
+                Text("Додати предмет")
             }
         }
     }

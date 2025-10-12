@@ -12,6 +12,7 @@ import com.lifelover.companion159.presentation.ui.inventory.InventoryScreen
 import com.lifelover.companion159.presentation.ui.main.MainMenuScreen
 import com.lifelover.companion159.presentation.ui.position.PositionScreen
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.lifelover.companion159.domain.models.DisplayCategory
 import com.lifelover.companion159.domain.models.InventoryItem
 import com.lifelover.companion159.presentation.viewmodels.InventoryViewModel
 import com.lifelover.companion159.presentation.ui.inventory.AddEditItemScreen
@@ -27,17 +28,18 @@ object Position
 object MainMenu
 
 @Serializable
-data class InventoryDetail(val category: InventoryCategory)
+data class InventoryDetail(val displayCategory: String)  // CHANGED: use String for DisplayCategory
 
 @Serializable
-data class AddItem(val category: InventoryCategory)
+data class AddItem(val displayCategory: String)  // CHANGED
 
 @Serializable
 data class EditItem(
-    val category: InventoryCategory,
+    val displayCategory: String,  // CHANGED
     val itemId: Long,
     val itemName: String,
-    val itemQuantity: Int
+    val availableQuantity: Int,
+    val neededQuantity: Int  // NEW
 )
 
 @Composable
@@ -80,8 +82,8 @@ fun AppNavigation(
 
         composable<MainMenu> {
             MainMenuScreen(
-                onInventoryTypeSelected = { category ->
-                    navController.navigate(InventoryDetail(category))
+                onDisplayCategorySelected = { displayCategory ->
+                    navController.navigate(InventoryDetail(displayCategory.name))
                 },
                 onLogout = {
                     navController.navigate(Login) {
@@ -96,64 +98,67 @@ fun AppNavigation(
 
         composable<InventoryDetail> { backStackEntry ->
             val args = backStackEntry.toRoute<InventoryDetail>()
+            val displayCategory = DisplayCategory.valueOf(args.displayCategory)
+
             InventoryScreen(
-                inventoryCategory = args.category,
+                displayCategory = displayCategory,
                 onBackPressed = { navController.popBackStack() },
-                onAddItem = { // NEW: Navigate to Add screen
-                    navController.navigate(AddItem(args.category))
+                onAddItem = {
+                    navController.navigate(AddItem(displayCategory.name))
                 },
-                onEditItem = { item -> // FIXED: Use correct property names
+                onEditItem = { item ->
                     navController.navigate(
                         EditItem(
-                            category = args.category,
+                            displayCategory = displayCategory.name,
                             itemId = item.id,
                             itemName = item.itemName,
-                            itemQuantity = item.availableQuantity
+                            availableQuantity = item.availableQuantity,
+                            neededQuantity = item.neededQuantity
                         )
                     )
                 }
             )
         }
 
-        // NEW: Add Item screen
         composable<AddItem> { backStackEntry ->
             val args = backStackEntry.toRoute<AddItem>()
+            val displayCategory = DisplayCategory.valueOf(args.displayCategory)
             val viewModel: InventoryViewModel = hiltViewModel()
 
             AddEditItemScreen(
-                category = args.category,
-                itemId = null, // null = create mode
+                displayCategory = displayCategory,
+                itemId = null,
                 itemName = null,
-                itemQuantity = null,
+                availableQuantity = null,
+                neededQuantity = null,
                 onBackPressed = { navController.popBackStack() },
-                onSave = { name, quantity ->
-                    viewModel.addNewItem(name, quantity, args.category)
+                onSave = { name, availableQty, neededQty ->
+                    viewModel.addNewItem(name, availableQty, neededQty, displayCategory)
                     navController.popBackStack()
                 }
             )
         }
 
-        // NEW: Edit Item screen
         composable<EditItem> { backStackEntry ->
             val args = backStackEntry.toRoute<EditItem>()
+            val displayCategory = DisplayCategory.valueOf(args.displayCategory)
             val viewModel: InventoryViewModel = hiltViewModel()
 
             AddEditItemScreen(
-                category = args.category,
+                displayCategory = displayCategory,
                 itemId = args.itemId,
                 itemName = args.itemName,
-                itemQuantity = args.itemQuantity,
+                availableQuantity = args.availableQuantity,
+                neededQuantity = args.neededQuantity,
                 onBackPressed = { navController.popBackStack() },
-                onSave = { name, quantity ->
-                    // FIXED: Use correct property names and include crewName
-                    val item = InventoryItem(
-                        id = args.itemId,
-                        itemName = args.itemName,
-                        availableQuantity = args.itemQuantity,
-                        category = args.category,
-                        crewName = "" // Will be set by repository
+                onSave = { name, availableQty, neededQty ->
+                    viewModel.updateFullItem(
+                        itemId = args.itemId,
+                        newName = name,
+                        newAvailableQuantity = availableQty,
+                        newNeededQuantity = neededQty,
+                        displayCategory = displayCategory
                     )
-                    viewModel.updateFullItem(item, name, quantity)
                     navController.popBackStack()
                 }
             )
