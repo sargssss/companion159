@@ -15,7 +15,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.lifelover.companion159.R
 import com.lifelover.companion159.domain.models.DisplayCategory
 import com.lifelover.companion159.domain.models.titleRes
-import com.lifelover.companion159.presentation.ui.auth.AuthViewModel
+import com.lifelover.companion159.presentation.viewmodels.AuthViewModel
 import com.lifelover.companion159.presentation.viewmodels.InventoryViewModel
 import com.lifelover.companion159.presentation.viewmodels.SyncStatus
 import java.text.SimpleDateFormat
@@ -92,7 +92,7 @@ fun MainMenuScreen(
                 }
 
                 // Sync button (kept for UI, shows message when clicked)
-                if (authState.isAuthenticated && !authState.isOffline) {
+                if (authState.isAuthenticated) {
                     IconButton(
                         onClick = { inventoryViewModel.sync() },
                         enabled = inventoryState.syncStatus != SyncStatus.SYNCING
@@ -184,31 +184,12 @@ fun MainMenuScreen(
             }
         )
 
-        // Status card (kept for UI)
-        when {
-            authState.isAuthenticated && !authState.isOffline -> {
-                StatusCard(
-                    userEmail = authState.userEmail,
-                    lastSyncTime = inventoryState.lastSyncTime,
-                    isOffline = false
-                )
-            }
-
-            authState.isAuthenticated && authState.isOffline -> {
-                StatusCard(
-                    userEmail = authState.userEmail,
-                    lastSyncTime = inventoryState.lastSyncTime,
-                    isOffline = true
-                )
-            }
-
-            !authState.isAuthenticated && authState.isOffline -> {
-                OfflineStatusCard(message = "Офлайн режим (без аккаунта)")
-            }
-
-            else -> {
-                OfflineStatusCard(message = "Режим без аккаунта")
-            }
+        // Status card - only show when authenticated
+        if (authState.isAuthenticated) {
+            StatusCard(
+                userEmail = authState.userEmail,
+                lastSyncTime = inventoryState.lastSyncTime
+            )
         }
 
         // Category buttons
@@ -329,18 +310,14 @@ private fun LogoutConfirmationDialog(
 @Composable
 private fun StatusCard(
     userEmail: String?,
-    lastSyncTime: Long?,
-    isOffline: Boolean
+    lastSyncTime: Long?
 ) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 8.dp),
         colors = CardDefaults.cardColors(
-            containerColor = if (isOffline)
-                MaterialTheme.colorScheme.secondaryContainer
-            else
-                MaterialTheme.colorScheme.primaryContainer
+            containerColor = MaterialTheme.colorScheme.primaryContainer
         )
     ) {
         Column(
@@ -359,72 +336,16 @@ private fun StatusCard(
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.Medium
                     )
-
-                    if (isOffline) {
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            Icon(
-                                painter = painterResource(R.drawable.sync_attention),
-                                contentDescription = null,
-                                modifier = Modifier.size(16.dp),
-                                tint = MaterialTheme.colorScheme.onSecondaryContainer
-                            )
-                            Text(
-                                text = "Офлайн",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSecondaryContainer
-                            )
-                        }
-                    }
                 }
 
-                if (!isOffline) {
-                    lastSyncTime?.let { time ->
-                        val formatter = SimpleDateFormat("HH:mm", Locale.getDefault())
-                        Text(
-                            text = "Синхр.: ${formatter.format(Date(time))}",
-                            style = MaterialTheme.typography.bodySmall
-                        )
-                    }
+                lastSyncTime?.let { time ->
+                    val formatter = SimpleDateFormat("HH:mm", Locale.getDefault())
+                    Text(
+                        text = "Синхр.: ${formatter.format(Date(time))}",
+                        style = MaterialTheme.typography.bodySmall
+                    )
                 }
             }
-        }
-    }
-}
-
-/**
- * Offline status card
- */
-@Composable
-private fun OfflineStatusCard(message: String = "Офлайн режим") {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.secondaryContainer
-        )
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(12.dp),
-            horizontalArrangement = Arrangement.Center,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Icon(
-                painter = painterResource(R.drawable.offline),
-                contentDescription = null,
-                modifier = Modifier.size(20.dp)
-            )
-            Spacer(modifier = Modifier.width(8.dp))
-            Text(
-                text = message,
-                style = MaterialTheme.typography.bodyMedium
-            )
         }
     }
 }

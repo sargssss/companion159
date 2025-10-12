@@ -3,16 +3,20 @@ package com.lifelover.companion159.data.remote.auth
 import android.content.Context
 import android.util.Log
 import com.lifelover.companion159.data.local.UserPreferences
-import com.lifelover.companion159.data.remote.client.SupabaseClient
+import io.github.jan.supabase.SupabaseClient
+import io.github.jan.supabase.auth.Auth
 import io.github.jan.supabase.auth.auth
-import io.github.jan.supabase.auth.providers.builtin.Email
+import io.github.jan.supabase.auth.providers.Google
 import io.github.jan.supabase.auth.providers.builtin.IDToken
-import io.github.jan.supabase.auth.user.UserInfo
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.map
+import io.github.jan.supabase.auth.status.SessionStatus
+import kotlinx.coroutines.flow.*
 import javax.inject.Inject
 import javax.inject.Singleton
 
+/**
+ * Authentication service for Supabase
+ * Handles Google-only authentication
+ */
 @Singleton
 class SupabaseAuthService @Inject constructor(
     private val googleAuthService: GoogleAuthService,
@@ -22,94 +26,55 @@ class SupabaseAuthService @Inject constructor(
         private const val TAG = "SupabaseAuthService"
     }
 
-    private val client = SupabaseClient.client
+    private val client: SupabaseClient by lazy {
+        com.lifelover.companion159.data.remote.client.SupabaseClient.client
+    }
 
-    /**
-     * Authentication status flow
-     */
-    val isAuthenticated: Flow<Boolean> = client.auth.sessionStatus.map {
-        it is io.github.jan.supabase.auth.status.SessionStatus.Authenticated
+    private val auth: Auth by lazy {
+        client.auth
     }
 
     /**
-     * Get current user
+     * Flow that emits authentication state
      */
-    fun getCurrentUser(): UserInfo? = client.auth.currentUserOrNull()
-
-    /**
-     * Get current user ID
-     */
-    fun getUserId(): String? = getCurrentUser()?.id
-
-    private fun saveCurrentUserAsLast() {
-        val user = getCurrentUser()
-        if (user != null) {
-            userPreferences.saveLastUser(user.id, user.email)
-            Log.d(TAG, "💾 Saved last user: ${user.email} (${user.id})")
-        }
+    val isAuthenticated: Flow<Boolean> = auth.sessionStatus.map { status ->
+        status is SessionStatus.Authenticated
     }
 
     /**
-     * Sign up with email/password
+     * Sign in with Google
+     * The only authentication method available
      */
-    suspend fun signUp(email: String, password: String): Result<Unit> {
+    suspend fun signInWithGoogle(context: Context): Result<Unit> {
         return try {
-            client.auth.signUpWith(Email) {
-                this.email = email
-                this.password = password
-            }
-            saveCurrentUserAsLast()
-            Result.success(Unit)
-        } catch (e: Exception) {
-            Result.failure(e)
-        }
-    }
+            Log.d(TAG, "🔐 Starting Google Sign-In...")
 
-    /**
-     * Sign in with email/password
-     */
-    suspend fun signIn(email: String, password: String): Result<Unit> {
-        return try {
-            client.auth.signInWith(Email) {
-                this.email = email
-                this.password = password
-            }
-            saveCurrentUserAsLast()
-            Result.success(Unit)
-        } catch (e: Exception) {
-            Result.failure(e)
-        }
-    }
-
-    /**
-     * Sign in with Google OAuth
-     */
-    suspend fun signInWithGoogle(activityContext: Context): Result<Unit> {
-        return try {
             // Step 1: Get Google ID token
-            val googleResult = googleAuthService.signInWithGoogle(activityContext)
+            val googleResult = googleAuthService.signInWithGoogle(context)
 
-            googleResult.fold(
-                onSuccess = { googleSignInResult ->
-                    // Step 2: Authenticate with Supabase using Google ID token
-                    try {
-                        client.auth.signInWith(IDToken) {
-                            idToken = googleSignInResult.idToken
-                            provider = io.github.jan.supabase.auth.providers.Google
-                        }
-                        saveCurrentUserAsLast()
-                        Result.success(Unit)
-                    } catch (e: Exception) {
-                        Result.failure(Exception("Supabase authentication failed: ${e.message}"))
-                    }
-                },
-                onFailure = { error ->
-                    Log.e(TAG, "FAILED - Google Sign-In Error: ${error.message}")
-                    Result.failure(error)
-                }
-            )
+            val googleIdToken = googleResult.toString()
+
+            Log.d(TAG, "✅ Got Google ID token")
+
+            // Step 2: Authenticate with Supabase using Google token
+            auth.signInWith(IDToken) {
+                idToken = googleIdToken
+                provider = Google
+            }
+
+            Log.d(TAG, "✅ Authenticated with Supabase")
+
+            // Step 3: Save user info
+            val userId = getUserId()
+            if (userId != null) {
+                userPreferences.setLastUserId(userId)
+                Log.d(TAG, "✅ Saved userId: $userId")
+            }
+
+            Result.success(Unit)
+
         } catch (e: Exception) {
-            Log.e(TAG, "=== Unexpected error in signInWithGoogle ===")
+            Log.e(TAG, "❌ Google Sign-In failed", e)
             Result.failure(e)
         }
     }
@@ -117,15 +82,33 @@ class SupabaseAuthService @Inject constructor(
     /**
      * Sign out
      */
-    suspend fun signOut(): Result<Unit> {
-        return try {
-            client.auth.signOut()
-            googleAuthService.signOut()
-            Log.d(TAG, "Sign out successful")
-            Result.success(Unit)
+    suspend fun signOut() {
+        try {
+            Log.d(TAG, "🚪 Signing out...")
+            auth.signOut()
+            userPreferences.setLastUserId(null)
+            Log.d(TAG, "✅ Signed out successfully")
         } catch (e: Exception) {
-            Log.e(TAG, "Sign out failed", e)
-            Result.failure(e)
+            Log.e(TAG, "❌ Sign out failed", e)
         }
+    }
+
+    /**
+     * Get current user ID
+     */
+    fun getUserId(): String? {
+        return auth.currentUserOrNull()?.id
+    }
+
+    /**
+     * Get current user
+     */
+    fun getCurrentUser() = auth.currentUserOrNull()
+
+    /**
+     * Check if user is currently authenticated
+     */
+    fun isUserAuthenticated(): Boolean {
+        return auth.currentUserOrNull() != null
     }
 }

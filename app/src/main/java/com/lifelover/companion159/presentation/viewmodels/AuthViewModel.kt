@@ -1,4 +1,4 @@
-package com.lifelover.companion159.presentation.ui.auth
+package com.lifelover.companion159.presentation.viewmodels
 
 import android.content.Context
 import androidx.lifecycle.ViewModel
@@ -9,9 +9,11 @@ import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
+/**
+ * UI state for authentication
+ */
 data class AuthState(
     val isAuthenticated: Boolean = false,
-    val isOffline: Boolean = false,
     val isLoading: Boolean = false,
     val error: String? = null,
     val userEmail: String? = null,
@@ -20,7 +22,7 @@ data class AuthState(
 
 /**
  * ViewModel for authentication
- * Handles login, logout, and auth state
+ * Handles Google-only authentication flow
  */
 @HiltViewModel
 class AuthViewModel @Inject constructor(
@@ -49,54 +51,8 @@ class AuthViewModel @Inject constructor(
     }
 
     /**
-     * Sign in with email and password
-     */
-    fun signIn(email: String, password: String) {
-        viewModelScope.launch {
-            _state.update { it.copy(isLoading = true, error = null) }
-
-            authService.signIn(email, password)
-                .onSuccess {
-                    _state.update { it.copy(
-                        isLoading = false,
-                        isAuthenticated = true,
-                        userEmail = email
-                    )}
-                }
-                .onFailure { exception ->
-                    _state.update { it.copy(
-                        isLoading = false,
-                        error = mapError(exception)
-                    )}
-                }
-        }
-    }
-
-    /**
-     * Sign up with email and password
-     */
-    fun signUp(email: String, password: String) {
-        viewModelScope.launch {
-            _state.update { it.copy(isLoading = true, error = null) }
-
-            authService.signUp(email, password)
-                .onSuccess {
-                    _state.update { it.copy(
-                        isLoading = false,
-                        error = "Реєстрація успішна! Перевірте email для підтвердження."
-                    )}
-                }
-                .onFailure { exception ->
-                    _state.update { it.copy(
-                        isLoading = false,
-                        error = mapError(exception)
-                    )}
-                }
-        }
-    }
-
-    /**
      * Sign in with Google
+     * The only authentication method available
      */
     fun signInWithGoogle(context: Context) {
         viewModelScope.launch {
@@ -126,8 +82,7 @@ class AuthViewModel @Inject constructor(
         viewModelScope.launch {
             authService.signOut()
             _state.update { AuthState(
-                hasExplicitlyLoggedOut = true,
-                isOffline = _state.value.isOffline
+                hasExplicitlyLoggedOut = true
             )}
         }
     }
@@ -144,14 +99,12 @@ class AuthViewModel @Inject constructor(
      */
     private fun mapError(exception: Throwable): String {
         return when {
-            exception.message?.contains("Invalid login") == true ->
-                "Невірний email або пароль"
-            exception.message?.contains("User already registered") == true ->
-                "Користувач з таким email вже зареєстрований"
-            exception.message?.contains("Password") == true ->
-                "Пароль має містити мінімум 6 символів"
             exception.message?.contains("Google Sign-In failed") == true ->
                 "Помилка входу через Google"
+            exception.message?.contains("cancelled") == true ->
+                "Вхід скасовано"
+            exception.message?.contains("network") == true ->
+                "Немає підключення до інтернету"
             else -> exception.message ?: "Невідома помилка"
         }
     }

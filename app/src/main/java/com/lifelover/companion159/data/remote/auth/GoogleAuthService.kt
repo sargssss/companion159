@@ -39,8 +39,7 @@ class GoogleAuthService @Inject constructor(
     suspend fun signInWithGoogle(activityContext: Context): Result<GoogleSignInResult> = withContext(Dispatchers.Main) {
         try {
             // Check if Web Client ID is configured
-            if (BuildConfig.GOOGLE_WEB_CLIENT_ID.isEmpty() ||
-                BuildConfig.GOOGLE_WEB_CLIENT_ID == "\"\"") {
+            if (BuildConfig.GOOGLE_WEB_CLIENT_ID.isEmpty()) {
                 Log.e(TAG, "GOOGLE_WEB_CLIENT_ID is not configured in local.properties")
                 return@withContext Result.failure(
                     Exception("Google Web Client ID is not configured. Please add GOOGLE_WEB_CLIENT_ID to local.properties")
@@ -77,7 +76,6 @@ class GoogleAuthService @Inject constructor(
 
             Log.d(TAG, "=== Google Sign-In SUCCESS ===")
             Result.success(signInResult)
-
         } catch (e: GetCredentialException) {
             Result.failure(Exception("Google Sign-In failed: ${e.message}"))
 
@@ -100,4 +98,8 @@ class GoogleAuthService @Inject constructor(
             Result.failure(e)
         }
     }
+}
+
+fun GoogleSignInResult.toString(): String {
+    return this.idToken
 }
