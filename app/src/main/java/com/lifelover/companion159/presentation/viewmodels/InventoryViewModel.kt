@@ -5,7 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.lifelover.companion159.domain.models.DisplayCategory
 import com.lifelover.companion159.domain.models.InventoryItem
-import com.lifelover.companion159.domain.models.StorageCategory
+import com.lifelover.companion159.domain.models.toStorageCategory
 import com.lifelover.companion159.data.repository.InventoryRepositoryImpl
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
@@ -41,6 +41,7 @@ enum class SyncStatus {
 /**
  * ViewModel for inventory operations
  * Manages UI state and coordinates with repository
+ * Requires authenticated user for all operations
  */
 @HiltViewModel
 class InventoryViewModel @Inject constructor(
@@ -60,21 +61,35 @@ class InventoryViewModel @Inject constructor(
      */
     fun loadItems(displayCategory: DisplayCategory) {
         viewModelScope.launch {
-            _state.update { it.copy(
-                isLoading = true,
-                currentDisplayCategory = displayCategory
-            )}
-
-            val flow = when (displayCategory) {
-                DisplayCategory.AVAILABILITY -> repository.getAvailabilityItems()
-                DisplayCategory.AMMUNITION -> repository.getAmmunitionItems()
-                DisplayCategory.NEEDS -> repository.getNeedsItems()
-            }
-
-            flow.collect { items ->
+            try {
                 _state.update { it.copy(
-                    items = items,
-                    isLoading = false
+                    isLoading = true,
+                    currentDisplayCategory = displayCategory
+                )}
+
+                val flow = when (displayCategory) {
+                    DisplayCategory.AVAILABILITY -> repository.getAvailabilityItems()
+                    DisplayCategory.AMMUNITION -> repository.getAmmunitionItems()
+                    DisplayCategory.NEEDS -> repository.getNeedsItems()
+                }
+
+                flow.collect { items ->
+                    _state.update { it.copy(
+                        items = items,
+                        isLoading = false
+                    )}
+                }
+            } catch (e: IllegalStateException) {
+                Log.e(TAG, "❌ User not authenticated", e)
+                _state.update { it.copy(
+                    isLoading = false,
+                    error = "Необхідно увійти в акаунт"
+                )}
+            } catch (e: Exception) {
+                Log.e(TAG, "❌ Error loading items", e)
+                _state.update { it.copy(
+                    isLoading = false,
+                    error = e.message
                 )}
             }
         }
@@ -82,7 +97,7 @@ class InventoryViewModel @Inject constructor(
 
     /**
      * Add new item
-     * Determines storage category based on display context
+     * Uses extension function to convert DisplayCategory → StorageCategory
      */
     fun addNewItem(
         name: String,
@@ -94,18 +109,8 @@ class InventoryViewModel @Inject constructor(
 
         viewModelScope.launch {
             try {
-                Log.d(TAG, "Creating item: $name")
-                Log.d(TAG, "   Available: $availableQuantity")
-                Log.d(TAG, "   Needed: $neededQuantity")
-                Log.d(TAG, "   Display category: $displayCategory")
-
-                // Determine internal category based on DisplayCategory
-                val storageCategory: StorageCategory = when (displayCategory) {
-                    DisplayCategory.AMMUNITION -> StorageCategory.AMMUNITION
-                    DisplayCategory.AVAILABILITY,
-                    DisplayCategory.NEEDS -> StorageCategory.EQUIPMENT
-                }
-
+                // ✅ USE EXTENSION FUNCTION - no duplication!
+                val storageCategory = displayCategory.toStorageCategory()
                 Log.d(TAG, "   Storage category: $storageCategory")
 
                 val item = InventoryItem(
@@ -121,6 +126,9 @@ class InventoryViewModel @Inject constructor(
                 Log.d(TAG, "✅ Item created successfully")
                 _state.update { it.copy(message = "Предмет додано") }
 
+            } catch (e: IllegalStateException) {
+                Log.e(TAG, "❌ User not authenticated", e)
+                _state.update { it.copy(error = "Необхідно увійти в акаунт") }
             } catch (e: Exception) {
                 Log.e(TAG, "❌ Failed to add item", e)
                 _state.update { it.copy(error = e.message) }
@@ -143,22 +151,13 @@ class InventoryViewModel @Inject constructor(
 
         viewModelScope.launch {
             try {
-                Log.d(TAG, "🔄 Updating full item")
-                Log.d(TAG, "   Item ID: $itemId")
-                Log.d(TAG, "   New name: $newName")
-                Log.d(TAG, "   New available: $newAvailableQuantity")
-                Log.d(TAG, "   New needed: $newNeededQuantity")
-
                 // Get existing item to preserve other fields
                 val existingItem = _state.value.items.find { it.id == itemId }
                 if (existingItem == null) {
                     Log.e(TAG, "❌ Item not found in current state: $itemId")
-                    // Create new item object with updated values
-                    val storageCategory = when (displayCategory) {
-                        DisplayCategory.AMMUNITION -> StorageCategory.AMMUNITION
-                        DisplayCategory.AVAILABILITY,
-                        DisplayCategory.NEEDS -> StorageCategory.EQUIPMENT
-                    }
+
+                    // ✅ USE EXTENSION FUNCTION
+                    val storageCategory = displayCategory.toStorageCategory()
 
                     val item = InventoryItem(
                         id = itemId,
@@ -185,6 +184,12 @@ class InventoryViewModel @Inject constructor(
                 Log.d(TAG, "✅ Item updated successfully")
                 _state.update { it.copy(message = "Предмет оновлено") }
 
+            } catch (e: SecurityException) {
+                Log.e(TAG, "❌ Security error", e)
+                _state.update { it.copy(error = "Недостатньо прав") }
+            } catch (e: IllegalStateException) {
+                Log.e(TAG, "❌ User not authenticated", e)
+                _state.update { it.copy(error = "Необхідно увійти в акаунт") }
             } catch (e: Exception) {
                 Log.e(TAG, "❌ Failed to update item", e)
                 _state.update { it.copy(error = "Помилка оновлення: ${e.message}") }
@@ -217,6 +222,12 @@ class InventoryViewModel @Inject constructor(
                         repository.updateNeededQuantity(itemId, newQuantity)
                     }
                 }
+            } catch (e: SecurityException) {
+                Log.e(TAG, "❌ Security error", e)
+                _state.update { it.copy(error = "Недостатньо прав") }
+            } catch (e: IllegalStateException) {
+                Log.e(TAG, "❌ User not authenticated", e)
+                _state.update { it.copy(error = "Необхідно увійти в акаунт") }
             } catch (e: Exception) {
                 Log.e(TAG, "❌ Failed to update quantity", e)
                 _state.update { it.copy(error = "Помилка: ${e.message}") }
@@ -234,6 +245,12 @@ class InventoryViewModel @Inject constructor(
                 repository.deleteItem(id)
                 _state.update { it.copy(message = "Предмет видалено") }
 
+            } catch (e: SecurityException) {
+                Log.e(TAG, "❌ Security error", e)
+                _state.update { it.copy(error = "Недостатньо прав") }
+            } catch (e: IllegalStateException) {
+                Log.e(TAG, "❌ User not authenticated", e)
+                _state.update { it.copy(error = "Необхідно увійти в акаунт") }
             } catch (e: Exception) {
                 Log.e(TAG, "❌ Failed to delete item", e)
                 _state.update { it.copy(error = "Помилка видалення: ${e.message}") }

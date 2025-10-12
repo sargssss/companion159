@@ -20,3 +20,19 @@ fun DisplayCategory.titleRes(): Int = when (this) {
     DisplayCategory.AMMUNITION -> R.string.ammo
     DisplayCategory.NEEDS -> R.string.needs
 }
+
+/**
+ * Convert DisplayCategory to StorageCategory
+ * Centralized mapping logic to avoid duplication
+ *
+ * Rule:
+ * - AMMUNITION screen → stores as AMMUNITION
+ * - AVAILABILITY/NEEDS screens → stores as EQUIPMENT
+ */
+fun DisplayCategory.toStorageCategory(): StorageCategory {
+    return when (this) {
+        DisplayCategory.AMMUNITION -> StorageCategory.AMMUNITION
+        DisplayCategory.AVAILABILITY,
+        DisplayCategory.NEEDS -> StorageCategory.EQUIPMENT
+    }
+}

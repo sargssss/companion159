@@ -81,11 +81,4 @@ class PositionViewModel @Inject constructor(
             }
         }
     }
-
-    /**
-     * Clear error
-     */
-    fun clearError() {
-        _state.update { it.copy(error = null) }
-    }
 }

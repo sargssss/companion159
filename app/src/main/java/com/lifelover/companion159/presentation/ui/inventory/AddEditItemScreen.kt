@@ -1,6 +1,5 @@
 package com.lifelover.companion159.presentation.ui.inventory
 
-import android.util.Log
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -38,18 +37,6 @@ fun AddEditItemScreen(
     var neededQty by remember { mutableIntStateOf(neededQuantity ?: 0) }
     var showError by remember { mutableStateOf(false) }
 
-    // Log initial values
-    LaunchedEffect(Unit) {
-        Log.d("AddEditItemScreen", "═══════════════════════════════════")
-        Log.d("AddEditItemScreen", if (isEditMode) "EDIT MODE" else "CREATE MODE")
-        Log.d("AddEditItemScreen", "Item ID: $itemId")
-        Log.d("AddEditItemScreen", "Initial name: $itemName")
-        Log.d("AddEditItemScreen", "Initial available: $availableQuantity")
-        Log.d("AddEditItemScreen", "Initial needed: $neededQuantity")
-        Log.d("AddEditItemScreen", "Display category: $displayCategory")
-        Log.d("AddEditItemScreen", "═══════════════════════════════════")
-    }
-
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -76,10 +63,6 @@ fun AddEditItemScreen(
                         if (name.isBlank()) {
                             showError = true
                         } else {
-                            Log.d("AddEditItemScreen", "Save clicked")
-                            Log.d("AddEditItemScreen", "   Name: $name")
-                            Log.d("AddEditItemScreen", "   Available: $availableQty")
-                            Log.d("AddEditItemScreen", "   Needed: $neededQty")
                             onSave(name.trim(), availableQty, neededQty)
                         }
                     },
@@ -135,27 +118,23 @@ fun AddEditItemScreen(
                 )
             }
 
-            // CHANGED: Show available quantity for AMMUNITION and AVAILABILITY
             if (displayCategory == DisplayCategory.AMMUNITION ||
                 displayCategory == DisplayCategory.AVAILABILITY) {
                 QuantitySection(
                     title = "Наявна кількість",
                     quantity = availableQty,
                     onQuantityChange = {
-                        Log.d("AddEditItemScreen", "Available quantity changed: $it")
                         availableQty = it
                     }
                 )
             }
 
-            // CHANGED: Show needed quantity for AMMUNITION and NEEDS
             if (displayCategory == DisplayCategory.AMMUNITION ||
                 displayCategory == DisplayCategory.NEEDS) {
                 QuantitySection(
                     title = "Потрібна кількість",
                     quantity = neededQty,
                     onQuantityChange = {
-                        Log.d("AddEditItemScreen", "Needed quantity changed: $it")
                         neededQty = it
                     }
                 )
@@ -169,10 +148,6 @@ fun AddEditItemScreen(
                     if (name.isBlank()) {
                         showError = true
                     } else {
-                        Log.d("AddEditItemScreen", "Bottom save button clicked")
-                        Log.d("AddEditItemScreen", "   Name: $name")
-                        Log.d("AddEditItemScreen", "   Available: $availableQty")
-                        Log.d("AddEditItemScreen", "   Needed: $neededQty")
                         onSave(name.trim(), availableQty, neededQty)
                     }
                 },

@@ -19,6 +19,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 
+/**
+ * Login screen - authentication required to use the app
+ * No offline mode without previous authentication
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LoginScreen(
@@ -26,12 +30,6 @@ fun LoginScreen(
     viewModel: AuthViewModel = hiltViewModel()
 ) {
     val context = LocalContext.current
-    // Get Activity context
-    val activity = remember(context) {
-        context as? androidx.activity.ComponentActivity
-            ?: (context as? android.content.ContextWrapper)?.baseContext as? androidx.activity.ComponentActivity
-    }
-
     val state by viewModel.state.collectAsState()
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
@@ -74,7 +72,7 @@ fun LoginScreen(
 
         // Google Sign-In button
         OutlinedButton(
-            onClick = { viewModel.signInWithGoogle(context) }, // Pass Activity context
+            onClick = { viewModel.signInWithGoogle(context) },
             modifier = Modifier
                 .fillMaxWidth()
                 .height(50.dp),
@@ -87,7 +85,6 @@ fun LoginScreen(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Google icon (can be replaced with actual Google icon)
                 Icon(
                     imageVector = Icons.Default.AccountCircle,
                     contentDescription = null,
@@ -198,12 +195,8 @@ fun LoginScreen(
             )
         }
 
-        // Skip button (temporary)
-        TextButton(
-            onClick = onLoginSuccess
-        ) {
-            Text("Пропустити (працювати офлайн)")
-        }
+        // ❌ REMOVED: "Пропустити (працювати офлайн)" button
+        // Now authentication is required to use the app
 
         // Error message
         state.error?.let { error ->

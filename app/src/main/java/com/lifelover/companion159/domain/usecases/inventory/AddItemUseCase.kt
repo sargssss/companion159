@@ -4,12 +4,12 @@ import com.lifelover.companion159.data.repository.InventoryRepository
 import com.lifelover.companion159.domain.models.DisplayCategory
 import com.lifelover.companion159.domain.models.InventoryItem
 import com.lifelover.companion159.domain.models.InventoryResult
-import com.lifelover.companion159.domain.models.StorageCategory
+import com.lifelover.companion159.domain.models.toStorageCategory
 import javax.inject.Inject
 
 /**
  * Add new inventory item
- * Determines storage category based on display context
+ * Uses extension function to simplify category mapping
  */
 class AddItemUseCase @Inject constructor(
     private val repository: InventoryRepository
@@ -30,12 +30,8 @@ class AddItemUseCase @Inject constructor(
         }
 
         return try {
-            // Determine storage category based on DisplayCategory
-            val storageCategory = when (displayCategory) {
-                DisplayCategory.AMMUNITION -> StorageCategory.AMMUNITION
-                DisplayCategory.AVAILABILITY,
-                DisplayCategory.NEEDS -> StorageCategory.EQUIPMENT
-            }
+            // ✅ USE EXTENSION FUNCTION - no duplication!
+            val storageCategory = displayCategory.toStorageCategory()
 
             val item = InventoryItem(
                 id = 0,
@@ -49,6 +45,10 @@ class AddItemUseCase @Inject constructor(
             repository.addItem(item)
             InventoryResult.Success
 
+        } catch (e: IllegalStateException) {
+            InventoryResult.Error("Необхідно увійти в акаунт", e)
+        } catch (e: SecurityException) {
+            InventoryResult.PermissionError("Недостатньо прав для додавання")
         } catch (e: Exception) {
             InventoryResult.Error("Помилка додавання: ${e.message}", e)
         }
