@@ -18,6 +18,8 @@ import com.lifelover.companion159.data.repository.PositionRepository
 import com.lifelover.companion159.presentation.theme.Companion159Theme
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
+import androidx.activity.viewModels
+import com.lifelover.companion159.presentation.viewmodels.AuthViewModel
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -28,6 +30,8 @@ class MainActivity : ComponentActivity() {
 
     @Inject
     lateinit var positionRepository: PositionRepository
+
+    private val authViewModel: AuthViewModel by viewModels()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -60,12 +64,15 @@ class MainActivity : ComponentActivity() {
                 ) {
                     val navController = rememberNavController()
 
-                    // NEW: check if position is set
-                    val isPositionSet = positionRepository.isPositionSet()
+                    val currentPosition by positionRepository.currentPosition.collectAsState()
+                    val isPositionSet = !currentPosition.isNullOrBlank()
+
+                    val authState by authViewModel.state.collectAsState()
 
                     AppNavigation(
                         navController = navController,
-                        isPositionSet = isPositionSet // Pass position status
+                        isPositionSet = isPositionSet,
+                        isAuthenticated = authState.isAuthenticated
                     )
                 }
             }

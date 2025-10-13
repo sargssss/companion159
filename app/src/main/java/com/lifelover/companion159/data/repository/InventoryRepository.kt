@@ -95,21 +95,17 @@ class InventoryRepository @Inject constructor(
      */
     suspend fun addItem(item: InventoryItem) {
         val userId = requireUserId()
-        val crewName = positionRepository.getPosition()
+        val crewName = positionRepository.currentPosition.value  // ← змінено
             ?: throw IllegalStateException("Position must be set before adding items")
 
         val entity = item.copy(crewName = crewName).toEntity(userId = userId)
-
         val insertedId = dao.insertItem(entity)
         Log.d(TAG, "✅ Item created with ID: $insertedId for user: $userId")
     }
 
-    /**
-     * Update full item (name + both quantities)
-     */
     suspend fun updateItem(item: InventoryItem) {
         val userId = requireUserId()
-        val crewName = positionRepository.getPosition()
+        val crewName = positionRepository.currentPosition.value  // ← змінено
             ?: throw IllegalStateException("Position must be set")
 
         val existingItem = dao.getItemById(item.id)
@@ -117,7 +113,6 @@ class InventoryRepository @Inject constructor(
             throw IllegalArgumentException("Item with ID ${item.id} does not exist")
         }
 
-        // Ensure user owns this item
         if (existingItem.userId != userId) {
             throw SecurityException("Cannot update item of another user")
         }

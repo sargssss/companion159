@@ -3,6 +3,7 @@ package com.lifelover.companion159.di
 import android.content.Context
 import com.lifelover.companion159.data.local.UserPreferences
 import com.lifelover.companion159.data.local.dao.InventoryDao
+import com.lifelover.companion159.data.local.dao.PreferencesDao
 import com.lifelover.companion159.data.remote.auth.GoogleAuthService
 import com.lifelover.companion159.data.remote.auth.SupabaseAuthService
 import com.lifelover.companion159.data.remote.SupabaseClient
@@ -71,9 +72,9 @@ object NetworkModule {
     @Provides
     @Singleton
     fun providePositionRepository(
-        @ApplicationContext context: Context
+        preferencesDao: PreferencesDao
     ): PositionRepository {
-        return PositionRepository(context)
+        return PositionRepository(preferencesDao)
     }
 
     /**

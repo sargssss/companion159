@@ -1,67 +1,39 @@
 package com.lifelover.companion159.data.repository
 
-import android.content.Context
-import android.content.SharedPreferences
-import dagger.hilt.android.qualifiers.ApplicationContext
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
 import javax.inject.Inject
 import javax.inject.Singleton
-import androidx.core.content.edit
+import com.lifelover.companion159.data.local.dao.PreferencesDao
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 
 @Singleton
 class PositionRepository @Inject constructor(
-    @ApplicationContext private val context: Context
+    private val preferencesDao: PreferencesDao
 ) {
     companion object {
-        private const val PREFS_NAME = "position_prefs"
-        private const val KEY_POSITION = "user_position"
-
-        // Predefined positions for autocomplete
         val PREDEFINED_POSITIONS = listOf("Барі", "Редбул", "Одеса")
     }
 
-    private val prefs: SharedPreferences = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+    val currentPosition: StateFlow<String?> = preferencesDao.getPreferences()
+        .map { it?.position }
+        .stateIn(
+            scope = CoroutineScope(Dispatchers.IO),
+            started = SharingStarted.Eagerly,
+            initialValue = null
+        )
 
-    private val _currentPosition = MutableStateFlow<String?>(getCurrentPositionFromPrefs())
-    val currentPosition: StateFlow<String?> = _currentPosition.asStateFlow()
+    fun getPosition(): String? = currentPosition.value
 
-    /**
-     * Get current position from SharedPreferences
-     */
-    private fun getCurrentPositionFromPrefs(): String? {
-        return prefs.getString(KEY_POSITION, null)
+    suspend fun savePosition(position: String) {
+        preferencesDao.updatePosition(position.trim())
     }
 
-    /**
-     * Get current position synchronously
-     */
-    fun getPosition(): String? {
-        return _currentPosition.value
-    }
-
-    /**
-     * Save position to SharedPreferences
-     */
-    fun savePosition(position: String) {
-        prefs.edit { putString(KEY_POSITION, position.trim()) }
-        _currentPosition.value = position.trim()
-    }
-
-    /**
-     * Check if position is set
-     */
-    fun isPositionSet(): Boolean {
-        return !getPosition().isNullOrBlank()
-    }
-
-    /**
-     * Get autocomplete suggestions based on input
-     */
     fun getAutocompleteSuggestions(input: String): List<String> {
         if (input.isBlank()) return PREDEFINED_POSITIONS
-
         return PREDEFINED_POSITIONS.filter {
             it.startsWith(input, ignoreCase = true)
         }

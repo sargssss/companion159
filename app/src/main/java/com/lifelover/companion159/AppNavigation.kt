@@ -1,5 +1,7 @@
 package com.lifelover.companion159
 
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.runtime.Composable
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavHostController
@@ -43,24 +45,28 @@ data class EditItem(
 @Composable
 fun AppNavigation(
     navController: NavHostController,
-    isPositionSet: Boolean
+    isPositionSet: Boolean,
+    isAuthenticated: Boolean
 ) {
     val startDestination = when {
+        !isAuthenticated -> Login
         !isPositionSet -> Position
-        SupabaseConfig.isConfigured -> Login
-        else -> MainMenu
+        !SupabaseConfig.isConfigured && isPositionSet -> MainMenu
+        else -> Position
     }
 
     NavHost(
         navController = navController,
-        startDestination = startDestination
+        startDestination = startDestination,
+        enterTransition = { EnterTransition.None },
+        exitTransition = { ExitTransition.None },
+        popEnterTransition = { EnterTransition.None },
+        popExitTransition = { ExitTransition.None }
     ) {
         composable<Position> {
             PositionScreen(
                 onPositionSaved = {
-                    navController.navigate(
-                        if (SupabaseConfig.isConfigured) Login else MainMenu
-                    ) {
+                    navController.navigate(MainMenu) {
                         popUpTo(Position) { inclusive = true }
                     }
                 },

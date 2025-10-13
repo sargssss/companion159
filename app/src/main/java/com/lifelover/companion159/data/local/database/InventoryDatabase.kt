@@ -9,7 +9,9 @@ import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.lifelover.companion159.data.local.entities.Converters
 import com.lifelover.companion159.data.local.dao.InventoryDao
+import com.lifelover.companion159.data.local.dao.PreferencesDao
 import com.lifelover.companion159.data.local.entities.InventoryItemEntity
+import com.lifelover.companion159.data.local.entities.PreferencesEntity
 
 val MIGRATION_1_2 = object : Migration(1, 2) {
     override fun migrate(db: SupportSQLiteDatabase) {
@@ -68,14 +70,34 @@ val MIGRATION_6_7 = object : Migration(6, 7) {
     }
 }
 
+val MIGRATION_7_8 = object : Migration(7, 8) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS preferences (
+                id INTEGER PRIMARY KEY NOT NULL,
+                position TEXT,
+                updatedAt INTEGER NOT NULL
+            )
+        """
+        )
+    }
+}
+
 @Database(
-    entities = [InventoryItemEntity::class],
-    version = 7,  // CHANGED: increment version
+    entities = [
+        InventoryItemEntity::class,
+        PreferencesEntity::class
+    ],
+    version = 8,  // increment version
     exportSchema = false
 )
 @TypeConverters(Converters::class)
 abstract class InventoryDatabase : RoomDatabase() {
+
     abstract fun inventoryDao(): InventoryDao
+
+    abstract fun preferencesDao(): PreferencesDao
 
     companion object {
         @Volatile
@@ -94,7 +116,8 @@ abstract class InventoryDatabase : RoomDatabase() {
                         MIGRATION_3_4,
                         MIGRATION_4_5,
                         MIGRATION_5_6,
-                        MIGRATION_6_7  // NEW: Add migration
+                        MIGRATION_6_7,
+                        MIGRATION_7_8
                     )
                     .build()
                 INSTANCE = instance

@@ -2,6 +2,7 @@ package com.lifelover.companion159.di
 
 import android.content.Context
 import com.lifelover.companion159.data.local.dao.InventoryDao
+import com.lifelover.companion159.data.local.dao.PreferencesDao
 import com.lifelover.companion159.data.local.database.InventoryDatabase
 import dagger.Module
 import dagger.Provides
@@ -20,6 +21,13 @@ object DatabaseModule {
         @ApplicationContext context: Context
     ): InventoryDatabase {
         return InventoryDatabase.getDatabase(context)
+    }
+
+    @Provides
+    fun providePreferencesDao(
+        database: InventoryDatabase
+    ): PreferencesDao {
+        return database.preferencesDao()
     }
 
     @Provides
