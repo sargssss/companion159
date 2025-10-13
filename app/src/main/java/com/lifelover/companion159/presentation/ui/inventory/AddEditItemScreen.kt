@@ -3,7 +3,6 @@ package com.lifelover.companion159.presentation.ui.inventory
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.*
@@ -42,9 +41,22 @@ fun AddEditItemScreen(
 ) {
     val isEditMode = itemId != null
 
+    // Set default values based on category when creating new item
+    val defaultAvailableQty = when {
+        isEditMode -> availableQuantity ?: 0
+        displayCategory is DisplayCategory.Needs -> 0
+        else -> 1 // Availability and Ammunition default to 1
+    }
+
+    val defaultNeededQty = when {
+        isEditMode -> neededQuantity ?: 0
+        displayCategory is DisplayCategory.Needs -> 1 // Needs default to 1
+        else -> 0 // Availability and Ammunition default to 0
+    }
+
     var name by remember { mutableStateOf(itemName ?: "") }
-    var availableQty by remember { mutableIntStateOf(availableQuantity ?: 0) }
-    var neededQty by remember { mutableIntStateOf(neededQuantity ?: 0) }
+    var availableQty by remember { mutableIntStateOf(defaultAvailableQty) }
+    var neededQty by remember { mutableIntStateOf(defaultNeededQty) }
     var showError by remember { mutableStateOf(false) }
 
     Column(
@@ -65,7 +77,7 @@ fun AddEditItemScreen(
             navigationIcon = {
                 IconButton(onClick = onBackPressed) {
                     Icon(
-                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                        imageVector = Icons.Default.ArrowBack,
                         contentDescription = stringResource(R.string.content_description_back_button)
                     )
                 }
@@ -125,18 +137,16 @@ fun AddEditItemScreen(
                 }
             }
 
-            // Needed quantity for AMMUNITION and NEEDS
+            // Needed quantity for ALL categories
             when (displayCategory) {
                 is DisplayCategory.Ammunition,
+                is DisplayCategory.Availability,
                 is DisplayCategory.Needs -> {
                     QuantitySection(
                         title = stringResource(R.string.needed_quantity),
                         quantity = neededQty,
                         onQuantityChange = { neededQty = it }
                     )
-                }
-                is DisplayCategory.Availability -> {
-                    // Don't show needed quantity for AVAILABILITY
                 }
             }
 

@@ -18,6 +18,7 @@ import com.lifelover.companion159.R
 import com.lifelover.companion159.domain.models.toUserMessage
 import com.lifelover.companion159.presentation.ui.components.PrimaryButton
 import com.lifelover.companion159.presentation.ui.components.SecondaryButton
+import com.lifelover.companion159.presentation.viewmodels.PositionViewModel
 
 /**
  * Position setup screen

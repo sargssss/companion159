@@ -1,4 +1,4 @@
-package com.lifelover.companion159.presentation.ui.position
+package com.lifelover.companion159.presentation.viewmodels
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
