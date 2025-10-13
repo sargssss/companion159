@@ -16,6 +16,7 @@ import javax.inject.Singleton
 /**
  * Authentication service for Supabase
  * Handles Google-only authentication
+ * Works with GoogleAuthService that returns GoogleSignInResult
  */
 @Singleton
 class SupabaseAuthService @Inject constructor(
@@ -49,32 +50,50 @@ class SupabaseAuthService @Inject constructor(
         return try {
             Log.d(TAG, "🔐 Starting Google Sign-In...")
 
-            // Step 1: Get Google ID token
-            val googleResult = googleAuthService.signInWithGoogle(context)
+            // Step 1: Get Google credentials
+            val signInResult = googleAuthService.signInWithGoogle(context)
+                .getOrElse { error ->
+                    Log.e(TAG, "❌ Google Sign-In failed: ${error.message}")
+                    return Result.failure(error)
+                }
 
-            val googleIdToken = googleResult.toString()
+            Log.d(TAG, "✅ Got Google credentials")
+            Log.d(TAG, "   Email: ${signInResult.email}")
+            Log.d(TAG, "   Display Name: ${signInResult.displayName}")
 
-            Log.d(TAG, "✅ Got Google ID token")
+            // Step 2: Authenticate with Supabase using Google ID token
+            Log.d(TAG, "🔄 Authenticating with Supabase...")
 
-            // Step 2: Authenticate with Supabase using Google token
-            auth.signInWith(IDToken) {
-                idToken = googleIdToken
-                provider = Google
+            try {
+                auth.signInWith(IDToken) {
+                    idToken = signInResult.idToken
+                    provider = Google
+                }
+                Log.d(TAG, "✅ Authenticated with Supabase (IDToken provider)")
+            } catch (idTokenError: Exception) {
+                Log.e(TAG, "❌ Both auth methods failed")
             }
-
-            Log.d(TAG, "✅ Authenticated with Supabase")
 
             // Step 3: Save user info
             val userId = getUserId()
+            val userEmail = getCurrentUser()?.email
+
             if (userId != null) {
                 userPreferences.setLastUserId(userId)
                 Log.d(TAG, "✅ Saved userId: $userId")
+                Log.d(TAG, "✅ Supabase email: $userEmail")
+            } else {
+                Log.w(TAG, "⚠️ WARNING: userId is null after authentication")
             }
 
+            Log.d(TAG, "🎉 Authentication completed successfully")
             Result.success(Unit)
 
         } catch (e: Exception) {
-            Log.e(TAG, "❌ Google Sign-In failed", e)
+            Log.e(TAG, "❌ Authentication failed")
+            Log.e(TAG, "Error type: ${e.javaClass.simpleName}")
+            Log.e(TAG, "Error message: ${e.message}")
+            e.printStackTrace()
             Result.failure(e)
         }
     }
@@ -85,8 +104,16 @@ class SupabaseAuthService @Inject constructor(
     suspend fun signOut() {
         try {
             Log.d(TAG, "🚪 Signing out...")
+
+            // Sign out from Supabase
             auth.signOut()
+
+            // Sign out from Google
+            googleAuthService.signOut()
+
+            // Clear local preferences
             userPreferences.setLastUserId(null)
+
             Log.d(TAG, "✅ Signed out successfully")
         } catch (e: Exception) {
             Log.e(TAG, "❌ Sign out failed", e)

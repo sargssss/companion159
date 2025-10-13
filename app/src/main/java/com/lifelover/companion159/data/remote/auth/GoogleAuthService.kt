@@ -99,7 +99,3 @@ class GoogleAuthService @Inject constructor(
         }
     }
 }
-
-fun GoogleSignInResult.toString(): String {
-    return this.idToken
-}
