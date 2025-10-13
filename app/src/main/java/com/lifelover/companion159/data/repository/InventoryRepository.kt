@@ -3,7 +3,7 @@ package com.lifelover.companion159.data.repository
 import android.util.Log
 import com.lifelover.companion159.data.local.dao.InventoryDao
 import com.lifelover.companion159.data.local.entities.toDomain
-import com.lifelover.companion159.data.remote.auth.SupabaseAuthService
+import com.lifelover.companion159.auth.SupabaseAuthService
 import com.lifelover.companion159.domain.models.InventoryItem
 import com.lifelover.companion159.domain.models.toEntity
 import kotlinx.coroutines.flow.*

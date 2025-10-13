@@ -1,4 +1,4 @@
-package com.lifelover.companion159.data.remote.auth
+package com.lifelover.companion159.auth
 
 import android.content.Context
 import android.util.Log
@@ -28,7 +28,7 @@ class SupabaseAuthService @Inject constructor(
     }
 
     private val client: SupabaseClient by lazy {
-        com.lifelover.companion159.data.remote.client.SupabaseClient.client
+        com.lifelover.companion159.data.remote.SupabaseClient.client
     }
 
     private val auth: Auth by lazy {

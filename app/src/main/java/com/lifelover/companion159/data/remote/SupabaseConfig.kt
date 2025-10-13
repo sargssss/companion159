@@ -1,4 +1,4 @@
-package com.lifelover.companion159.data.remote.config
+package com.lifelover.companion159.data.remote
 
 import com.lifelover.companion159.BuildConfig
 

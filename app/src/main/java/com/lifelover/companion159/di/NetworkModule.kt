@@ -3,9 +3,9 @@ package com.lifelover.companion159.di
 import android.content.Context
 import com.lifelover.companion159.data.local.UserPreferences
 import com.lifelover.companion159.data.local.dao.InventoryDao
-import com.lifelover.companion159.data.remote.auth.GoogleAuthService
-import com.lifelover.companion159.data.remote.auth.SupabaseAuthService
-import com.lifelover.companion159.data.remote.client.SupabaseClient
+import com.lifelover.companion159.auth.GoogleAuthService
+import com.lifelover.companion159.auth.SupabaseAuthService
+import com.lifelover.companion159.data.remote.SupabaseClient
 import com.lifelover.companion159.data.repository.InventoryRepository
 import com.lifelover.companion159.data.repository.PositionRepository
 import dagger.Module

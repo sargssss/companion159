@@ -1,6 +1,5 @@
-package com.lifelover.companion159.data.remote.client
+package com.lifelover.companion159.data.remote
 
-import com.lifelover.companion159.data.remote.config.SupabaseConfig
 import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.auth.Auth
 import io.github.jan.supabase.createSupabaseClient
@@ -13,9 +12,9 @@ object SupabaseClient {
         supabaseUrl = SupabaseConfig.SUPABASE_URL,
         supabaseKey = SupabaseConfig.SUPABASE_ANON_KEY
     ) {
-        install(Auth)
-        install(Postgrest)
-        install(Storage)
-        install(Realtime)
+        install(Auth.Companion)
+        install(Postgrest.Companion)
+        install(Storage.Companion)
+        install(Realtime.Companion)
     }
 }
