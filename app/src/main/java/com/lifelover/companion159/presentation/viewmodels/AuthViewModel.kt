@@ -1,9 +1,12 @@
 package com.lifelover.companion159.presentation.viewmodels
 
 import android.content.Context
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.lifelover.companion159.R
 import com.lifelover.companion159.data.remote.auth.SupabaseAuthService
+import com.lifelover.companion159.domain.models.AppError
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -15,19 +18,27 @@ import javax.inject.Inject
 data class AuthState(
     val isAuthenticated: Boolean = false,
     val isLoading: Boolean = false,
-    val error: String? = null,
+    val error: AppError? = null,
     val userEmail: String? = null,
     val hasExplicitlyLoggedOut: Boolean = false
 )
 
 /**
- * ViewModel for authentication
- * Handles Google-only authentication flow
+ * ViewModel for authentication management
+ *
+ * Responsibilities:
+ * - Handle Google authentication flow
+ * - Manage authentication state
+ * - Provide user session information
  */
 @HiltViewModel
 class AuthViewModel @Inject constructor(
     private val authService: SupabaseAuthService
 ) : ViewModel() {
+
+    companion object {
+        private const val TAG = "AuthViewModel"
+    }
 
     private val _state = MutableStateFlow(AuthState())
     val state: StateFlow<AuthState> = _state.asStateFlow()
@@ -60,6 +71,7 @@ class AuthViewModel @Inject constructor(
 
             authService.signInWithGoogle(context)
                 .onSuccess {
+                    Log.d(TAG, "Authentication successful")
                     _state.update { it.copy(
                         isLoading = false,
                         isAuthenticated = true,
@@ -67,19 +79,32 @@ class AuthViewModel @Inject constructor(
                     )}
                 }
                 .onFailure { exception ->
+                    Log.e(TAG, "Authentication failed: ${exception.message}")
+
+                    val error = when {
+                        exception.message?.contains("Google Sign-In failed", ignoreCase = true) == true ->
+                            AppError.Authentication.GoogleSignInFailed(exception)
+                        exception.message?.contains("cancelled", ignoreCase = true) == true ->
+                            AppError.Authentication.GoogleSignInFailed(exception)
+                        exception.message?.contains("network", ignoreCase = true) == true ->
+                            AppError.Network.NoConnection(exception)
+                        else -> AppError.Unknown(exception.message ?: "Authentication error", exception)
+                    }
+
                     _state.update { it.copy(
                         isLoading = false,
-                        error = mapError(exception)
+                        error = error
                     )}
                 }
         }
     }
 
     /**
-     * Sign out
+     * Sign out from all services
      */
     fun signOut() {
         viewModelScope.launch {
+            Log.d(TAG, "Signing out")
             authService.signOut()
             _state.update { AuthState(
                 hasExplicitlyLoggedOut = true
@@ -95,17 +120,9 @@ class AuthViewModel @Inject constructor(
     }
 
     /**
-     * Map exceptions to user-friendly error messages
+     * Clear error state
      */
-    private fun mapError(exception: Throwable): String {
-        return when {
-            exception.message?.contains("Google Sign-In failed") == true ->
-                "Помилка входу через Google"
-            exception.message?.contains("cancelled") == true ->
-                "Вхід скасовано"
-            exception.message?.contains("network") == true ->
-                "Немає підключення до інтернету"
-            else -> exception.message ?: "Невідома помилка"
-        }
+    fun clearError() {
+        _state.update { it.copy(error = null) }
     }
 }

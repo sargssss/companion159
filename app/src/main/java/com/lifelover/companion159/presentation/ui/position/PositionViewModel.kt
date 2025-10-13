@@ -3,6 +3,8 @@ package com.lifelover.companion159.presentation.ui.position
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.lifelover.companion159.data.repository.PositionRepository
+import com.lifelover.companion159.domain.models.AppError
+import com.lifelover.companion159.domain.validation.InputValidator
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -11,13 +13,24 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
+/**
+ * UI state for position management
+ */
 data class PositionState(
     val currentPosition: String? = null,
     val isLoading: Boolean = false,
     val isPositionSaved: Boolean = false,
-    val error: String? = null
+    val error: AppError? = null
 )
 
+/**
+ * ViewModel for position management
+ *
+ * Responsibilities:
+ * - Manage user position/crew name
+ * - Validate position input
+ * - Provide autocomplete suggestions
+ */
 @HiltViewModel
 class PositionViewModel @Inject constructor(
     private val positionRepository: PositionRepository
@@ -49,36 +62,43 @@ class PositionViewModel @Inject constructor(
     }
 
     /**
-     * Save position
+     * Save position with validation
      */
     fun savePosition(position: String) {
-        if (position.isBlank()) {
-            _state.update { it.copy(error = "Позиція не може бути порожньою") }
-            return
-        }
-
         viewModelScope.launch {
-            try {
-                _state.update { it.copy(isLoading = true, error = null) }
+            // Validate input
+            val validationResult = InputValidator.validatePosition(position)
 
-                // Save position
-                positionRepository.savePosition(position)
+            validationResult
+                .onSuccess { validPosition ->
+                    try {
+                        _state.update { it.copy(isLoading = true, error = null) }
 
-                _state.update {
-                    it.copy(
-                        isLoading = false,
-                        isPositionSaved = true,
-                        currentPosition = position
-                    )
+                        positionRepository.savePosition(validPosition)
+
+                        _state.update {
+                            it.copy(
+                                isLoading = false,
+                                isPositionSaved = true,
+                                currentPosition = validPosition
+                            )
+                        }
+                    } catch (e: Exception) {
+                        _state.update {
+                            it.copy(
+                                isLoading = false,
+                                error = AppError.Unknown("Save failed", e)
+                            )
+                        }
+                    }
                 }
-            } catch (e: Exception) {
-                _state.update {
-                    it.copy(
-                        isLoading = false,
-                        error = "Помилка збереження: ${e.message}"
-                    )
+                .onFailure { error ->
+                    _state.update {
+                        it.copy(
+                            error = error as? AppError ?: AppError.Validation.EmptyField("position")
+                        )
+                    }
                 }
-            }
         }
     }
 }

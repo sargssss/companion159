@@ -9,15 +9,24 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.lifelover.companion159.R
+import com.lifelover.companion159.domain.models.toUserMessage
+import com.lifelover.companion159.presentation.ui.components.PrimaryButton
 import com.lifelover.companion159.presentation.viewmodels.AuthViewModel
 
 /**
- * Login screen - Google authentication only
- * Simple and secure authentication flow
+ * Login screen with Google authentication
+ *
+ * Features:
+ * - Google-only authentication
+ * - Type-safe error handling
+ * - Standardized buttons
+ * - Full i18n support
  */
 @Composable
 fun LoginScreen(
@@ -27,11 +36,10 @@ fun LoginScreen(
     val context = LocalContext.current
     val state by viewModel.state.collectAsState()
 
-    // Handle successful authentication
+    // Navigate on successful authentication
     LaunchedEffect(state.isAuthenticated) {
         if (state.isAuthenticated) {
-            Log.d("LoginScreen", "🎉 Authentication successful - navigating to main menu")
-            Log.d("LoginScreen", "👤 User: ${state.userEmail}")
+            Log.d("LoginScreen", "Authentication successful")
             onLoginSuccess()
         }
     }
@@ -47,7 +55,7 @@ fun LoginScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(24.dp)
         ) {
-            // Logo/Icon
+            // App icon
             Icon(
                 imageVector = Icons.Default.Lock,
                 contentDescription = null,
@@ -55,15 +63,16 @@ fun LoginScreen(
                 tint = MaterialTheme.colorScheme.primary
             )
 
-            // Title
+            // App title
             Text(
-                text = "Companion 159",
+                text = stringResource(R.string.login_title),
                 style = MaterialTheme.typography.headlineLarge,
                 fontWeight = FontWeight.Bold
             )
 
+            // Description
             Text(
-                text = "Увійдіть через Google для продовження",
+                text = stringResource(R.string.login_description),
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center
@@ -72,39 +81,13 @@ fun LoginScreen(
             Spacer(modifier = Modifier.height(16.dp))
 
             // Google Sign-In button
-            Button(
+            PrimaryButton(
+                text = stringResource(R.string.login_button),
                 onClick = { viewModel.signInWithGoogle(context) },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(56.dp),
                 enabled = !state.isLoading,
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.primary
-                )
-            ) {
-                if (state.isLoading) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(24.dp),
-                        color = MaterialTheme.colorScheme.onPrimary,
-                        strokeWidth = 2.dp
-                    )
-                } else {
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.AccountCircle,
-                            contentDescription = null,
-                            modifier = Modifier.size(24.dp)
-                        )
-                        Text(
-                            text = "Увійти через Google",
-                            style = MaterialTheme.typography.titleMedium
-                        )
-                    }
-                }
-            }
+                icon = Icons.Default.AccountCircle,
+                loading = state.isLoading
+            )
 
             // Error message
             state.error?.let { error ->
@@ -125,7 +108,7 @@ fun LoginScreen(
                             tint = MaterialTheme.colorScheme.onErrorContainer
                         )
                         Text(
-                            text = error,
+                            text = stringResource(error.toUserMessage()),
                             color = MaterialTheme.colorScheme.onErrorContainer,
                             style = MaterialTheme.typography.bodyMedium
                         )

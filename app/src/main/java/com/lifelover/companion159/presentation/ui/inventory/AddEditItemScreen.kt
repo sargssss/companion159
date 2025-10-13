@@ -3,6 +3,7 @@ package com.lifelover.companion159.presentation.ui.inventory
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.*
@@ -17,7 +18,17 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.lifelover.companion159.R
 import com.lifelover.companion159.domain.models.DisplayCategory
+import com.lifelover.companion159.presentation.ui.components.PrimaryButton
 
+/**
+ * Screen for adding or editing inventory items
+ *
+ * Features:
+ * - Validates input before saving
+ * - Different quantity fields based on category
+ * - Standardized buttons
+ * - Full i18n support
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddEditItemScreen(
@@ -44,36 +55,18 @@ fun AddEditItemScreen(
         TopAppBar(
             title = {
                 Text(
-                    text = if (isEditMode) "Редагувати" else stringResource(id = R.string.add),
+                    text = if (isEditMode)
+                        stringResource(R.string.edit_item)
+                    else
+                        stringResource(R.string.add),
                     fontWeight = FontWeight.Bold
                 )
             },
             navigationIcon = {
                 IconButton(onClick = onBackPressed) {
                     Icon(
-                        imageVector = Icons.Default.ArrowBack,
-                        contentDescription = stringResource(id = R.string.back)
-                    )
-                }
-            },
-            actions = {
-                IconButton(
-                    onClick = {
-                        if (name.isBlank()) {
-                            showError = true
-                        } else {
-                            onSave(name.trim(), availableQty, neededQty)
-                        }
-                    },
-                    enabled = name.isNotBlank()
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Check,
-                        contentDescription = "Зберегти",
-                        tint = if (name.isNotBlank())
-                            MaterialTheme.colorScheme.primary
-                        else
-                            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = stringResource(R.string.content_description_back_button)
                     )
                 }
             }
@@ -97,7 +90,7 @@ fun AddEditItemScreen(
             // Name input
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(
-                    text = "Назва",
+                    text = stringResource(R.string.item_name_label),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Medium
                 )
@@ -109,21 +102,20 @@ fun AddEditItemScreen(
                         showError = false
                     },
                     modifier = Modifier.fillMaxWidth(),
-                    placeholder = { Text("Введіть назву") },
+                    placeholder = { Text(stringResource(R.string.item_name_placeholder)) },
                     isError = showError,
                     supportingText = if (showError) {
-                        { Text("Назва обов'язкова") }
+                        { Text(stringResource(R.string.error_name_required)) }
                     } else null
                 )
             }
 
-            // FIXED: Use when with sealed class
-            // Show available quantity for AMMUNITION and AVAILABILITY
+            // Available quantity for AMMUNITION and AVAILABILITY
             when (displayCategory) {
                 is DisplayCategory.Ammunition,
                 is DisplayCategory.Availability -> {
                     QuantitySection(
-                        title = "Наявна кількість",
+                        title = stringResource(R.string.available_quantity),
                         quantity = availableQty,
                         onQuantityChange = { availableQty = it }
                     )
@@ -133,12 +125,12 @@ fun AddEditItemScreen(
                 }
             }
 
-            // Show needed quantity for AMMUNITION and NEEDS
+            // Needed quantity for AMMUNITION and NEEDS
             when (displayCategory) {
                 is DisplayCategory.Ammunition,
                 is DisplayCategory.Needs -> {
                     QuantitySection(
-                        title = "Потрібна кількість",
+                        title = stringResource(R.string.needed_quantity),
                         quantity = neededQty,
                         onQuantityChange = { neededQty = it }
                     )
@@ -151,7 +143,11 @@ fun AddEditItemScreen(
             Spacer(modifier = Modifier.weight(1f))
 
             // Save button
-            Button(
+            PrimaryButton(
+                text = if (isEditMode)
+                    stringResource(R.string.save)
+                else
+                    stringResource(R.string.add),
                 onClick = {
                     if (name.isBlank()) {
                         showError = true
@@ -160,25 +156,15 @@ fun AddEditItemScreen(
                     }
                 },
                 enabled = name.isNotBlank(),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(56.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Check,
-                    contentDescription = null,
-                    modifier = Modifier.size(20.dp)
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = if (isEditMode) "Зберегти" else "Додати",
-                    style = MaterialTheme.typography.titleMedium
-                )
-            }
+                icon = Icons.Default.Check
+            )
         }
     }
 }
 
+/**
+ * Reusable quantity input section
+ */
 @Composable
 private fun QuantitySection(
     title: String,
@@ -212,7 +198,7 @@ private fun QuantitySection(
                 ) {
                     Icon(
                         painter = painterResource(R.drawable.minus),
-                        contentDescription = "Зменшити",
+                        contentDescription = stringResource(R.string.decrease),
                         modifier = Modifier.size(24.dp)
                     )
                 }
@@ -243,7 +229,7 @@ private fun QuantitySection(
                 ) {
                     Icon(
                         painter = painterResource(R.drawable.plus_large),
-                        contentDescription = "Збільшити",
+                        contentDescription = stringResource(R.string.increase),
                         modifier = Modifier.size(24.dp)
                     )
                 }

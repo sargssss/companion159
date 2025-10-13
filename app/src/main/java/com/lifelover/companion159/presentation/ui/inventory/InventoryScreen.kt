@@ -4,8 +4,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -70,15 +70,15 @@ fun InventoryScreen(
         TopAppBar(
             title = {
                 Text(
-                    text = stringResource(displayCategory.titleRes()),
+                    text = stringResource(displayCategory.titleRes),
                     fontWeight = FontWeight.Bold
                 )
             },
             navigationIcon = {
                 IconButton(onClick = onBackPressed) {
                     Icon(
-                        imageVector = Icons.Default.ArrowBack,
-                        contentDescription = stringResource(id = R.string.back)
+                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = stringResource(R.string.content_description_back_button)
                     )
                 }
             },
@@ -86,7 +86,7 @@ fun InventoryScreen(
                 IconButton(onClick = onAddItem) {
                     Icon(
                         imageVector = Icons.Default.Add,
-                        contentDescription = stringResource(id = R.string.add)
+                        contentDescription = stringResource(R.string.content_description_add_button)
                     )
                 }
             }
@@ -151,23 +151,29 @@ private fun EmptyState(
             verticalArrangement = Arrangement.spacedBy(20.dp),
             modifier = Modifier.padding(48.dp)
         ) {
+            // Exhaustive when with sealed class
+            val emptyMessage = when (displayCategory) {
+                is DisplayCategory.Availability -> stringResource(R.string.empty_availability)
+                is DisplayCategory.Ammunition -> stringResource(R.string.empty_ammunition)
+                is DisplayCategory.Needs -> stringResource(R.string.empty_needs)
+            }
+
             Text(
-                text = when (displayCategory) {
-                    DisplayCategory.AVAILABILITY -> "Немає предметів в наявності"
-                    DisplayCategory.AMMUNITION -> "Немає БК"
-                    DisplayCategory.NEEDS -> "Немає потреб"
-                },
+                text = emptyMessage,
                 style = MaterialTheme.typography.headlineSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontWeight = FontWeight.Medium,
                 textAlign = TextAlign.Center
             )
 
+            val emptyDescription = when (displayCategory) {
+                is DisplayCategory.Needs -> stringResource(R.string.empty_description_needs)
+                is DisplayCategory.Availability,
+                is DisplayCategory.Ammunition -> stringResource(R.string.empty_description_default)
+            }
+
             Text(
-                text = when (displayCategory) {
-                    DisplayCategory.NEEDS -> "Додайте предмети з потрібною кількістю"
-                    else -> "Натисніть + щоб додати"
-                },
+                text = emptyDescription,
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center
@@ -183,7 +189,7 @@ private fun EmptyState(
                     modifier = Modifier.size(18.dp)
                 )
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("Додати предмет")
+                Text(stringResource(R.string.add_item))
             }
         }
     }

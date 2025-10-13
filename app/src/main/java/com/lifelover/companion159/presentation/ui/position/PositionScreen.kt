@@ -9,12 +9,25 @@ import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.lifelover.companion159.R
+import com.lifelover.companion159.domain.models.toUserMessage
+import com.lifelover.companion159.presentation.ui.components.PrimaryButton
+import com.lifelover.companion159.presentation.ui.components.SecondaryButton
 
+/**
+ * Position setup screen
+ *
+ * Features:
+ * - Position validation
+ * - Autocomplete suggestions
+ * - Standardized buttons
+ * - Full i18n support
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PositionScreen(
@@ -45,21 +58,22 @@ fun PositionScreen(
         TopAppBar(
             title = {
                 Text(
-                    text = if (showBackButton) "Змінити позицію" else "Встановіть вашу позицію",
+                    text = if (showBackButton)
+                        stringResource(R.string.position_change_title)
+                    else
+                        stringResource(R.string.position_title),
                     fontWeight = FontWeight.Bold
                 )
             },
             navigationIcon = {
-                if (showBackButton) {
-                    @Composable {
-                        IconButton(onClick = { onBackPressed?.invoke() }) {
-                            Icon(
-                                imageVector = Icons.Default.ArrowBack,
-                                contentDescription = "Назад"
-                            )
-                        }
+                if (showBackButton && onBackPressed != null) {
+                    IconButton(onClick = onBackPressed) {
+                        Icon(
+                            imageVector = Icons.Default.ArrowBack,
+                            contentDescription = stringResource(R.string.content_description_back_button)
+                        )
                     }
-                } else null
+                }
             }
         )
 
@@ -72,9 +86,9 @@ fun PositionScreen(
             // Title and description
             Text(
                 text = if (showBackButton)
-                    "Оновіть вашу позицію"
+                    stringResource(R.string.position_update_description)
                 else
-                    "Для початку роботи вкажіть вашу позицію",
+                    stringResource(R.string.position_description),
                 style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Medium
             )
@@ -91,8 +105,8 @@ fun PositionScreen(
             OutlinedTextField(
                 value = positionInput,
                 onValueChange = { positionInput = it },
-                label = { Text("Позиція") },
-                placeholder = { Text("Введіть або оберіть позицію") },
+                label = { Text(stringResource(R.string.position_label)) },
+                placeholder = { Text(stringResource(R.string.position_placeholder)) },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
                 isError = state.error != null
@@ -127,7 +141,7 @@ fun PositionScreen(
             // Show predefined options when input is empty
             if (positionInput.isBlank()) {
                 Text(
-                    text = "Або оберіть зі списку:",
+                    text = stringResource(R.string.position_select_list),
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.Medium
                 )
@@ -136,12 +150,10 @@ fun PositionScreen(
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     suggestions.forEach { position ->
-                        OutlinedButton(
-                            onClick = { positionInput = position },
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text(position)
-                        }
+                        SecondaryButton(
+                            text = position,
+                            onClick = { positionInput = position }
+                        )
                     }
                 }
             }
@@ -151,37 +163,20 @@ fun PositionScreen(
             // Error message
             state.error?.let { error ->
                 Text(
-                    text = error,
+                    text = stringResource(error.toUserMessage()),
                     color = MaterialTheme.colorScheme.error,
                     style = MaterialTheme.typography.bodySmall
                 )
             }
 
             // Save button
-            Button(
-                onClick = {
-                    viewModel.savePosition(positionInput)
-                },
+            PrimaryButton(
+                text = stringResource(R.string.position_save),
+                onClick = { viewModel.savePosition(positionInput) },
                 enabled = positionInput.isNotBlank() && !state.isLoading,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(56.dp)
-            ) {
-                if (state.isLoading) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(24.dp),
-                        color = MaterialTheme.colorScheme.onPrimary
-                    )
-                } else {
-                    Icon(
-                        imageVector = Icons.Default.Check,
-                        contentDescription = null,
-                        modifier = Modifier.size(20.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Зберегти позицію")
-                }
-            }
+                icon = Icons.Default.Check,
+                loading = state.isLoading
+            )
         }
     }
 }

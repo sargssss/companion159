@@ -9,6 +9,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.lifelover.companion159.domain.models.DisplayCategory
+import com.lifelover.companion159.domain.models.toStorageCategory
 
 /**
  * Reusable category selection grid
@@ -62,7 +63,7 @@ fun CategoryCard(
             contentAlignment = Alignment.Center
         ) {
             Text(
-                text = stringResource(category.titleRes()),
+                text = stringResource(category.titleRes),
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Medium
             )

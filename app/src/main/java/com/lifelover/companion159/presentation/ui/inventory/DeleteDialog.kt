@@ -13,7 +13,17 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import com.lifelover.companion159.R
 import com.lifelover.companion159.domain.models.InventoryItem
+import com.lifelover.companion159.presentation.ui.components.DestructiveButton
+import com.lifelover.companion159.presentation.ui.components.SecondaryButton
 
+/**
+ * Delete confirmation dialog
+ *
+ * Features:
+ * - Standardized buttons (Destructive + Secondary)
+ * - Full i18n support
+ * - Clear warning message
+ */
 @Composable
 fun DeleteConfirmationDialog(
     item: InventoryItem,
@@ -35,15 +45,15 @@ fun DeleteConfirmationDialog(
             ) {
                 // Title
                 Text(
-                    text = "Видалити",
+                    text = stringResource(R.string.delete_confirmation_title),
                     style = MaterialTheme.typography.headlineMedium,
                     fontWeight = FontWeight.Bold,
                     textAlign = TextAlign.Center
                 )
 
-                // Message - FIXED: Use itemName instead of name
+                // Message with item name
                 Text(
-                    text = "Впевнені що хочете видалити \"${item.itemName}\"?",
+                    text = stringResource(R.string.delete_confirmation_message, item.itemName),
                     style = MaterialTheme.typography.bodyLarge,
                     textAlign = TextAlign.Center,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -54,35 +64,15 @@ fun DeleteConfirmationDialog(
                     modifier = Modifier.fillMaxWidth(),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    Button(
-                        onClick = onConfirm,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(56.dp),
-                        shape = RoundedCornerShape(16.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.error,
-                            contentColor = MaterialTheme.colorScheme.onError
-                        )
-                    ) {
-                        Text(
-                            stringResource(id = R.string.delete),
-                            style = MaterialTheme.typography.titleMedium
-                        )
-                    }
+                    DestructiveButton(
+                        text = stringResource(R.string.delete),
+                        onClick = onConfirm
+                    )
 
-                    OutlinedButton(
-                        onClick = onDismiss,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(56.dp),
-                        shape = RoundedCornerShape(16.dp)
-                    ) {
-                        Text(
-                            stringResource(id = R.string.cancel),
-                            style = MaterialTheme.typography.titleMedium
-                        )
-                    }
+                    SecondaryButton(
+                        text = stringResource(R.string.cancel),
+                        onClick = onDismiss
+                    )
                 }
             }
         }
