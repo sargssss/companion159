@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.lifelover.companion159.data.repository.InventoryRepository
 import com.lifelover.companion159.domain.models.DisplayCategory
 import com.lifelover.companion159.domain.models.InventoryItem
+import com.lifelover.companion159.domain.models.toStorageCategory
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -47,6 +48,8 @@ class InventoryViewModel @Inject constructor(
     /**
      * Load items based on DisplayCategory
      * Called from InventoryScreen
+     *
+     * FIXED: Use when with sealed class
      */
     fun loadItems(displayCategory: DisplayCategory) {
         viewModelScope.launch {
@@ -56,11 +59,11 @@ class InventoryViewModel @Inject constructor(
                     currentDisplayCategory = displayCategory
                 )}
 
-                // Get Flow from repository based on category
+                // FIXED: Exhaustive when with sealed class
                 val flow = when (displayCategory) {
-                    DisplayCategory.AVAILABILITY -> repository.getAvailabilityItems()
-                    DisplayCategory.AMMUNITION -> repository.getAmmunitionItems()
-                    DisplayCategory.NEEDS -> repository.getNeedsItems()
+                    is DisplayCategory.Availability -> repository.getAvailabilityItems()
+                    is DisplayCategory.Ammunition -> repository.getAmmunitionItems()
+                    is DisplayCategory.Needs -> repository.getNeedsItems()
                 }
 
                 // Collect and update state
@@ -212,6 +215,8 @@ class InventoryViewModel @Inject constructor(
      * Update quantity based on display category
      * - AVAILABILITY/AMMUNITION: updates available_quantity
      * - NEEDS: updates needed_quantity
+     *
+     * FIXED: Use when with sealed class
      */
     fun updateQuantity(
         itemId: Long,
@@ -225,13 +230,14 @@ class InventoryViewModel @Inject constructor(
 
         viewModelScope.launch {
             try {
+                // FIXED: Exhaustive when with sealed class
                 when (displayCategory) {
-                    DisplayCategory.AVAILABILITY,
-                    DisplayCategory.AMMUNITION -> {
+                    is DisplayCategory.Availability,
+                    is DisplayCategory.Ammunition -> {
                         Log.d(TAG, "📦 Updating available: $itemId -> $newQuantity")
                         repository.updateItemQuantity(itemId, newQuantity)
                     }
-                    DisplayCategory.NEEDS -> {
+                    is DisplayCategory.Needs -> {
                         Log.d(TAG, "📦 Updating needed: $itemId -> $newQuantity")
                         repository.updateNeededQuantity(itemId, newQuantity)
                     }

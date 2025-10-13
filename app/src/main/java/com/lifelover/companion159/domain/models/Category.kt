@@ -5,6 +5,8 @@ import com.lifelover.companion159.R
 /**
  * Storage categories - used in database
  * Represents actual item type stored in DB
+ *
+ * This is ENUM - stays as is
  */
 enum class StorageCategory {
     AMMUNITION,  // Ammunition items
@@ -21,32 +23,78 @@ enum class StorageCategory {
 
 /**
  * Display categories for UI screens
- * Represents the three main screens in the app
- * These are FILTERS, not storage types
+ *
+ * CHANGED: sealed class instead of enum
+ * Each category knows its storage mapping
+ *
+ * Benefits:
+ * - Open/Closed compliant
+ * - Each category is self-contained
+ * - Easy to add new categories
  */
-enum class DisplayCategory {
-    AVAILABILITY,  // Shows EQUIPMENT items with availableQuantity > 0
-    AMMUNITION,    // Shows AMMUNITION items (all quantities)
-    NEEDS;         // Shows ALL items with neededQuantity > 0
+sealed class DisplayCategory(
+    val name: String,  // For navigation
+    val titleRes: Int,
+    val storageCategory: StorageCategory
+) {
+    /**
+     * Shows EQUIPMENT items with availableQuantity > 0
+     */
+    data object Availability : DisplayCategory(
+        name = "AVAILABILITY",
+        titleRes = R.string.availability,
+        storageCategory = StorageCategory.EQUIPMENT
+    )
 
     /**
-     * Get title resource for this display category
+     * Shows AMMUNITION items (all quantities)
      */
-    fun titleRes(): Int = when (this) {
-        AVAILABILITY -> R.string.availability
-        AMMUNITION -> R.string.ammo
-        NEEDS -> R.string.needs
-    }
+    data object Ammunition : DisplayCategory(
+        name = "AMMUNITION",
+        titleRes = R.string.ammo,
+        storageCategory = StorageCategory.AMMUNITION
+    )
 
     /**
-     * Convert display category to storage category for new items
-     *
-     * Rule:
-     * - AMMUNITION screen → stores as AMMUNITION
-     * - AVAILABILITY/NEEDS screens → stores as EQUIPMENT
+     * Shows ALL items with neededQuantity > 0
      */
-    fun toStorageCategory(): StorageCategory = when (this) {
-        AMMUNITION -> StorageCategory.AMMUNITION
-        AVAILABILITY, NEEDS -> StorageCategory.EQUIPMENT
+    data object Needs : DisplayCategory(
+        name = "NEEDS",
+        titleRes = R.string.needs,
+        storageCategory = StorageCategory.EQUIPMENT
+    )
+
+    companion object {
+        /**
+         * Get all display categories
+         * Used for iteration in UI
+         */
+        val entries: List<DisplayCategory> = listOf(
+            Availability,
+            Ammunition,
+            Needs
+        )
+
+        /**
+         * Get display category by name
+         * Used for navigation arguments
+         */
+        fun valueOf(name: String): DisplayCategory = when (name.uppercase()) {
+            "AVAILABILITY" -> Availability
+            "AMMUNITION" -> Ammunition
+            "NEEDS" -> Needs
+            else -> throw IllegalArgumentException("Unknown DisplayCategory: $name")
+        }
     }
 }
+
+/**
+ * Extension: Get storage category from display category
+ * Simple property access - no complex logic
+ */
+fun DisplayCategory.toStorageCategory(): StorageCategory = this.storageCategory
+
+/**
+ * Extension: Get title resource
+ */
+fun DisplayCategory.titleRes(): Int = this.titleRes

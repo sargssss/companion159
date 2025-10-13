@@ -1,4 +1,4 @@
-package com.lifelover.companion159.auth
+package com.lifelover.companion159.data.remote.auth
 
 import android.content.Context
 import android.util.Log

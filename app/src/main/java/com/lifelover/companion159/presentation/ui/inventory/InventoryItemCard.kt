@@ -26,10 +26,10 @@ fun InventoryItemCard(
     onEdit: () -> Unit,
     showSyncStatus: Boolean = false
 ) {
-    // Determine which quantity to display based on category
     val displayedQuantity = when (displayCategory) {
-        DisplayCategory.NEEDS -> item.neededQuantity
-        else -> item.availableQuantity
+        is DisplayCategory.Needs -> item.neededQuantity
+        is DisplayCategory.Availability,
+        is DisplayCategory.Ammunition -> item.availableQuantity
     }
 
     Card(

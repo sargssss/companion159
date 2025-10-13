@@ -87,7 +87,7 @@ fun AddEditItemScreen(
         ) {
             // Category header
             Text(
-                text = stringResource(displayCategory.titleRes()),
+                text = stringResource(displayCategory.titleRes),
                 style = MaterialTheme.typography.headlineMedium,
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.fillMaxWidth(),
@@ -117,26 +117,35 @@ fun AddEditItemScreen(
                 )
             }
 
-            if (displayCategory == DisplayCategory.AMMUNITION ||
-                displayCategory == DisplayCategory.AVAILABILITY) {
-                QuantitySection(
-                    title = "Наявна кількість",
-                    quantity = availableQty,
-                    onQuantityChange = {
-                        availableQty = it
-                    }
-                )
+            // FIXED: Use when with sealed class
+            // Show available quantity for AMMUNITION and AVAILABILITY
+            when (displayCategory) {
+                is DisplayCategory.Ammunition,
+                is DisplayCategory.Availability -> {
+                    QuantitySection(
+                        title = "Наявна кількість",
+                        quantity = availableQty,
+                        onQuantityChange = { availableQty = it }
+                    )
+                }
+                is DisplayCategory.Needs -> {
+                    // Don't show available quantity for NEEDS
+                }
             }
 
-            if (displayCategory == DisplayCategory.AMMUNITION ||
-                displayCategory == DisplayCategory.NEEDS) {
-                QuantitySection(
-                    title = "Потрібна кількість",
-                    quantity = neededQty,
-                    onQuantityChange = {
-                        neededQty = it
-                    }
-                )
+            // Show needed quantity for AMMUNITION and NEEDS
+            when (displayCategory) {
+                is DisplayCategory.Ammunition,
+                is DisplayCategory.Needs -> {
+                    QuantitySection(
+                        title = "Потрібна кількість",
+                        quantity = neededQty,
+                        onQuantityChange = { neededQty = it }
+                    )
+                }
+                is DisplayCategory.Availability -> {
+                    // Don't show needed quantity for AVAILABILITY
+                }
             }
 
             Spacer(modifier = Modifier.weight(1f))

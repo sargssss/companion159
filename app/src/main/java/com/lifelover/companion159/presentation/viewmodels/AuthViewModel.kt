@@ -3,7 +3,7 @@ package com.lifelover.companion159.presentation.viewmodels
 import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.lifelover.companion159.auth.SupabaseAuthService
+import com.lifelover.companion159.data.remote.auth.SupabaseAuthService
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
