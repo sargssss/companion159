@@ -7,7 +7,6 @@ import com.lifelover.companion159.data.remote.auth.GoogleAuthService
 import com.lifelover.companion159.data.remote.auth.SupabaseAuthService
 import com.lifelover.companion159.data.remote.client.SupabaseClient
 import com.lifelover.companion159.data.repository.InventoryRepository
-import com.lifelover.companion159.data.repository.InventoryRepositoryImpl
 import com.lifelover.companion159.data.repository.PositionRepository
 import dagger.Module
 import dagger.Provides
@@ -20,7 +19,7 @@ import javax.inject.Singleton
 
 /**
  * Provides network-related dependencies
- * Includes: Supabase client, Auth services, Position repository
+ * Simplified: removed UseCases, direct Repository provision
  */
 @Module
 @InstallIn(SingletonComponent::class)
@@ -77,14 +76,16 @@ object NetworkModule {
         return PositionRepository(context)
     }
 
-    // ✅ NEW: Provide InventoryRepository with authService
+    /**
+     * Provide InventoryRepository directly (no interface)
+     */
     @Provides
     @Singleton
     fun provideInventoryRepository(
-        localDao: InventoryDao,
+        dao: InventoryDao,
         positionRepository: PositionRepository,
         authService: SupabaseAuthService
     ): InventoryRepository {
-        return InventoryRepositoryImpl(localDao, positionRepository, authService)
+        return InventoryRepository(dao, positionRepository, authService)
     }
 }

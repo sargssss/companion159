@@ -7,23 +7,17 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.lifelover.companion159.R
 import com.lifelover.companion159.domain.models.DisplayCategory
-import com.lifelover.companion159.domain.models.titleRes
 import com.lifelover.companion159.presentation.viewmodels.AuthViewModel
-import com.lifelover.companion159.presentation.viewmodels.InventoryViewModel
-import com.lifelover.companion159.presentation.viewmodels.SyncStatus
-import java.text.SimpleDateFormat
-import java.util.*
 
 /**
  * Main menu screen with category buttons
- * Sync UI is kept for future implementation but not functional
+ * Simplified: removed sync UI (not functional)
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -31,11 +25,9 @@ fun MainMenuScreen(
     onDisplayCategorySelected: (DisplayCategory) -> Unit = {},
     onLogout: () -> Unit = {},
     onChangePosition: () -> Unit = {},
-    authViewModel: AuthViewModel = hiltViewModel(),
-    inventoryViewModel: InventoryViewModel = hiltViewModel()
+    authViewModel: AuthViewModel = hiltViewModel()
 ) {
     val authState by authViewModel.state.collectAsState()
-    val inventoryState by inventoryViewModel.state.collectAsState()
 
     var showUserMenu by remember { mutableStateOf(false) }
     var showLogoutDialog by remember { mutableStateOf(false) }
@@ -57,57 +49,7 @@ fun MainMenuScreen(
                 )
             },
             actions = {
-                // Sync status indicator (kept for UI, but not functional)
-                when (inventoryState.syncStatus) {
-                    SyncStatus.SYNCING -> {
-                        CircularProgressIndicator(
-                            modifier = Modifier
-                                .size(32.dp)
-                                .padding(top = 6.dp, end = 14.dp),
-                            strokeWidth = 2.dp
-                        )
-                    }
-
-                    SyncStatus.SUCCESS -> {
-                        Icon(
-                            painter = painterResource(R.drawable.sync_check),
-                            contentDescription = "Синхронізовано",
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier
-                                .size(42.dp)
-                                .padding(end = 12.dp)
-                        )
-                    }
-
-                    SyncStatus.ERROR -> {
-                        Icon(
-                            painter = painterResource(R.drawable.sync_attention),
-                            contentDescription = "Помилка синхронізації",
-                            tint = MaterialTheme.colorScheme.error,
-                            modifier = Modifier.size(40.dp)
-                        )
-                    }
-
-                    else -> {}
-                }
-
-                // Sync button (kept for UI, shows message when clicked)
-                if (authState.isAuthenticated) {
-                    IconButton(
-                        onClick = { inventoryViewModel.sync() },
-                        enabled = inventoryState.syncStatus != SyncStatus.SYNCING
-                    ) {
-                        Icon(
-                            painter = painterResource(R.drawable.repeat),
-                            contentDescription = "Синхронізувати",
-                            modifier = Modifier
-                                .size(42.dp)
-                                .padding(end = 12.dp)
-                        )
-                    }
-                }
-
-                // User menu
+                // User menu (only if authenticated)
                 if (authState.isAuthenticated) {
                     Box {
                         IconButton(onClick = { showUserMenu = true }) {
@@ -121,6 +63,23 @@ fun MainMenuScreen(
                             expanded = showUserMenu,
                             onDismissRequest = { showUserMenu = false }
                         ) {
+                            // User email
+                            authState.userEmail?.let { email ->
+                                DropdownMenuItem(
+                                    text = {
+                                        Text(
+                                            email,
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    },
+                                    onClick = {},
+                                    enabled = false
+                                )
+                                HorizontalDivider()
+                            }
+
+                            // Change position
                             DropdownMenuItem(
                                 text = { Text("Змінити позицію") },
                                 onClick = {
@@ -137,6 +96,7 @@ fun MainMenuScreen(
 
                             HorizontalDivider()
 
+                            // Settings (placeholder)
                             DropdownMenuItem(
                                 text = { Text("Налаштування") },
                                 onClick = {
@@ -152,6 +112,7 @@ fun MainMenuScreen(
 
                             HorizontalDivider()
 
+                            // Logout
                             DropdownMenuItem(
                                 text = {
                                     Text(
@@ -174,6 +135,7 @@ fun MainMenuScreen(
                         }
                     }
                 } else {
+                    // Login button (if not authenticated)
                     IconButton(onClick = onLogout) {
                         Icon(
                             imageVector = Icons.Default.AccountCircle,
@@ -183,14 +145,6 @@ fun MainMenuScreen(
                 }
             }
         )
-
-        // Status card - only show when authenticated
-        if (authState.isAuthenticated) {
-            StatusCard(
-                userEmail = authState.userEmail,
-                lastSyncTime = inventoryState.lastSyncTime
-            )
-        }
 
         // Category buttons
         Column(
@@ -221,21 +175,6 @@ fun MainMenuScreen(
                         )
                     }
                 }
-            }
-        }
-
-        // Show messages from ViewModel
-        inventoryState.message?.let { message ->
-            LaunchedEffect(message) {
-                // Show Snackbar
-                inventoryViewModel.clearMessage()
-            }
-        }
-
-        inventoryState.error?.let { error ->
-            LaunchedEffect(error) {
-                // Show Snackbar
-                inventoryViewModel.clearError()
             }
         }
     }
@@ -301,51 +240,4 @@ private fun LogoutConfirmationDialog(
             }
         }
     )
-}
-
-/**
- * Status card showing user info
- * Sync info kept for UI but not functional
- */
-@Composable
-private fun StatusCard(
-    userEmail: String?,
-    lastSyncTime: Long?
-) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.primaryContainer
-        )
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(12.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = "Користувач: ${userEmail ?: "Невідомий"}",
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.Medium
-                    )
-                }
-
-                lastSyncTime?.let { time ->
-                    val formatter = SimpleDateFormat("HH:mm", Locale.getDefault())
-                    Text(
-                        text = "Синхр.: ${formatter.format(Date(time))}",
-                        style = MaterialTheme.typography.bodySmall
-                    )
-                }
-            }
-        }
-    }
 }

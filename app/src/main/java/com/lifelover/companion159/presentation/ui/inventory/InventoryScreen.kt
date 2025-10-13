@@ -18,7 +18,6 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.lifelover.companion159.R
 import com.lifelover.companion159.domain.models.DisplayCategory
 import com.lifelover.companion159.domain.models.InventoryItem
-import com.lifelover.companion159.domain.models.titleRes
 import com.lifelover.companion159.presentation.viewmodels.InventoryViewModel
 
 /**

@@ -16,3 +16,26 @@ data class InventoryItem(
     val lastModified: Date = Date(),
     val isSynced: Boolean = false
 )
+
+/**
+ * Extension: Convert to Entity
+ * Replaces InventoryMapper.toEntity()
+ */
+fun InventoryItem.toEntity(
+    userId: String?,
+    supabaseId: Long? = null
+) = com.lifelover.companion159.data.local.entities.InventoryItemEntity(
+    id = id,
+    itemName = itemName,
+    availableQuantity = availableQuantity,
+    neededQuantity = neededQuantity,
+    category = category,
+    userId = userId,
+    crewName = crewName,
+    supabaseId = supabaseId,
+    createdAt = Date(),
+    lastModified = lastModified,
+    lastSynced = if (isSynced) Date() else null,
+    needsSync = !isSynced,
+    isActive = true
+)

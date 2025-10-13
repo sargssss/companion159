@@ -3,10 +3,9 @@ package com.lifelover.companion159.presentation.viewmodels
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.lifelover.companion159.data.repository.InventoryRepository
 import com.lifelover.companion159.domain.models.DisplayCategory
 import com.lifelover.companion159.domain.models.InventoryItem
-import com.lifelover.companion159.domain.models.toStorageCategory
-import com.lifelover.companion159.data.repository.InventoryRepositoryImpl
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -14,38 +13,24 @@ import javax.inject.Inject
 
 /**
  * UI state for inventory screens
+ * Simplified: removed sync fields
  */
 data class InventoryState(
     val items: List<InventoryItem> = emptyList(),
     val isLoading: Boolean = false,
     val error: String? = null,
     val message: String? = null,
-    val currentDisplayCategory: DisplayCategory? = null,
-    // Keep sync UI states for future use (but not functional now)
-    val syncStatus: SyncStatus = SyncStatus.IDLE,
-    val lastSyncTime: Long? = null
+    val currentDisplayCategory: DisplayCategory? = null
 )
 
 /**
- * Sync status enum - kept for UI compatibility
- * Will be functional again when sync is re-implemented
- */
-enum class SyncStatus {
-    IDLE,
-    SYNCING,
-    SUCCESS,
-    ERROR,
-    OFFLINE
-}
-
-/**
  * ViewModel for inventory operations
- * Manages UI state and coordinates with repository
+ * Simplified: calls Repository directly (no UseCases)
  * Requires authenticated user for all operations
  */
 @HiltViewModel
 class InventoryViewModel @Inject constructor(
-    private val repository: InventoryRepositoryImpl
+    private val repository: InventoryRepository
 ) : ViewModel() {
 
     companion object {
@@ -55,9 +40,13 @@ class InventoryViewModel @Inject constructor(
     private val _state = MutableStateFlow(InventoryState())
     val state = _state.asStateFlow()
 
+    // ============================================================
+    // LOAD ITEMS
+    // ============================================================
+
     /**
      * Load items based on DisplayCategory
-     * This method is called from InventoryScreen
+     * Called from InventoryScreen
      */
     fun loadItems(displayCategory: DisplayCategory) {
         viewModelScope.launch {
@@ -67,12 +56,14 @@ class InventoryViewModel @Inject constructor(
                     currentDisplayCategory = displayCategory
                 )}
 
+                // Get Flow from repository based on category
                 val flow = when (displayCategory) {
                     DisplayCategory.AVAILABILITY -> repository.getAvailabilityItems()
                     DisplayCategory.AMMUNITION -> repository.getAmmunitionItems()
                     DisplayCategory.NEEDS -> repository.getNeedsItems()
                 }
 
+                // Collect and update state
                 flow.collect { items ->
                     _state.update { it.copy(
                         items = items,
@@ -95,9 +86,13 @@ class InventoryViewModel @Inject constructor(
         }
     }
 
+    // ============================================================
+    // CREATE ITEM
+    // ============================================================
+
     /**
      * Add new item
-     * Uses extension function to convert DisplayCategory → StorageCategory
+     * Validation done here (UI logic)
      */
     fun addNewItem(
         name: String,
@@ -105,13 +100,21 @@ class InventoryViewModel @Inject constructor(
         neededQuantity: Int,
         displayCategory: DisplayCategory
     ) {
-        if (name.isBlank()) return
+        // Validation
+        if (name.isBlank()) {
+            _state.update { it.copy(error = "Назва не може бути порожньою") }
+            return
+        }
+
+        if (availableQuantity < 0 || neededQuantity < 0) {
+            _state.update { it.copy(error = "Кількість не може бути від'ємною") }
+            return
+        }
 
         viewModelScope.launch {
             try {
-                // ✅ USE EXTENSION FUNCTION - no duplication!
                 val storageCategory = displayCategory.toStorageCategory()
-                Log.d(TAG, "   Storage category: $storageCategory")
+                Log.d(TAG, "➕ Adding item: $name ($storageCategory)")
 
                 val item = InventoryItem(
                     id = 0,
@@ -131,10 +134,14 @@ class InventoryViewModel @Inject constructor(
                 _state.update { it.copy(error = "Необхідно увійти в акаунт") }
             } catch (e: Exception) {
                 Log.e(TAG, "❌ Failed to add item", e)
-                _state.update { it.copy(error = e.message) }
+                _state.update { it.copy(error = "Помилка: ${e.message}") }
             }
         }
     }
+
+    // ============================================================
+    // UPDATE ITEM
+    // ============================================================
 
     /**
      * Update full item with both quantities
@@ -147,16 +154,24 @@ class InventoryViewModel @Inject constructor(
         newNeededQuantity: Int,
         displayCategory: DisplayCategory
     ) {
-        if (newName.isBlank()) return
+        // Validation
+        if (newName.isBlank()) {
+            _state.update { it.copy(error = "Назва не може бути порожньою") }
+            return
+        }
+
+        if (newAvailableQuantity < 0 || newNeededQuantity < 0) {
+            _state.update { it.copy(error = "Кількість не може бути від'ємною") }
+            return
+        }
 
         viewModelScope.launch {
             try {
                 // Get existing item to preserve other fields
                 val existingItem = _state.value.items.find { it.id == itemId }
-                if (existingItem == null) {
-                    Log.e(TAG, "❌ Item not found in current state: $itemId")
 
-                    // ✅ USE EXTENSION FUNCTION
+                if (existingItem == null) {
+                    Log.w(TAG, "⚠️ Item not found in state, creating with category")
                     val storageCategory = displayCategory.toStorageCategory()
 
                     val item = InventoryItem(
@@ -165,22 +180,18 @@ class InventoryViewModel @Inject constructor(
                         availableQuantity = newAvailableQuantity,
                         neededQuantity = newNeededQuantity,
                         category = storageCategory,
-                        crewName = ""  // Will be set in repository
+                        crewName = ""
                     )
                     repository.updateItem(item)
-                    Log.d(TAG, "✅ Item updated (no existing state)")
-                    _state.update { it.copy(message = "Предмет оновлено") }
-                    return@launch
+                } else {
+                    val updatedItem = existingItem.copy(
+                        itemName = newName.trim(),
+                        availableQuantity = newAvailableQuantity,
+                        neededQuantity = newNeededQuantity
+                    )
+                    repository.updateItem(updatedItem)
                 }
 
-                val updatedItem = existingItem.copy(
-                    itemName = newName.trim(),
-                    availableQuantity = newAvailableQuantity,
-                    neededQuantity = newNeededQuantity
-                )
-
-                Log.d(TAG, "📦 Updating item in repository...")
-                repository.updateItem(updatedItem)
                 Log.d(TAG, "✅ Item updated successfully")
                 _state.update { it.copy(message = "Предмет оновлено") }
 
@@ -207,18 +218,21 @@ class InventoryViewModel @Inject constructor(
         newQuantity: Int,
         displayCategory: DisplayCategory
     ) {
-        if (newQuantity < 0) return
+        if (newQuantity < 0) {
+            _state.update { it.copy(error = "Кількість не може бути від'ємною") }
+            return
+        }
 
         viewModelScope.launch {
             try {
                 when (displayCategory) {
                     DisplayCategory.AVAILABILITY,
                     DisplayCategory.AMMUNITION -> {
-                        Log.d(TAG, "Updating available quantity: $itemId -> $newQuantity")
+                        Log.d(TAG, "📦 Updating available: $itemId -> $newQuantity")
                         repository.updateItemQuantity(itemId, newQuantity)
                     }
                     DisplayCategory.NEEDS -> {
-                        Log.d(TAG, "Updating needed quantity: $itemId -> $newQuantity")
+                        Log.d(TAG, "📦 Updating needed: $itemId -> $newQuantity")
                         repository.updateNeededQuantity(itemId, newQuantity)
                     }
                 }
@@ -235,13 +249,17 @@ class InventoryViewModel @Inject constructor(
         }
     }
 
+    // ============================================================
+    // DELETE ITEM
+    // ============================================================
+
     /**
      * Delete item by ID
      */
     fun deleteItem(id: Long) {
         viewModelScope.launch {
             try {
-                Log.d(TAG, "Deleting item ID: $id")
+                Log.d(TAG, "🗑️ Deleting item ID: $id")
                 repository.deleteItem(id)
                 _state.update { it.copy(message = "Предмет видалено") }
 
@@ -258,17 +276,9 @@ class InventoryViewModel @Inject constructor(
         }
     }
 
-    /**
-     * Sync function - kept for UI compatibility
-     * Does nothing until sync is re-implemented
-     */
-    fun sync() {
-        Log.d(TAG, "⚠️ Sync called but not implemented (sync removed)")
-        _state.update { it.copy(
-            syncStatus = SyncStatus.IDLE,
-            message = "Синхронізація тимчасово недоступна"
-        )}
-    }
+    // ============================================================
+    // STATE MANAGEMENT
+    // ============================================================
 
     fun clearMessage() {
         _state.update { it.copy(message = null) }

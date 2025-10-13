@@ -3,9 +3,14 @@ package com.lifelover.companion159.data.local.entities
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 import androidx.room.TypeConverter
-import com.lifelover.companion159.R
+import com.lifelover.companion159.domain.models.InventoryItem
+import com.lifelover.companion159.domain.models.StorageCategory
 import java.util.Date
 
+/**
+ * Room entity for inventory items
+ * Simplified: removed sync fields, using StorageCategory
+ */
 @Entity(tableName = "inventory_items")
 data class InventoryItemEntity(
     @PrimaryKey(autoGenerate = true)
@@ -16,14 +21,14 @@ data class InventoryItemEntity(
     val availableQuantity: Int = 0,
     val neededQuantity: Int = 0,
 
-    // Category stored LOCALLY only
-    val category: InventoryCategory,
+    // Category - using domain StorageCategory directly
+    val category: StorageCategory,
 
     // User/Position context
     val userId: String? = null,
     val crewName: String,
 
-    // Server sync fields
+    // Server sync fields (kept for future use)
     val supabaseId: Long? = null,
 
     // Timestamps
@@ -31,37 +36,36 @@ data class InventoryItemEntity(
     val lastModified: Date = Date(),
     val lastSynced: Date? = null,
 
-    // Sync status
+    // Sync status (kept for future use)
     val needsSync: Boolean = true,
     val isActive: Boolean = true
 )
-// Keep existing enum for LOCAL use
-enum class InventoryCategory {
-    SHIPS, AMMUNITION, EQUIPMENT, PROVISIONS
-}
 
-// Keep existing helper functions
-fun InventoryCategory.titleRes(): Int = when (this) {
-    InventoryCategory.SHIPS -> R.string.drones
-    InventoryCategory.AMMUNITION -> R.string.ammo
-    InventoryCategory.EQUIPMENT -> R.string.tool
-    InventoryCategory.PROVISIONS -> R.string.food
-}
+/**
+ * Extension: Convert Entity to Domain model
+ * Replaces InventoryMapper.toDomain()
+ */
+fun InventoryItemEntity.toDomain() = InventoryItem(
+    id = id,
+    itemName = itemName,
+    availableQuantity = availableQuantity,
+    neededQuantity = neededQuantity,
+    category = category,
+    crewName = crewName,
+    lastModified = lastModified,
+    isSynced = !needsSync
+)
 
-fun InventoryCategory.iconRes(): Int = when (this) {
-    InventoryCategory.SHIPS -> R.drawable.drone
-    InventoryCategory.AMMUNITION -> R.drawable.bomb
-    InventoryCategory.EQUIPMENT -> R.drawable.tool
-    InventoryCategory.PROVISIONS -> R.drawable.food
-}
-
+/**
+ * Type converters for Room
+ */
 class Converters {
     @TypeConverter
-    fun fromCategory(category: InventoryCategory): String = category.name
+    fun fromCategory(category: StorageCategory): String = category.name
 
     @TypeConverter
-    fun toCategory(category: String): InventoryCategory =
-        InventoryCategory.valueOf(category)
+    fun toCategory(category: String): StorageCategory =
+        StorageCategory.valueOf(category)
 
     @TypeConverter
     fun fromDate(date: Date?): Long? = date?.time

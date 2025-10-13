@@ -2,41 +2,27 @@ package com.lifelover.companion159.data.repository
 
 import android.util.Log
 import com.lifelover.companion159.data.local.dao.InventoryDao
-import com.lifelover.companion159.data.mappers.InventoryMapper
+import com.lifelover.companion159.data.local.entities.toDomain
 import com.lifelover.companion159.data.remote.auth.SupabaseAuthService
 import com.lifelover.companion159.domain.models.InventoryItem
+import com.lifelover.companion159.domain.models.toEntity
 import kotlinx.coroutines.flow.*
 import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Repository interface for inventory operations
+ * Repository for inventory operations
+ * Simplified: no interface, uses extension functions instead of Mapper
+ *
  * All operations require authenticated user
- */
-interface InventoryRepository {
-    fun getAvailabilityItems(): Flow<List<InventoryItem>>
-    fun getAmmunitionItems(): Flow<List<InventoryItem>>
-    fun getNeedsItems(): Flow<List<InventoryItem>>
-    suspend fun getAllItemsOnce(): List<InventoryItem>
-    suspend fun addItem(item: InventoryItem)
-    suspend fun updateItem(item: InventoryItem)
-    suspend fun updateItemQuantity(itemId: Long, quantity: Int)
-    suspend fun updateNeededQuantity(itemId: Long, quantity: Int)
-    suspend fun deleteItem(id: Long)
-}
-
-/**
- * Implementation of inventory repository
- * Works with local database only (offline-first approach)
- * Requires user authentication to access data
+ * Works with local database only (offline-first)
  */
 @Singleton
-class InventoryRepositoryImpl @Inject constructor(
-    private val localDao: InventoryDao,
+class InventoryRepository @Inject constructor(
+    private val dao: InventoryDao,
     private val positionRepository: PositionRepository,
     private val authService: SupabaseAuthService
-) : InventoryRepository {
-
+) {
     companion object {
         private const val TAG = "InventoryRepository"
     }
@@ -49,58 +35,84 @@ class InventoryRepositoryImpl @Inject constructor(
             ?: throw IllegalStateException("User must be authenticated to access inventory")
     }
 
-    override fun getAvailabilityItems(): Flow<List<InventoryItem>> {
+    // ============================================================
+    // QUERY METHODS
+    // ============================================================
+
+    /**
+     * Get items for AVAILABILITY screen
+     * Shows EQUIPMENT with availableQuantity > 0
+     */
+    fun getAvailabilityItems(): Flow<List<InventoryItem>> {
         return flow {
             val userId = requireUserId()
-            localDao.getAvailabilityItems(userId).collect { entities ->
-                emit(entities.map { InventoryMapper.toDomain(it) })
+            dao.getAvailabilityItems(userId).collect { entities ->
+                emit(entities.map { it.toDomain() })
             }
         }
     }
 
-    override fun getAmmunitionItems(): Flow<List<InventoryItem>> {
+    /**
+     * Get items for AMMUNITION screen
+     * Shows AMMUNITION items
+     */
+    fun getAmmunitionItems(): Flow<List<InventoryItem>> {
         return flow {
             val userId = requireUserId()
-            localDao.getAmmunitionItems(userId).collect { entities ->
-                emit(entities.map { InventoryMapper.toDomain(it) })
+            dao.getAmmunitionItems(userId).collect { entities ->
+                emit(entities.map { it.toDomain() })
             }
         }
     }
 
-    override fun getNeedsItems(): Flow<List<InventoryItem>> {
+    /**
+     * Get items for NEEDS screen
+     * Shows all items with neededQuantity > 0
+     */
+    fun getNeedsItems(): Flow<List<InventoryItem>> {
         return flow {
             val userId = requireUserId()
-            localDao.getNeedsItems(userId).collect { entities ->
-                emit(entities.map { InventoryMapper.toDomain(it) })
+            dao.getNeedsItems(userId).collect { entities ->
+                emit(entities.map { it.toDomain() })
             }
         }
     }
 
-    override suspend fun getAllItemsOnce(): List<InventoryItem> {
+    /**
+     * Get all items (for export/analysis)
+     */
+    suspend fun getAllItemsOnce(): List<InventoryItem> {
         val userId = requireUserId()
-        return localDao.getAllItems(userId).map { InventoryMapper.toDomain(it) }
+        return dao.getAllItems(userId).map { it.toDomain() }
     }
 
-    override suspend fun addItem(item: InventoryItem) {
+    // ============================================================
+    // CREATE / UPDATE / DELETE
+    // ============================================================
+
+    /**
+     * Add new item
+     */
+    suspend fun addItem(item: InventoryItem) {
         val userId = requireUserId()
         val crewName = positionRepository.getPosition()
             ?: throw IllegalStateException("Position must be set before adding items")
 
-        val entity = InventoryMapper.toEntity(
-            domain = item.copy(crewName = crewName),
-            userId = userId
-        )
+        val entity = item.copy(crewName = crewName).toEntity(userId = userId)
 
-        val insertedId = localDao.insertItem(entity)
+        val insertedId = dao.insertItem(entity)
         Log.d(TAG, "✅ Item created with ID: $insertedId for user: $userId")
     }
 
-    override suspend fun updateItem(item: InventoryItem) {
+    /**
+     * Update full item (name + both quantities)
+     */
+    suspend fun updateItem(item: InventoryItem) {
         val userId = requireUserId()
         val crewName = positionRepository.getPosition()
             ?: throw IllegalStateException("Position must be set")
 
-        val existingItem = localDao.getItemById(item.id)
+        val existingItem = dao.getItemById(item.id)
         if (existingItem == null) {
             throw IllegalArgumentException("Item with ID ${item.id} does not exist")
         }
@@ -110,12 +122,12 @@ class InventoryRepositoryImpl @Inject constructor(
             throw SecurityException("Cannot update item of another user")
         }
 
-        val updatedRows = localDao.updateItemWithNeeds(
+        val updatedRows = dao.updateItemWithNeeds(
             id = item.id,
             name = item.itemName.trim(),
             availableQuantity = item.availableQuantity,
             neededQuantity = item.neededQuantity,
-            category = InventoryMapper.toEntity(item).category,
+            category = item.category,
             crewName = crewName
         )
 
@@ -124,10 +136,13 @@ class InventoryRepositoryImpl @Inject constructor(
         }
     }
 
-    override suspend fun updateItemQuantity(itemId: Long, quantity: Int) {
+    /**
+     * Update available quantity only
+     */
+    suspend fun updateItemQuantity(itemId: Long, quantity: Int) {
         val userId = requireUserId()
 
-        val existingItem = localDao.getItemById(itemId)
+        val existingItem = dao.getItemById(itemId)
         if (existingItem == null) {
             Log.e(TAG, "❌ Item with ID $itemId does NOT exist")
             return
@@ -138,7 +153,7 @@ class InventoryRepositoryImpl @Inject constructor(
             throw SecurityException("Cannot update item of another user")
         }
 
-        val updatedRows = localDao.updateQuantity(itemId, quantity)
+        val updatedRows = dao.updateQuantity(itemId, quantity)
 
         if (updatedRows > 0) {
             Log.d(TAG, "✅ Available quantity updated: $itemId -> $quantity")
@@ -147,10 +162,13 @@ class InventoryRepositoryImpl @Inject constructor(
         }
     }
 
-    override suspend fun updateNeededQuantity(itemId: Long, quantity: Int) {
+    /**
+     * Update needed quantity only
+     */
+    suspend fun updateNeededQuantity(itemId: Long, quantity: Int) {
         val userId = requireUserId()
 
-        val existingItem = localDao.getItemById(itemId)
+        val existingItem = dao.getItemById(itemId)
         if (existingItem == null) {
             Log.e(TAG, "❌ Item $itemId not found")
             return
@@ -161,14 +179,17 @@ class InventoryRepositoryImpl @Inject constructor(
             throw SecurityException("Cannot update item of another user")
         }
 
-        localDao.updateNeededQuantity(itemId, quantity)
+        dao.updateNeededQuantity(itemId, quantity)
         Log.d(TAG, "✅ Needed quantity updated: $itemId -> $quantity")
     }
 
-    override suspend fun deleteItem(id: Long) {
+    /**
+     * Delete item (soft delete)
+     */
+    suspend fun deleteItem(id: Long) {
         val userId = requireUserId()
 
-        val existingItem = localDao.getItemById(id)
+        val existingItem = dao.getItemById(id)
         if (existingItem == null) {
             Log.w(TAG, "⚠️ Item $id not found")
             return
@@ -179,7 +200,7 @@ class InventoryRepositoryImpl @Inject constructor(
             throw SecurityException("Cannot delete item of another user")
         }
 
-        localDao.softDeleteItem(id)
+        dao.softDeleteItem(id)
         Log.d(TAG, "✅ Item deleted: $id")
     }
 }

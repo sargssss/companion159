@@ -17,7 +17,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.lifelover.companion159.R
 import com.lifelover.companion159.domain.models.DisplayCategory
-import com.lifelover.companion159.domain.models.titleRes
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

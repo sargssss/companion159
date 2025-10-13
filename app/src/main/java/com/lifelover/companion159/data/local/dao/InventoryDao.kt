@@ -3,93 +3,115 @@ package com.lifelover.companion159.data.local.dao
 import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.Query
-import com.lifelover.companion159.data.local.entities.InventoryCategory
 import com.lifelover.companion159.data.local.entities.InventoryItemEntity
+import com.lifelover.companion159.domain.models.StorageCategory
 import kotlinx.coroutines.flow.Flow
 import java.util.Date
 
+/**
+ * DAO for inventory operations
+ * Simplified: removed sync methods, using StorageCategory
+ */
 @Dao
 interface InventoryDao {
 
-    // Get items by category (LOCAL filter, not synced to server)
+    // ============================================================
+    // QUERY METHODS (for display filtering)
+    // ============================================================
+
+    /**
+     * Get items for AVAILABILITY display
+     * Shows non-ammunition with availableQuantity > 0
+     */
     @Query("""
         SELECT * FROM inventory_items 
         WHERE isActive = 1 
-        AND category = :category 
+        AND category != 'AMMUNITION'
+        AND availableQuantity > 0
         AND (userId = :userId OR userId IS NULL) 
         ORDER BY createdAt DESC
     """)
-    fun getItemsByCategory(
-        category: InventoryCategory,
-        userId: String?
-    ): Flow<List<InventoryItemEntity>>
+    fun getAvailabilityItems(userId: String?): Flow<List<InventoryItemEntity>>
 
-    // Get offline items (without userId)
+    /**
+     * Get items for AMMUNITION display
+     * Shows ammunition only (all quantities)
+     */
     @Query("""
         SELECT * FROM inventory_items 
         WHERE isActive = 1 
-        AND category = :category 
-        AND userId IS NULL 
+        AND category = 'AMMUNITION'
+        AND (userId = :userId OR userId IS NULL) 
         ORDER BY createdAt DESC
     """)
-    fun getItemsByCategoryOffline(
-        category: InventoryCategory
-    ): Flow<List<InventoryItemEntity>>
+    fun getAmmunitionItems(userId: String?): Flow<List<InventoryItemEntity>>
 
-    // Get all items for sync
+    /**
+     * Get items for NEEDS display
+     * Shows ALL items with neededQuantity > 0
+     */
+    @Query("""
+        SELECT * FROM inventory_items 
+        WHERE isActive = 1 
+        AND neededQuantity > 0
+        AND (userId = :userId OR userId IS NULL) 
+        ORDER BY createdAt DESC
+    """)
+    fun getNeedsItems(userId: String?): Flow<List<InventoryItemEntity>>
+
+    /**
+     * Get all items for user (for export/analysis)
+     */
     @Query("SELECT * FROM inventory_items WHERE userId = :userId OR userId IS NULL")
     suspend fun getAllItems(userId: String?): List<InventoryItemEntity>
 
-    // Get items needing sync
-    @Query("""
-        SELECT * FROM inventory_items 
-        WHERE needsSync = 1 
-        AND userId = :userId 
-        AND userId IS NOT NULL
-    """)
-    suspend fun getItemsNeedingSync(userId: String): List<InventoryItemEntity>
+    // ============================================================
+    // SINGLE ITEM QUERIES
+    // ============================================================
 
-    // Get offline items for migration to user
-    @Query("SELECT * FROM inventory_items WHERE userId IS NULL")
-    suspend fun getOfflineItems(): List<InventoryItemEntity>
-
-    // Assign userId to offline items
-    @Query("UPDATE inventory_items SET userId = :userId, needsSync = 1 WHERE userId IS NULL")
-    suspend fun assignUserIdToOfflineItems(userId: String): Int
-
-    // Get item by ID
+    /**
+     * Get item by local ID
+     */
     @Query("SELECT * FROM inventory_items WHERE id = :id")
     suspend fun getItemById(id: Long): InventoryItemEntity?
 
-    // Get item by Supabase ID
-    @Query("SELECT * FROM inventory_items WHERE supabaseId = :supabaseId")
-    suspend fun getItemBySupabaseId(supabaseId: Long): InventoryItemEntity?
+    // ============================================================
+    // CREATE / UPDATE / DELETE
+    // ============================================================
 
-    // Insert item
+    /**
+     * Insert new item
+     */
     @Insert
     suspend fun insertItem(item: InventoryItemEntity): Long
 
-    // Update full item
+    /**
+     * Update full item with both quantities
+     */
     @Query("""
         UPDATE inventory_items 
         SET itemName = :name,
-            availableQuantity = :quantity,
+            availableQuantity = :availableQuantity,
+            neededQuantity = :neededQuantity,
             category = :category,
             crewName = :crewName,
             needsSync = 1,
             lastModified = :timestamp
         WHERE id = :id
     """)
-    suspend fun updateItem(
+    suspend fun updateItemWithNeeds(
         id: Long,
         name: String,
-        quantity: Int,
-        category: InventoryCategory,
+        availableQuantity: Int,
+        neededQuantity: Int,
+        category: StorageCategory,
         crewName: String,
         timestamp: Date = Date()
     ): Int
 
-    // Update quantity only
+    /**
+     * Update available quantity only
+     */
     @Query("""
         UPDATE inventory_items 
         SET availableQuantity = :quantity,
@@ -103,7 +125,25 @@ interface InventoryDao {
         timestamp: Date = Date()
     ): Int
 
-    // Soft delete (set isActive = false)
+    /**
+     * Update needed quantity only
+     */
+    @Query("""
+        UPDATE inventory_items 
+        SET neededQuantity = :quantity,
+            needsSync = 1,
+            lastModified = :timestamp
+        WHERE id = :id
+    """)
+    suspend fun updateNeededQuantity(
+        id: Long,
+        quantity: Int,
+        timestamp: Date = Date()
+    ): Int
+
+    /**
+     * Soft delete (set isActive = false)
+     */
     @Query("""
         UPDATE inventory_items 
         SET isActive = 0,
@@ -115,123 +155,4 @@ interface InventoryDao {
         id: Long,
         timestamp: Date = Date()
     ): Int
-
-    // Set Supabase ID after creating on server
-    @Query("""
-        UPDATE inventory_items 
-        SET supabaseId = :supabaseId,
-            needsSync = 0,
-            lastSynced = :timestamp
-        WHERE id = :localId
-    """)
-    suspend fun setSupabaseId(
-        localId: Long,
-        supabaseId: Long,  // Changed from String to Long
-        timestamp: Date = Date()
-    ): Int
-
-    // Mark as synced
-    @Query("""
-        UPDATE inventory_items 
-        SET needsSync = 0,
-            lastSynced = :timestamp
-        WHERE id = :localId
-    """)
-    suspend fun markAsSynced(
-        localId: Long,
-        timestamp: Date = Date()
-    ): Int
-
-    // Update from server (during sync PULL)
-    @Query("""
-        UPDATE inventory_items 
-        SET itemName = :name,
-            availableQuantity = :quantity,
-            neededQuantity = :neededQuantity,
-            category = :category,
-            crewName = :crewName,
-            isActive = :isActive,
-            userId = :userId,
-            needsSync = 0,
-            lastSynced = :timestamp
-        WHERE supabaseId = :supabaseId
-    """)
-    suspend fun updateFromServer(
-        supabaseId: Long,
-        userId: String,
-        name: String,
-        quantity: Int,
-        neededQuantity: Int,
-        category: InventoryCategory,
-        crewName: String,
-        isActive: Boolean,
-        timestamp: Date = Date()
-    ): Int
-
-    // Update needed quantity
-    @Query("""
-    UPDATE inventory_items 
-    SET neededQuantity = :quantity,
-        needsSync = 1,
-        lastModified = :timestamp
-    WHERE id = :id
-""")
-    suspend fun updateNeededQuantity(
-        id: Long,
-        quantity: Int,
-        timestamp: Date = Date()
-    ): Int
-
-    // Update full item with needed quantity
-    @Query("""
-    UPDATE inventory_items 
-    SET itemName = :name,
-        availableQuantity = :availableQuantity,
-        neededQuantity = :neededQuantity,
-        category = :category,
-        crewName = :crewName,
-        needsSync = 1,
-        lastModified = :timestamp
-    WHERE id = :id
-""")
-    suspend fun updateItemWithNeeds(
-        id: Long,
-        name: String,
-        availableQuantity: Int,
-        neededQuantity: Int,
-        category: InventoryCategory,
-        crewName: String,
-        timestamp: Date = Date()
-    ): Int
-
-    // Get items for AVAILABILITY display (all non-ammunition with available_quantity > 0)
-    @Query("""
-    SELECT * FROM inventory_items 
-    WHERE isActive = 1 
-    AND category != 'AMMUNITION'
-    AND availableQuantity > 0
-    AND (userId = :userId OR userId IS NULL) 
-    ORDER BY createdAt DESC
-""")
-    fun getAvailabilityItems(userId: String?): Flow<List<InventoryItemEntity>>
-
-    // Get items for БК display (ammunition only, show all with available_quantity)
-    @Query("""
-    SELECT * FROM inventory_items 
-    WHERE isActive = 1 
-    AND category = 'AMMUNITION'
-    AND (userId = :userId OR userId IS NULL) 
-    ORDER BY createdAt DESC
-""")
-    fun getAmmunitionItems(userId: String?): Flow<List<InventoryItemEntity>>
-
-    // CHANGED: Get items for NEEDS display (ALL items with needed_quantity > 0, including ammunition)
-    @Query("""
-    SELECT * FROM inventory_items 
-    WHERE isActive = 1 
-    AND neededQuantity > 0
-    AND (userId = :userId OR userId IS NULL) 
-    ORDER BY createdAt DESC
-""")
-    fun getNeedsItems(userId: String?): Flow<List<InventoryItemEntity>>
 }
