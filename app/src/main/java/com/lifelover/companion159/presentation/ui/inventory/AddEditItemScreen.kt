@@ -122,30 +122,35 @@ fun AddEditItemScreen(
                 )
             }
 
-            // Available quantity for AMMUNITION and AVAILABILITY
+            // Quantity fields based on category
             when (displayCategory) {
-                is DisplayCategory.Ammunition,
-                is DisplayCategory.Availability -> {
+                is DisplayCategory.Availability,
+                is DisplayCategory.Ammunition -> {
+                    // Show available first, then needed
                     QuantitySection(
                         title = stringResource(R.string.available_quantity),
                         quantity = availableQty,
                         onQuantityChange = { availableQty = it }
                     )
-                }
-                is DisplayCategory.Needs -> {
-                    // Don't show available quantity for NEEDS
-                }
-            }
 
-            // Needed quantity for ALL categories
-            when (displayCategory) {
-                is DisplayCategory.Ammunition,
-                is DisplayCategory.Availability,
-                is DisplayCategory.Needs -> {
                     QuantitySection(
                         title = stringResource(R.string.needed_quantity),
                         quantity = neededQty,
                         onQuantityChange = { neededQty = it }
+                    )
+                }
+                is DisplayCategory.Needs -> {
+                    // Show needed first, then available
+                    QuantitySection(
+                        title = stringResource(R.string.needed_quantity),
+                        quantity = neededQty,
+                        onQuantityChange = { neededQty = it }
+                    )
+
+                    QuantitySection(
+                        title = stringResource(R.string.available_quantity),
+                        quantity = availableQty,
+                        onQuantityChange = { availableQty = it }
                     )
                 }
             }

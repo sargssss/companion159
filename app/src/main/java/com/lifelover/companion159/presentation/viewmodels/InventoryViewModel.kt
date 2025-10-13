@@ -9,6 +9,7 @@ import com.lifelover.companion159.domain.models.DisplayCategory
 import com.lifelover.companion159.domain.models.InventoryItem
 import com.lifelover.companion159.domain.models.toAppError
 import com.lifelover.companion159.domain.models.toStorageCategory
+import com.lifelover.companion159.domain.usecases.DeleteItemUseCase
 import com.lifelover.companion159.domain.validation.InputValidator
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
@@ -31,14 +32,15 @@ data class InventoryState(
  * ViewModel for inventory management
  *
  * Responsibilities:
- * - Load items filtered by display category
+ * - Load items filtered by display category (only relevant items)
  * - Validate input before repository calls
- * - Handle errors with type-safe AppError
+ * - Handle smart deletion through use case
  * - Provide reactive state via Flow
  */
 @HiltViewModel
 class InventoryViewModel @Inject constructor(
-    private val repository: InventoryRepository
+    private val repository: InventoryRepository,
+    private val deleteItemUseCase: DeleteItemUseCase
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(InventoryState())
@@ -46,7 +48,7 @@ class InventoryViewModel @Inject constructor(
 
     /**
      * Load items based on DisplayCategory
-     * Uses exhaustive when expression with sealed class
+     * Applies smart filtering to show only relevant items
      */
     fun loadItems(displayCategory: DisplayCategory) {
         viewModelScope.launch {
@@ -56,25 +58,51 @@ class InventoryViewModel @Inject constructor(
                     currentDisplayCategory = displayCategory
                 )}
 
-                // Exhaustive when - compiler ensures all cases handled
-                val flow: Flow<List<InventoryItem>> = when (displayCategory) {
+                // Get base flow from repository
+                val baseFlow: Flow<List<InventoryItem>> = when (displayCategory) {
                     is DisplayCategory.Availability -> repository.getAvailabilityItems()
                     is DisplayCategory.Ammunition -> repository.getAmmunitionItems()
                     is DisplayCategory.Needs -> repository.getNeedsItems()
                 }
 
-                flow.collect { items ->
-                    _state.update { it.copy(
-                        items = items,
-                        isLoading = false
-                    )}
-                }
+                // Apply smart filtering
+                baseFlow
+                    .map { items -> filterItemsByCategory(items, displayCategory) }
+                    .collect { filteredItems ->
+                        _state.update { it.copy(
+                            items = filteredItems,
+                            isLoading = false
+                        )}
+                    }
             } catch (e: Exception) {
                 val appError = e.toAppError()
                 _state.update { it.copy(
                     isLoading = false,
                     error = appError
                 )}
+            }
+        }
+    }
+
+    /**
+     * Filter items to show only relevant ones based on category
+     *
+     * Rules:
+     * - Availability: show only items with availableQuantity > 0
+     * - Ammunition: show only items with availableQuantity > 0
+     * - Needs: show only items with neededQuantity > 0
+     */
+    private fun filterItemsByCategory(
+        items: List<InventoryItem>,
+        displayCategory: DisplayCategory
+    ): List<InventoryItem> {
+        return when (displayCategory) {
+            is DisplayCategory.Availability,
+            is DisplayCategory.Ammunition -> {
+                items.filter { it.availableQuantity > 0 }
+            }
+            is DisplayCategory.Needs -> {
+                items.filter { it.neededQuantity > 0 }
             }
         }
     }
@@ -216,17 +244,20 @@ class InventoryViewModel @Inject constructor(
     }
 
     /**
-     * Delete item by ID
+     * Smart delete using use case
+     * Handles business logic: zero-out or full delete
      */
-    fun deleteItem(id: Long) {
+    fun deleteItem(item: InventoryItem) {
         viewModelScope.launch {
-            try {
-                repository.deleteItem(id)
-                _state.update { it.copy(message = R.string.item_deleted) }
+            val currentCategory = _state.value.currentDisplayCategory ?: return@launch
 
-            } catch (e: Exception) {
-                _state.update { it.copy(error = e.toAppError()) }
-            }
+            deleteItemUseCase(item, currentCategory)
+                .onSuccess {
+                    _state.update { it.copy(message = R.string.item_deleted) }
+                }
+                .onFailure { error ->
+                    _state.update { it.copy(error = error.toAppError()) }
+                }
         }
     }
 

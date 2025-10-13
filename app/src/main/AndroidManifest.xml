@@ -29,44 +29,8 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.Companion159">
 
-        <!-- ==================== RECEIVERS ==================== -->
-
-        <!-- Receiver для перезавантаження пристрою -->
-        <receiver
-            android:name=".data.sync.BootReceiver"
-            android:enabled="true"
-            android:exported="true"
-            android:directBootAware="true">
-            <intent-filter>
-                <action android:name="android.intent.action.BOOT_COMPLETED" />
-                <action android:name="android.intent.action.LOCKED_BOOT_COMPLETED" />
-                <action android:name="android.intent.action.QUICKBOOT_POWERON" />
-                <category android:name="android.intent.category.DEFAULT" />
-            </intent-filter>
-        </receiver>
-
-        <!-- Receiver для зміни мережі -->
-        <receiver
-            android:name=".data.sync.NetworkChangeReceiver"
-            android:enabled="true"
-            android:exported="false">
-            <intent-filter>
-                <action android:name="android.net.conn.CONNECTIVITY_CHANGE" />
-                <action android:name="android.net.wifi.STATE_CHANGE" />
-            </intent-filter>
-        </receiver>
-
-        <!-- ==================== SERVICES ==================== -->
-
-        <!-- Foreground Service для критичної синхронізації -->
-        <service
-            android:name=".data.sync.SyncForegroundService"
-            android:enabled="true"
-            android:exported="false"
-            android:foregroundServiceType="dataSync" />
 
         <!-- ==================== ACTIVITIES ==================== -->
-
         <activity
             android:name=".MainActivity"
             android:exported="true"

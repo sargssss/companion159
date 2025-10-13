@@ -1,51 +1,49 @@
 package com.lifelover.companion159.presentation.ui.inventory.components
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.widthIn
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
+import androidx.compose.foundation.layout.*
+import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.lifelover.companion159.R
 
 /**
- * Quantity controls (-, number, +)
- * Reusable component for any quantity input
+ * Quantity controls with increment/decrement buttons
+ * Reusable component for inline quantity editing
  */
 @Composable
 fun QuantityControls(
     quantity: Int,
     onQuantityChange: (Int) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true
 ) {
     Row(
-        modifier = modifier,
         horizontalArrangement = Arrangement.spacedBy(4.dp),
-        verticalAlignment = Alignment.CenterVertically
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = modifier
     ) {
-        // Decrease button
         IconButton(
-            onClick = { if (quantity > 0) onQuantityChange(quantity - 1) },
-            enabled = quantity > 0,
+            onClick = {
+                if (quantity > 0) {
+                    onQuantityChange(quantity - 1)
+                }
+            },
+            enabled = enabled && quantity > 0,
             modifier = Modifier.size(32.dp)
         ) {
             Icon(
                 modifier = Modifier.size(20.dp),
                 painter = painterResource(R.drawable.minus_circle),
-                contentDescription = "Зменшити"
+                contentDescription = stringResource(R.string.decrease)
             )
         }
 
-        // Quantity display
         Text(
             text = quantity.toString(),
             style = MaterialTheme.typography.titleMedium,
@@ -54,15 +52,75 @@ fun QuantityControls(
             textAlign = TextAlign.Center
         )
 
-        // Increase button
         IconButton(
             onClick = { onQuantityChange(quantity + 1) },
+            enabled = enabled,
             modifier = Modifier.size(32.dp)
         ) {
             Icon(
                 modifier = Modifier.size(20.dp),
                 painter = painterResource(R.drawable.plus_circle),
-                contentDescription = "Збільшити"
+                contentDescription = stringResource(R.string.increase)
+            )
+        }
+    }
+}
+
+/**
+ * Display row for available quantity with inline controls
+ */
+@Composable
+fun AvailableQuantityRow(
+    quantity: Int,
+    onQuantityChange: (Int) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = stringResource(R.string.available_quantity) + ":",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.weight(1f)
+        )
+
+        QuantityControls(
+            quantity = quantity,
+            onQuantityChange = onQuantityChange
+        )
+    }
+}
+
+/**
+ * Display row for needed quantity (read-only)
+ * Only shown if quantity > 0
+ */
+@Composable
+fun NeededQuantityRow(
+    quantity: Int,
+    modifier: Modifier = Modifier
+) {
+    // Only show if quantity > 0
+    if (quantity > 0) {
+        Row(
+            modifier = modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = stringResource(R.string.needed_quantity) + ":",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+
+            Text(
+                text = quantity.toString(),
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Medium,
+                color = MaterialTheme.colorScheme.primary
             )
         }
     }
