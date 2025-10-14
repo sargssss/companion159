@@ -15,8 +15,11 @@ import androidx.compose.ui.unit.dp
 import com.lifelover.companion159.R
 import com.lifelover.companion159.domain.models.DisplayCategory
 import com.lifelover.companion159.domain.models.InventoryItem
+import com.lifelover.companion159.presentation.ui.inventory.components.AvailabilityOrAmmunitionLayout
 import com.lifelover.companion159.presentation.ui.inventory.components.AvailableQuantityRow
+import com.lifelover.companion159.presentation.ui.inventory.components.ItemCardActionButtons
 import com.lifelover.companion159.presentation.ui.inventory.components.NeededQuantityRow
+import com.lifelover.companion159.presentation.ui.inventory.components.NeedsLayout
 import com.lifelover.companion159.presentation.ui.inventory.components.QuantityControls
 
 /**
@@ -95,105 +98,6 @@ fun InventoryItemCard(
                     )
                 }
             }
-        }
-    }
-}
-
-/**
- * Layout for Availability and Ammunition categories
- * Shows available quantity with controls + needed quantity if > 0
- */
-@Composable
-private fun AvailabilityOrAmmunitionLayout(
-    item: InventoryItem,
-    onQuantityChange: (Int) -> Unit,
-    onEdit: () -> Unit,
-    onDelete: () -> Unit
-) {
-    Column(
-        verticalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        // Available quantity with controls
-        AvailableQuantityRow(
-            quantity = item.availableQuantity,
-            onQuantityChange = onQuantityChange
-        )
-
-        // Needed quantity (only if > 0)
-        NeededQuantityRow(quantity = item.neededQuantity)
-
-        // Action buttons
-        ActionButtons(
-            onEdit = onEdit,
-            onDelete = onDelete
-        )
-    }
-}
-
-/**
- * Layout for Needs category
- * Shows only needed quantity with controls
- */
-@Composable
-private fun NeedsLayout(
-    item: InventoryItem,
-    onQuantityChange: (Int) -> Unit,
-    onEdit: () -> Unit,
-    onDelete: () -> Unit
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        // Needed quantity controls
-        QuantityControls(
-            quantity = item.neededQuantity,
-            onQuantityChange = onQuantityChange
-        )
-
-        // Action buttons
-        ActionButtons(
-            onEdit = onEdit,
-            onDelete = onDelete
-        )
-    }
-}
-
-/**
- * Reusable action buttons component
- */
-@Composable
-private fun ActionButtons(
-    onEdit: () -> Unit,
-    onDelete: () -> Unit
-) {
-    Row(
-        horizontalArrangement = Arrangement.End,
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        IconButton(
-            onClick = onEdit,
-            modifier = Modifier.size(40.dp)
-        ) {
-            Icon(
-                imageVector = Icons.Default.Edit,
-                contentDescription = stringResource(R.string.edit),
-                modifier = Modifier.size(20.dp),
-                tint = MaterialTheme.colorScheme.primary
-            )
-        }
-
-        IconButton(
-            onClick = onDelete,
-            modifier = Modifier.size(40.dp)
-        ) {
-            Icon(
-                imageVector = Icons.Default.Delete,
-                contentDescription = stringResource(R.string.delete),
-                modifier = Modifier.size(20.dp),
-                tint = MaterialTheme.colorScheme.error
-            )
         }
     }
 }
