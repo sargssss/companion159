@@ -4,6 +4,7 @@ import android.util.Log
 import com.lifelover.companion159.data.local.dao.InventoryDao
 import com.lifelover.companion159.data.local.entities.toDomain
 import com.lifelover.companion159.data.remote.auth.SupabaseAuthService
+import com.lifelover.companion159.data.remote.sync.SyncManager
 import com.lifelover.companion159.domain.models.InventoryItem
 import com.lifelover.companion159.domain.models.toEntity
 import kotlinx.coroutines.flow.*
@@ -21,7 +22,8 @@ import javax.inject.Singleton
 class InventoryRepository @Inject constructor(
     private val dao: InventoryDao,
     private val positionRepository: PositionRepository,
-    private val authService: SupabaseAuthService
+    private val authService: SupabaseAuthService,
+    private val syncManager: SyncManager
 ) {
     companion object {
         private const val TAG = "InventoryRepository"
@@ -101,6 +103,8 @@ class InventoryRepository @Inject constructor(
         val entity = item.copy(crewName = crewName).toEntity(userId = userId)
         val insertedId = dao.insertItem(entity)
         Log.d(TAG, "✅ Item created with ID: $insertedId for user: $userId")
+
+        syncManager.syncOnDataChange()
     }
 
     suspend fun updateItem(item: InventoryItem) {
@@ -129,6 +133,8 @@ class InventoryRepository @Inject constructor(
         if (updatedRows > 0) {
             Log.d(TAG, "✅ Item updated: $updatedRows rows")
         }
+
+        syncManager.syncOnDataChange()
     }
 
     /**
@@ -155,6 +161,8 @@ class InventoryRepository @Inject constructor(
         } else {
             Log.e(TAG, "❌ Failed to update available quantity")
         }
+
+        syncManager.syncOnDataChange()
     }
 
     /**
@@ -176,6 +184,8 @@ class InventoryRepository @Inject constructor(
 
         dao.updateNeededQuantity(itemId, quantity)
         Log.d(TAG, "✅ Needed quantity updated: $itemId -> $quantity")
+
+        syncManager.syncOnDataChange()
     }
 
     /**
@@ -197,5 +207,7 @@ class InventoryRepository @Inject constructor(
 
         dao.softDeleteItem(id)
         Log.d(TAG, "✅ Item deleted: $id")
+
+        syncManager.syncOnDataChange()
     }
 }

@@ -4,9 +4,15 @@ import android.content.Context
 import com.lifelover.companion159.data.local.UserPreferences
 import com.lifelover.companion159.data.local.dao.InventoryDao
 import com.lifelover.companion159.data.local.dao.PreferencesDao
+import com.lifelover.companion159.data.local.dao.SyncQueueDao
+import com.lifelover.companion159.data.remote.SupabaseClient as AppSupabaseClient
 import com.lifelover.companion159.data.remote.auth.GoogleAuthService
 import com.lifelover.companion159.data.remote.auth.SupabaseAuthService
-import com.lifelover.companion159.data.remote.SupabaseClient
+import com.lifelover.companion159.data.remote.sync.DownloadSyncService
+import com.lifelover.companion159.data.remote.api.SupabaseInventoryApi
+import com.lifelover.companion159.data.remote.sync.SyncManager
+import com.lifelover.companion159.data.remote.sync.SyncMapper
+import com.lifelover.companion159.data.remote.sync.UploadSyncService
 import com.lifelover.companion159.data.repository.InventoryRepository
 import com.lifelover.companion159.data.repository.PositionRepository
 import dagger.Module
@@ -14,7 +20,10 @@ import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
+import io.github.jan.supabase.SupabaseClient
+import io.github.jan.supabase.auth.Auth
 import io.github.jan.supabase.auth.auth
+import io.github.jan.supabase.postgrest.Postgrest
 import io.github.jan.supabase.postgrest.postgrest
 import javax.inject.Singleton
 
@@ -28,19 +37,19 @@ object NetworkModule {
 
     @Provides
     @Singleton
-    fun provideSupabaseClient(): io.github.jan.supabase.SupabaseClient {
-        return SupabaseClient.client
+    fun provideSupabaseClient(): SupabaseClient {
+        return AppSupabaseClient.client
     }
 
     @Provides
     @Singleton
-    fun provideSupabaseAuth(client: io.github.jan.supabase.SupabaseClient): io.github.jan.supabase.auth.Auth {
+    fun provideSupabaseAuth(client: SupabaseClient): Auth {
         return client.auth
     }
 
     @Provides
     @Singleton
-    fun provideSupabasePostgrest(client: io.github.jan.supabase.SupabaseClient): io.github.jan.supabase.postgrest.Postgrest {
+    fun provideSupabasePostgrest(client: SupabaseClient): Postgrest {
         return client.postgrest
     }
 
@@ -72,9 +81,10 @@ object NetworkModule {
     @Provides
     @Singleton
     fun providePositionRepository(
-        preferencesDao: PreferencesDao
+        preferencesDao: PreferencesDao,
+        authService: SupabaseAuthService
     ): PositionRepository {
-        return PositionRepository(preferencesDao)
+        return PositionRepository(preferencesDao, authService)
     }
 
     /**
@@ -85,8 +95,57 @@ object NetworkModule {
     fun provideInventoryRepository(
         dao: InventoryDao,
         positionRepository: PositionRepository,
-        authService: SupabaseAuthService
+        authService: SupabaseAuthService,
+        syncManager: SyncManager
     ): InventoryRepository {
-        return InventoryRepository(dao, positionRepository, authService)
+        return InventoryRepository(dao, positionRepository, authService, syncManager)
+    }
+
+    @Provides
+    @Singleton
+    fun provideSyncMapper(): SyncMapper {
+        return SyncMapper
+    }
+
+    @Provides
+    @Singleton
+    fun provideSupabaseInventoryApi(
+        client: SupabaseClient
+    ): SupabaseInventoryApi {
+        return SupabaseInventoryApi(client)
+    }
+
+    @Provides
+    @Singleton
+    fun provideUploadSyncService(
+        dao: InventoryDao,
+        queueDao: SyncQueueDao,
+        api: SupabaseInventoryApi,
+        mapper: SyncMapper
+    ): UploadSyncService {
+        return UploadSyncService(dao, queueDao, api, mapper)
+    }
+
+    @Provides
+    @Singleton
+    fun provideDownloadSyncService(
+        dao: InventoryDao,
+        api: SupabaseInventoryApi,
+        mapper: SyncMapper
+    ): DownloadSyncService {
+        return DownloadSyncService(dao, api, mapper)
+    }
+
+    @Provides
+    @Singleton
+    fun provideSyncManager(
+        @ApplicationContext context: Context,
+        authService: SupabaseAuthService,
+        positionRepository: PositionRepository,
+        uploadService: UploadSyncService,
+        downloadService: DownloadSyncService,
+        queueDao: SyncQueueDao
+    ): SyncManager {
+        return SyncManager(context, authService, positionRepository, uploadService, downloadService, queueDao)
     }
 }

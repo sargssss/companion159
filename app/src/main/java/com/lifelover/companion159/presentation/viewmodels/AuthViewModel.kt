@@ -8,6 +8,7 @@ import com.lifelover.companion159.AppNavigation
 import com.lifelover.companion159.R
 import com.lifelover.companion159.data.remote.auth.SupabaseAuthService
 import com.lifelover.companion159.domain.models.AppError
+import com.lifelover.companion159.domain.models.toAppError
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -118,5 +119,25 @@ class AuthViewModel @Inject constructor(
      */
     fun clearLogoutFlag() {
         _state.update { it.copy(hasExplicitlyLoggedOut = false) }
+    }
+
+    /**
+     * Update user's crew name in Supabase metadata
+     * Call this after user selects their position
+     */
+    fun updateUserCrewName(crewName: String) {
+        viewModelScope.launch {
+            authService.updateUserCrewName(crewName).fold(
+                onSuccess = {
+                    Log.d(TAG, "✅ Crew name '$crewName' saved to Supabase metadata")
+                },
+                onFailure = { error ->
+                    Log.e(TAG, "❌ Failed to save crew name to Supabase", error)
+                    _state.update {
+                        it.copy(error = error.toAppError())
+                    }
+                }
+            )
+        }
     }
 }

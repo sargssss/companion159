@@ -38,6 +38,10 @@ class GoogleAuthService @Inject constructor(
      */
     suspend fun signInWithGoogle(activityContext: Context): Result<GoogleSignInResult> = withContext(Dispatchers.Main) {
         try {
+            Log.d(TAG, "=== GOOGLE SIGN-IN DEBUG ===")
+            Log.d(TAG, "Web Client ID: ${BuildConfig.GOOGLE_WEB_CLIENT_ID}")
+            Log.d(TAG, "Context: ${activityContext.javaClass.simpleName}")
+
             // Check if Web Client ID is configured
             if (BuildConfig.GOOGLE_WEB_CLIENT_ID.isEmpty()) {
                 Log.e(TAG, "GOOGLE_WEB_CLIENT_ID is not configured in local.properties")

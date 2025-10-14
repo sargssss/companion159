@@ -155,4 +155,58 @@ interface InventoryDao {
         id: Long,
         timestamp: Date = Date()
     ): Int
+
+    /**
+     * Get all items needing sync
+     */
+    @Query("""
+    SELECT * FROM inventory_items 
+    WHERE needsSync = 1 
+    AND isActive = 1
+    AND (userId = :userId OR userId IS NULL)
+""")
+    suspend fun getItemsNeedingSync(userId: String?): List<InventoryItemEntity>
+
+    /**
+     * Update supabaseId after successful upload
+     * Marks item as synced
+     */
+    @Query("""
+    UPDATE inventory_items 
+    SET supabaseId = :supabaseId,
+        lastSynced = :timestamp,
+        needsSync = 0
+    WHERE id = :localId
+""")
+    suspend fun updateSupabaseId(
+        localId: Long,
+        supabaseId: Long,
+        timestamp: Long = System.currentTimeMillis()
+    )
+
+    /**
+     * Mark item as synced without updating supabaseId
+     */
+    @Query("""
+    UPDATE inventory_items 
+    SET lastSynced = :timestamp,
+        needsSync = 0
+    WHERE id = :localId
+""")
+    suspend fun markAsSynced(
+        localId: Long,
+        timestamp: Long = System.currentTimeMillis()
+    )
+
+    /**
+     * Get item by supabaseId
+     * Used to find existing synced items
+     */
+    @Query("""
+    SELECT * FROM inventory_items 
+    WHERE supabaseId = :supabaseId
+    AND (userId = :userId OR userId IS NULL)
+    LIMIT 1
+""")
+    suspend fun getItemBySupabaseId(supabaseId: Long, userId: String?): InventoryItemEntity?
 }

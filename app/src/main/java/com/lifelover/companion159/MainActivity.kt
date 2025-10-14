@@ -20,7 +20,9 @@ import com.lifelover.companion159.presentation.theme.Companion159Theme
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
 import androidx.activity.viewModels
+import com.lifelover.companion159.data.remote.sync.SyncManager
 import com.lifelover.companion159.presentation.viewmodels.AuthViewModel
+import com.lifelover.companion159.workers.SyncWorker
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -28,6 +30,9 @@ class MainActivity : ComponentActivity() {
     companion object {
         private const val TAG = "MainActivity"
     }
+
+    /*@Inject
+    lateinit var syncManager: SyncManager*/
 
     @Inject
     lateinit var positionRepository: PositionRepository
@@ -42,6 +47,29 @@ class MainActivity : ComponentActivity() {
 
         // Make status bar transparent
         WindowCompat.setDecorFitsSystemWindows(window, false)
+
+        fun checkConfig() {
+            Log.d("GoogleAuthTest", "=== CONFIG CHECK ===")
+            Log.d(
+                "GoogleAuthTest",
+                "GOOGLE_WEB_CLIENT_ID exists: ${BuildConfig.GOOGLE_WEB_CLIENT_ID.isNotEmpty()}"
+            )
+            Log.d(
+                "GoogleAuthTest",
+                "GOOGLE_WEB_CLIENT_ID length: ${BuildConfig.GOOGLE_WEB_CLIENT_ID.length}"
+            )
+            Log.d(
+                "GoogleAuthTest",
+                "Ends with .apps.googleusercontent.com: ${
+                    BuildConfig.GOOGLE_WEB_CLIENT_ID.endsWith(".apps.googleusercontent.com")
+                }"
+            )
+
+            // Не логуй повний ID в production!
+            if (BuildConfig.DEBUG) {
+                Log.d("GoogleAuthTest", "ID: ${BuildConfig.GOOGLE_WEB_CLIENT_ID}")
+            }
+        }
 
         setContent {
             Companion159Theme {
@@ -77,5 +105,9 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+
+        /*SyncWorker.schedulePeriodicSync(this)
+        // Sync on startup
+        syncManager.syncOnStartup()*/
     }
 }

@@ -9,7 +9,11 @@ import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.auth.providers.Google
 import io.github.jan.supabase.auth.providers.builtin.IDToken
 import io.github.jan.supabase.auth.status.SessionStatus
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.withContext
+import kotlinx.serialization.json.buildJsonObject
+import org.slf4j.MDC.put
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -137,5 +141,54 @@ class SupabaseAuthService @Inject constructor(
      */
     fun isUserAuthenticated(): Boolean {
         return auth.currentUserOrNull() != null
+    }
+
+    /**
+     * Update user metadata with crew_name
+     * Called after user selects their position
+     *
+     * @param crewName Position name (e.g. "Барі", "Редбул", etc.)
+     */
+    /**
+     * Update user metadata with crew_name
+     * Called after user selects their position
+     *
+     * @param crewName Position name (e.g. "Барі", "Редбул", etc.)
+     */
+    suspend fun updateUserCrewName(crewName: String): Result<Unit> = withContext(Dispatchers.IO) {
+        try {
+            Log.d(TAG, "📝 Updating user metadata with crew_name: $crewName")
+
+            // Import kotlinx.serialization.json.buildJsonObject
+            // Update user metadata in Supabase
+            client.auth.updateUser {
+                data = buildJsonObject {
+                    put("crew_name", crewName)
+                }
+            }
+
+            Log.d(TAG, "✅ User metadata updated successfully")
+            Result.success(Unit)
+
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ Failed to update user metadata", e)
+            Result.failure(e)
+        }
+    }
+
+    /**
+     * Get current user's crew_name from metadata
+     * Returns null if not set
+     */
+    suspend fun getUserCrewName(): String? = withContext(Dispatchers.IO) {
+        try {
+            val session = client.auth.currentSessionOrNull()
+            val crewName = session?.user?.userMetadata?.get("crew_name") as? String
+            Log.d(TAG, "Current crew_name from metadata: $crewName")
+            crewName
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to get crew_name from metadata", e)
+            null
+        }
     }
 }

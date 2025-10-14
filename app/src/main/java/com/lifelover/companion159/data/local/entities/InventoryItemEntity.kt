@@ -24,6 +24,8 @@ data class InventoryItemEntity(
     // Category - using domain StorageCategory directly
     val category: StorageCategory,
 
+    val priority: String = "medium", //low|medium|high|urgent
+
     // User/Position context
     val userId: String? = null,
     val crewName: String,
@@ -52,6 +54,7 @@ fun InventoryItemEntity.toDomain() = InventoryItem(
     neededQuantity = neededQuantity,
     category = category,
     crewName = crewName,
+    priority = priority,
     lastModified = lastModified,
     isSynced = !needsSync
 )
