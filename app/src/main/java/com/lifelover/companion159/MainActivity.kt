@@ -1,6 +1,7 @@
 package com.lifelover.companion159
 
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -64,14 +65,13 @@ class MainActivity : ComponentActivity() {
                 ) {
                     val navController = rememberNavController()
 
-                    val currentPosition by positionRepository.currentPosition.collectAsState()
-                    val isPositionSet = !currentPosition.isNullOrBlank()
-
                     val authState by authViewModel.state.collectAsState()
+
+                    val currentPosition = positionRepository.currentPosition.collectAsState().value
 
                     AppNavigation(
                         navController = navController,
-                        isPositionSet = isPositionSet,
+                        currentPosition = currentPosition,
                         isAuthenticated = authState.isAuthenticated
                     )
                 }

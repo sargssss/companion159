@@ -6,6 +6,5 @@ import androidx.room.PrimaryKey
 @Entity(tableName = "preferences")
 data class PreferencesEntity(
     @PrimaryKey val id: Int = 1,
-    val position: String? = null,
-    val updatedAt: Long = System.currentTimeMillis()
+    val position: String? = null
 )

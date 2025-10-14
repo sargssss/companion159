@@ -76,8 +76,7 @@ val MIGRATION_7_8 = object : Migration(7, 8) {
             """
             CREATE TABLE IF NOT EXISTS preferences (
                 id INTEGER PRIMARY KEY NOT NULL,
-                position TEXT,
-                updatedAt INTEGER NOT NULL
+                position TEXT
             )
         """
         )

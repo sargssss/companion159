@@ -4,6 +4,7 @@ import kotlinx.coroutines.flow.StateFlow
 import javax.inject.Inject
 import javax.inject.Singleton
 import com.lifelover.companion159.data.local.dao.PreferencesDao
+import com.lifelover.companion159.data.local.entities.PreferencesEntity
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.SharingStarted
@@ -15,7 +16,11 @@ class PositionRepository @Inject constructor(
     private val preferencesDao: PreferencesDao
 ) {
     companion object {
-        val PREDEFINED_POSITIONS = listOf("Барі", "Редбул", "Одеса")
+        val PREDEFINED_POSITIONS = listOf(
+            "Барі",
+            "Редбул",
+            "Одеса"
+        )
     }
 
     val currentPosition: StateFlow<String?> = preferencesDao.getPreferences()
@@ -29,11 +34,17 @@ class PositionRepository @Inject constructor(
     fun getPosition(): String? = currentPosition.value
 
     suspend fun savePosition(position: String) {
-        preferencesDao.updatePosition(position.trim())
+        preferencesDao.savePreferences(
+            PreferencesEntity(
+                id = 1,
+                position = position.trim()
+            )
+        )
     }
 
     fun getAutocompleteSuggestions(input: String): List<String> {
         if (input.isBlank()) return PREDEFINED_POSITIONS
+
         return PREDEFINED_POSITIONS.filter {
             it.startsWith(input, ignoreCase = true)
         }

@@ -4,6 +4,7 @@ import android.content.Context
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.lifelover.companion159.AppNavigation
 import com.lifelover.companion159.R
 import com.lifelover.companion159.data.remote.auth.SupabaseAuthService
 import com.lifelover.companion159.domain.models.AppError
@@ -117,12 +118,5 @@ class AuthViewModel @Inject constructor(
      */
     fun clearLogoutFlag() {
         _state.update { it.copy(hasExplicitlyLoggedOut = false) }
-    }
-
-    /**
-     * Clear error state
-     */
-    fun clearError() {
-        _state.update { it.copy(error = null) }
     }
 }
