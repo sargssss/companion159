@@ -200,11 +200,30 @@ class UploadSyncService @Inject constructor(
         )
     }
 
-    // Lines 250-276: Keep the fixed batchUpdateItems method from previous version
     private suspend fun batchUpdateItems(items: List<InventoryItemEntity>): Int {
         if (items.isEmpty()) return 0
 
+        Log.d(TAG, "========================================")
+        Log.d(TAG, "batchUpdateItems() - Items BEFORE mapping:")
+        items.forEachIndexed { index, item ->
+            Log.d(TAG, "  [$index] ${item.itemName}")
+            Log.d(TAG, "      id=${item.id}, supabaseId=${item.supabaseId}")
+            Log.d(TAG, "      available=${item.availableQuantity}, needed=${item.neededQuantity}")
+            Log.d(TAG, "      needsSync=${item.needsSync}")
+        }
+        Log.d(TAG, "========================================")
+
         val dtos = items.map { mapper.entityToDto(it) }
+
+        Log.d(TAG, "========================================")
+        Log.d(TAG, "After mapping to DTOs:")
+        dtos.forEachIndexed { index, dto ->
+            Log.d(TAG, "  DTO[$index]: ${dto.itemName}")
+            Log.d(TAG, "    id=${dto.id}")
+            Log.d(TAG, "    available=${dto.availableQuantity}, needed=${dto.neededQuantity}")
+        }
+        Log.d(TAG, "========================================")
+
         val result = supabaseApi.batchUpdate(dtos)
 
         return result.fold(

@@ -27,7 +27,7 @@ object SyncMapper {
     fun entityToDto(entity: InventoryItemEntity): SupabaseInventoryItemDto {
         return SupabaseInventoryItemDto(
             id = entity.supabaseId, // null for new items
-            tenantId = 0, // Always 0 per requirements
+            tenantId = 9999, // Always 9999 per requirements
             crewName = entity.crewName,
             itemName = entity.itemName,
             availableQuantity = entity.availableQuantity,

@@ -8,7 +8,9 @@ import com.lifelover.companion159.data.remote.sync.SyncManager
 import com.lifelover.companion159.domain.models.InventoryItem
 import com.lifelover.companion159.domain.models.QuantityType
 import com.lifelover.companion159.domain.models.toEntity
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
+import java.util.Date
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -111,22 +113,51 @@ class InventoryRepository @Inject constructor(
         quantity: Int,
         quantityType: QuantityType
     ) {
+        val userId = requireUserId()
         val crewName = requireCrewName()
 
         val existingItem = dao.getItemById(itemId)
         if (existingItem == null) {
+            Log.w(TAG, "⚠️ Item $itemId not found")
             return
         }
 
         validateItemOwnership(existingItem, crewName)
 
-        val updatedRows = when (quantityType) {
-            QuantityType.AVAILABLE -> dao.updateQuantity(itemId, quantity)
-            QuantityType.NEEDED -> dao.updateNeededQuantity(itemId, quantity)
+        // Update FULL item to trigger needsSync flag
+        val updatedItem = when (quantityType) {
+            QuantityType.AVAILABLE -> existingItem.copy(
+                availableQuantity = quantity,
+                needsSync = true,
+                lastModified = Date()
+            )
+            QuantityType.NEEDED -> existingItem.copy(
+                neededQuantity = quantity,
+                needsSync = true,
+                lastModified = Date()
+            )
         }
 
+        val updatedRows = dao.updateItemWithNeeds(
+            id = updatedItem.id,
+            name = updatedItem.itemName,
+            availableQuantity = updatedItem.availableQuantity,
+            neededQuantity = updatedItem.neededQuantity,
+            category = updatedItem.category,
+            crewName = updatedItem.crewName
+        )
 
         if (updatedRows > 0) {
+            Log.d(TAG, "========================================")
+            Log.d(TAG, "✅ Item quantity updated: ${quantityType.name}=$quantity")
+            Log.d(TAG, "   Item ID: $itemId")
+            Log.d(TAG, "   Available: ${updatedItem.availableQuantity}")
+            Log.d(TAG, "   Needed: ${updatedItem.neededQuantity}")
+            Log.d(TAG, "   needsSync: ${updatedItem.needsSync}")
+            Log.d(TAG, "   crewName: ${updatedItem.crewName}")
+            Log.d(TAG, "   Calling triggerLightweightUpload()...")
+            Log.d(TAG, "========================================")
+
             triggerLightweightUpload()
         } else {
             Log.e(TAG, "❌ No rows updated!")
@@ -139,10 +170,15 @@ class InventoryRepository @Inject constructor(
         Log.d(TAG, "  canSync: $canSync")
 
         if (canSync) {
-            Log.d(TAG, "  Calling syncManager.uploadOnlySync()")
-            syncManager.uploadOnlySync()
+            viewModelScope.launch {
+                // Wait for DB transaction to complete
+                delay(100)  // 100ms delay
+
+                Log.d(TAG, "  ✅ Calling syncManager.uploadOnlySync()")
+                syncManager.uploadOnlySync()
+            }
         } else {
-            Log.d(TAG, "⏭️ Offline - changes queued")
+            Log.d(TAG, "  ⏭️ Offline - changes queued")
         }
     }
 
