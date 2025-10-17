@@ -115,14 +115,6 @@ interface InventoryDao {
     suspend fun getAllItems(userId: String?, crewName: String): List<InventoryItemEntity>
 
     @Query("""
-        SELECT * FROM inventory_items 
-        WHERE needsSync = 1 
-        AND crewName = :crewName
-        AND (userId = :userId OR userId IS NULL)
-    """)
-    suspend fun getItemsNeedingSync(userId: String?, crewName: String): List<InventoryItemEntity>
-
-    @Query("""
         UPDATE inventory_items 
         SET supabaseId = :supabaseId,
             lastSynced = :timestamp,
@@ -147,10 +139,30 @@ interface InventoryDao {
     )
 
     @Query("""
+    SELECT * FROM inventory_items 
+    WHERE needsSync = 1 
+    AND crewName = :crewName
+    AND (userId = :userId OR userId IS NULL)
+""")
+    suspend fun getItemsNeedingSync(userId: String?, crewName: String): List<InventoryItemEntity>
+
+    @Query("""
         SELECT * FROM inventory_items 
         WHERE supabaseId = :supabaseId
         AND (userId = :userId OR userId IS NULL)
         LIMIT 1
     """)
     suspend fun getItemBySupabaseId(supabaseId: Long, userId: String?): InventoryItemEntity?
+
+    /**
+     * Observe items needing sync in real-time
+     * Used by SyncOrchestrator for automatic sync
+     */
+    @Query("""
+        SELECT * FROM inventory_items 
+        WHERE needsSync = 1 
+        AND crewName = :crewName
+        AND (userId = :userId OR userId IS NULL)
+    """)
+    fun observeItemsNeedingSync(userId: String?, crewName: String): Flow<List<InventoryItemEntity>>
 }

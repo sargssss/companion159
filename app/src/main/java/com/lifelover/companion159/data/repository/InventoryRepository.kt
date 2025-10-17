@@ -4,11 +4,9 @@ import android.util.Log
 import com.lifelover.companion159.data.local.dao.InventoryDao
 import com.lifelover.companion159.data.local.entities.toDomain
 import com.lifelover.companion159.data.remote.auth.SupabaseAuthService
-import com.lifelover.companion159.data.remote.sync.SyncManager
 import com.lifelover.companion159.domain.models.InventoryItem
 import com.lifelover.companion159.domain.models.QuantityType
 import com.lifelover.companion159.domain.models.toEntity
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
 import java.util.Date
 import javax.inject.Inject
@@ -18,8 +16,7 @@ import javax.inject.Singleton
 class InventoryRepository @Inject constructor(
     private val dao: InventoryDao,
     private val positionRepository: PositionRepository,
-    private val authService: SupabaseAuthService,
-    private val syncManager: SyncManager
+    private val authService: SupabaseAuthService
 ) {
     companion object {
         private const val TAG = "InventoryRepository"
@@ -77,9 +74,7 @@ class InventoryRepository @Inject constructor(
 
         val entity = item.copy(crewName = crewName).toEntity(userId = userId)
         val insertedId = dao.insertItem(entity)
-        Log.d(TAG, "✅ Item created with ID: $insertedId")
-
-        triggerLightweightUpload()
+        Log.d(TAG, "✅ Item created with ID: $insertedId (sync will be triggered automatically)")
     }
 
     suspend fun updateItem(item: InventoryItem) {
@@ -103,8 +98,7 @@ class InventoryRepository @Inject constructor(
         )
 
         if (updatedRows > 0) {
-            Log.d(TAG, "✅ Item updated")
-            triggerLightweightUpload()
+            Log.d(TAG, "✅ Item updated (sync will be triggered automatically)")
         }
     }
 
@@ -124,7 +118,7 @@ class InventoryRepository @Inject constructor(
 
         validateItemOwnership(existingItem, crewName)
 
-        // Update FULL item to trigger needsSync flag
+        // Update item with needsSync flag
         val updatedItem = when (quantityType) {
             QuantityType.AVAILABLE -> existingItem.copy(
                 availableQuantity = quantity,
@@ -148,37 +142,9 @@ class InventoryRepository @Inject constructor(
         )
 
         if (updatedRows > 0) {
-            Log.d(TAG, "========================================")
-            Log.d(TAG, "✅ Item quantity updated: ${quantityType.name}=$quantity")
-            Log.d(TAG, "   Item ID: $itemId")
-            Log.d(TAG, "   Available: ${updatedItem.availableQuantity}")
-            Log.d(TAG, "   Needed: ${updatedItem.neededQuantity}")
-            Log.d(TAG, "   needsSync: ${updatedItem.needsSync}")
-            Log.d(TAG, "   crewName: ${updatedItem.crewName}")
-            Log.d(TAG, "   Calling triggerLightweightUpload()...")
-            Log.d(TAG, "========================================")
-
-            triggerLightweightUpload()
+            Log.d(TAG, "✅ Item quantity updated: ${quantityType.name}=$quantity (sync automatic)")
         } else {
             Log.e(TAG, "❌ No rows updated!")
-        }
-    }
-
-    private fun triggerLightweightUpload() {
-        Log.d(TAG, "triggerLightweightUpload() called")
-        val canSync = syncManager.canSync()
-        Log.d(TAG, "  canSync: $canSync")
-
-        if (canSync) {
-            viewModelScope.launch {
-                // Wait for DB transaction to complete
-                delay(100)  // 100ms delay
-
-                Log.d(TAG, "  ✅ Calling syncManager.uploadOnlySync()")
-                syncManager.uploadOnlySync()
-            }
-        } else {
-            Log.d(TAG, "  ⏭️ Offline - changes queued")
         }
     }
 
@@ -203,9 +169,7 @@ class InventoryRepository @Inject constructor(
         validateItemOwnership(existingItem, crewName)
 
         dao.softDeleteItem(id)
-        Log.d(TAG, "✅ Item deleted: $id")
-
-        triggerLightweightUpload()
+        Log.d(TAG, "✅ Item deleted: $id (sync will be triggered automatically)")
     }
 
     private fun validateItemOwnership(

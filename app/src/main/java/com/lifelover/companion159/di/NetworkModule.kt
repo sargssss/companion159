@@ -12,6 +12,7 @@ import com.lifelover.companion159.data.remote.sync.DownloadSyncService
 import com.lifelover.companion159.data.remote.api.SupabaseInventoryApi
 import com.lifelover.companion159.data.remote.sync.SyncManager
 import com.lifelover.companion159.data.remote.sync.SyncMapper
+import com.lifelover.companion159.data.remote.sync.SyncOrchestrator
 import com.lifelover.companion159.data.remote.sync.UploadSyncService
 import com.lifelover.companion159.data.repository.InventoryRepository
 import com.lifelover.companion159.data.repository.PositionRepository
@@ -27,10 +28,6 @@ import io.github.jan.supabase.postgrest.Postgrest
 import io.github.jan.supabase.postgrest.postgrest
 import javax.inject.Singleton
 
-/**
- * Provides network-related dependencies
- * Simplified: removed UseCases, direct Repository provision
- */
 @Module
 @InstallIn(SingletonComponent::class)
 object NetworkModule {
@@ -88,17 +85,17 @@ object NetworkModule {
     }
 
     /**
-     * Provide InventoryRepository directly (no interface)
+     * Provide InventoryRepository WITHOUT syncManager
+     * Sync handled by SyncOrchestrator
      */
     @Provides
     @Singleton
     fun provideInventoryRepository(
         dao: InventoryDao,
         positionRepository: PositionRepository,
-        authService: SupabaseAuthService,
-        syncManager: SyncManager
+        authService: SupabaseAuthService
     ): InventoryRepository {
-        return InventoryRepository(dao, positionRepository, authService, syncManager)
+        return InventoryRepository(dao, positionRepository, authService)
     }
 
     @Provides
@@ -136,6 +133,24 @@ object NetworkModule {
         return DownloadSyncService(dao, api, mapper)
     }
 
+    /**
+     * Provide SyncOrchestrator for automatic sync
+     */
+    @Provides
+    @Singleton
+    fun provideSyncOrchestrator(
+        @ApplicationContext context: Context,
+        dao: InventoryDao,
+        authService: SupabaseAuthService,
+        positionRepository: PositionRepository,
+        uploadService: UploadSyncService
+    ): SyncOrchestrator {
+        return SyncOrchestrator(context, dao, authService, positionRepository, uploadService)
+    }
+
+    /**
+     * Keep SyncManager for manual sync button
+     */
     @Provides
     @Singleton
     fun provideSyncManager(

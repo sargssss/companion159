@@ -9,14 +9,14 @@ import android.net.NetworkRequest
 import android.util.Log
 import androidx.hilt.work.HiltWorkerFactory
 import androidx.work.Configuration
-import com.lifelover.companion159.data.remote.sync.SyncManager
+import com.lifelover.companion159.data.remote.sync.SyncOrchestrator
 import com.lifelover.companion159.workers.SyncWorker
 import dagger.hilt.android.HiltAndroidApp
 import javax.inject.Inject
 
 /**
  * Application class for Companion159
- * Sets up Hilt dependency injection and WorkManager
+ * Sets up Hilt dependency injection and automatic sync
  */
 @HiltAndroidApp
 class CompanionApplication : Application(), Configuration.Provider {
@@ -25,7 +25,7 @@ class CompanionApplication : Application(), Configuration.Provider {
     lateinit var workerFactory: HiltWorkerFactory
 
     @Inject
-    lateinit var syncManager: SyncManager
+    lateinit var syncOrchestrator: SyncOrchestrator
 
     override val workManagerConfiguration: Configuration
         get() = Configuration.Builder()
@@ -37,6 +37,9 @@ class CompanionApplication : Application(), Configuration.Provider {
         super.onCreate()
         Log.d("CompanionApplication", "🚀 Application started")
 
+        // Start automatic sync observation
+        syncOrchestrator.startObserving()
+
         registerNetworkCallback()
     }
 
@@ -45,9 +48,8 @@ class CompanionApplication : Application(), Configuration.Provider {
 
         val networkCallback = object : ConnectivityManager.NetworkCallback() {
             override fun onAvailable(network: Network) {
-                Log.d("CompanionApplication", "📶 Network available - scheduling reconnect sync")
-                // Trigger upload of queued changes + download updates
-                syncManager.syncOnReconnect()
+                Log.d("CompanionApplication", "📶 Network available - SyncOrchestrator will handle sync")
+                // SyncOrchestrator handles sync automatically when network is available
             }
         }
 
