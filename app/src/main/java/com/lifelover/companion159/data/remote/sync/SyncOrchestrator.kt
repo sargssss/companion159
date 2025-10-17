@@ -49,7 +49,6 @@ class SyncOrchestrator @Inject constructor(
                     val position = positionRepository.getPosition()
 
                     if (userId != null && position != null) {
-                        // ✅ ВИКОРИСТОВУЄМО SyncDao
                         val items = syncDao.getItemsNeedingSync(userId, position)
 
                         if (items.isNotEmpty()) {

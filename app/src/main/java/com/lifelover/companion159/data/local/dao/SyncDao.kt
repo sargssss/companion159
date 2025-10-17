@@ -37,7 +37,6 @@ interface SyncDao {
         SELECT * FROM inventory_items 
         WHERE needsSync = 1 
         AND crewName = :crewName
-        AND (userId = :userId OR userId IS NULL)
         ORDER BY lastModified DESC
     """)
     suspend fun getItemsNeedingSync(userId: String?, crewName: String): List<InventoryItemEntity>
@@ -56,7 +55,6 @@ interface SyncDao {
         SELECT * FROM inventory_items 
         WHERE needsSync = 1 
         AND crewName = :crewName
-        AND (userId = :userId OR userId IS NULL)
         ORDER BY lastModified DESC
     """)
     fun observeItemsNeedingSync(userId: String?, crewName: String): Flow<List<InventoryItemEntity>>

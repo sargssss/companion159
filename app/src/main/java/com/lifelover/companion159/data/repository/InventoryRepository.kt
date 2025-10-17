@@ -118,33 +118,21 @@ class InventoryRepository @Inject constructor(
 
         validateItemOwnership(existingItem, crewName)
 
-        // Update item with needsSync flag
-        val updatedItem = when (quantityType) {
-            QuantityType.AVAILABLE -> existingItem.copy(
-                availableQuantity = quantity,
-                needsSync = true,
-                lastModified = Date()
-            )
-            QuantityType.NEEDED -> existingItem.copy(
-                neededQuantity = quantity,
-                needsSync = true,
-                lastModified = Date()
-            )
+        // Use appropriate DAO method based on quantity type
+        // These methods automatically set needsSync = 1
+        val updatedRows = when (quantityType) {
+            QuantityType.AVAILABLE -> {
+                dao.updateQuantity(itemId, quantity)
+            }
+            QuantityType.NEEDED -> {
+                dao.updateNeededQuantity(itemId, quantity)
+            }
         }
 
-        val updatedRows = dao.updateItemWithNeeds(
-            id = updatedItem.id,
-            name = updatedItem.itemName,
-            availableQuantity = updatedItem.availableQuantity,
-            neededQuantity = updatedItem.neededQuantity,
-            category = updatedItem.category,
-            crewName = updatedItem.crewName
-        )
-
         if (updatedRows > 0) {
-            Log.d(TAG, "✅ Item quantity updated: ${quantityType.name}=$quantity (sync automatic)")
+            Log.d(TAG, "✅ Item quantity updated: ${quantityType.name}=$quantity (sync will be triggered)")
         } else {
-            Log.e(TAG, "❌ No rows updated!")
+            Log.e(TAG, "❌ No rows updated for item $itemId!")
         }
     }
 

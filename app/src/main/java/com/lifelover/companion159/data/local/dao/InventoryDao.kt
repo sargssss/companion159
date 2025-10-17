@@ -103,6 +103,7 @@ interface InventoryDao {
 
     /**
      * Update only available quantity
+     * Sets needsSync flag to ensure synchronization
      */
     @Query("""
         UPDATE inventory_items 
@@ -119,6 +120,7 @@ interface InventoryDao {
 
     /**
      * Update only needed quantity
+     * Sets needsSync flag to ensure synchronization
      */
     @Query("""
         UPDATE inventory_items 
