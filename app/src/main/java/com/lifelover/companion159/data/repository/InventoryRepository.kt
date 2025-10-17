@@ -82,17 +82,8 @@ class InventoryRepository @Inject constructor(
 
         Log.d(TAG, "✅ Item created with ID: $insertedId")
 
-        // Enqueue INSERT operation
-        syncQueueManager.enqueueInsert(
-            localItemId = insertedId,
-            itemData = mapOf(
-                "itemName" to item.itemName,
-                "availableQuantity" to item.availableQuantity,
-                "neededQuantity" to item.neededQuantity,
-                "category" to item.category.name,
-                "crewName" to crewName
-            )
-        )
+        // Enqueue INSERT operation (only ID needed)
+        syncQueueManager.enqueueInsert(localItemId = insertedId)
     }
 
     /**
@@ -122,17 +113,10 @@ class InventoryRepository @Inject constructor(
         if (updatedRows > 0) {
             Log.d(TAG, "✅ Item updated")
 
-            // Enqueue UPDATE operation
+            // Enqueue UPDATE operation (only IDs needed)
             syncQueueManager.enqueueUpdate(
                 localItemId = item.id,
-                supabaseId = existingItem.supabaseId,
-                itemData = mapOf(
-                    "itemName" to item.itemName,
-                    "availableQuantity" to item.availableQuantity,
-                    "neededQuantity" to item.neededQuantity,
-                    "category" to item.category.name,
-                    "crewName" to crewName
-                )
+                supabaseId = existingItem.supabaseId
             )
         }
     }
@@ -169,20 +153,10 @@ class InventoryRepository @Inject constructor(
         if (updatedRows > 0) {
             Log.d(TAG, "✅ Item quantity updated: ${quantityType.name}=$quantity")
 
-            // Get updated item for queue
-            val updatedItem = dao.getItemById(itemId)!!
-
-            // Enqueue UPDATE operation
+            // Enqueue UPDATE operation (only IDs needed)
             syncQueueManager.enqueueUpdate(
                 localItemId = itemId,
-                supabaseId = existingItem.supabaseId,
-                itemData = mapOf(
-                    "itemName" to updatedItem.itemName,
-                    "availableQuantity" to updatedItem.availableQuantity,
-                    "neededQuantity" to updatedItem.neededQuantity,
-                    "category" to updatedItem.category.name,
-                    "crewName" to crewName
-                )
+                supabaseId = existingItem.supabaseId
             )
         }
     }
@@ -214,7 +188,7 @@ class InventoryRepository @Inject constructor(
         dao.softDeleteItem(id)
         Log.d(TAG, "✅ Item deleted: $id")
 
-        // Enqueue DELETE operation
+        // Enqueue DELETE operation (only IDs needed)
         syncQueueManager.enqueueDelete(
             localItemId = id,
             supabaseId = existingItem.supabaseId

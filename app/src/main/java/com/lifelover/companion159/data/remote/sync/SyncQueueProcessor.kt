@@ -9,7 +9,6 @@ import com.lifelover.companion159.data.local.entities.SyncQueueEntity
 import com.lifelover.companion159.data.remote.api.SupabaseInventoryApi
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import kotlinx.serialization.json.Json
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -20,6 +19,10 @@ import javax.inject.Singleton
  * - INSERT → upload to Supabase
  * - UPDATE → update in Supabase
  * - DELETE → soft delete in Supabase
+ *
+ * Simplified approach:
+ * - Always fetches fresh data from local DB
+ * - No serialization/deserialization needed
  */
 @Singleton
 class SyncQueueProcessor @Inject constructor(
@@ -27,8 +30,7 @@ class SyncQueueProcessor @Inject constructor(
     private val inventoryDao: InventoryDao,
     private val syncDao: SyncDao,
     private val supabaseApi: SupabaseInventoryApi,
-    private val mapper: SyncMapper,
-    private val json: Json
+    private val mapper: SyncMapper
 ) {
     companion object {
         private const val TAG = "SyncQueueProcessor"
@@ -108,6 +110,7 @@ class SyncQueueProcessor @Inject constructor(
 
     /**
      * Process INSERT operation
+     * Fetches item from DB and uploads to Supabase
      */
     private suspend fun processInsert(
         operation: SyncQueueEntity,
@@ -115,7 +118,7 @@ class SyncQueueProcessor @Inject constructor(
         crewName: String
     ): Boolean {
         try {
-            // Get local item
+            // Fetch item from DB
             val localItem = inventoryDao.getItemById(operation.localItemId)
             if (localItem == null) {
                 Log.w(TAG, "Local item not found: ${operation.localItemId}")
@@ -157,6 +160,7 @@ class SyncQueueProcessor @Inject constructor(
 
     /**
      * Process UPDATE operation
+     * Fetches item from DB and updates in Supabase
      */
     private suspend fun processUpdate(
         operation: SyncQueueEntity,
@@ -164,7 +168,7 @@ class SyncQueueProcessor @Inject constructor(
         crewName: String
     ): Boolean {
         try {
-            // Get local item
+            // Fetch item from DB
             val localItem = inventoryDao.getItemById(operation.localItemId)
             if (localItem == null) {
                 Log.w(TAG, "Local item not found: ${operation.localItemId}")

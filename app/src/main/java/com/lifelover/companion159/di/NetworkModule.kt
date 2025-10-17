@@ -125,10 +125,9 @@ object NetworkModule {
     @Singleton
     fun provideSyncQueueManager(
         syncQueueDao: SyncQueueDao,
-        json: Json,
         @ApplicationContext context: Context
     ): SyncQueueManager {
-        return SyncQueueManager(syncQueueDao, json, context)
+        return SyncQueueManager(syncQueueDao, context)
     }
 
     @Provides
@@ -138,10 +137,9 @@ object NetworkModule {
         inventoryDao: InventoryDao,
         syncDao: SyncDao,
         api: SupabaseInventoryApi,
-        mapper: SyncMapper,
-        json: Json
+        mapper: SyncMapper
     ): SyncQueueProcessor {
-        return SyncQueueProcessor(syncQueueDao, inventoryDao, syncDao, api, mapper, json)
+        return SyncQueueProcessor(syncQueueDao, inventoryDao, syncDao, api, mapper)
     }
 
     @Provides
