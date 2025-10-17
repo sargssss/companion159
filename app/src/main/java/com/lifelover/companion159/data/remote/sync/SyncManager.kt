@@ -5,6 +5,7 @@ import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.util.Log
 import com.lifelover.companion159.data.remote.auth.SupabaseAuthService
+import com.lifelover.companion159.data.repository.InventoryRepository
 import com.lifelover.companion159.data.repository.PositionRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
@@ -19,9 +20,6 @@ import kotlinx.coroutines.sync.withLock
 import javax.inject.Inject
 import javax.inject.Singleton
 
-/**
- * Sync state for UI
- */
 data class SyncState(
     val isSyncing: Boolean = false,
     val lastSyncTime: Long? = null,
@@ -29,14 +27,15 @@ data class SyncState(
 )
 
 /**
- * Manual sync manager - simplified version
+ * Simplified sync manager
  *
- * Only handles manual sync triggered by:
- * - UI sync button
- * - App startup
- * - User actions (if needed)
+ * Strategy:
+ * 1. After any DB change → trigger sync()
+ * 2. sync() uploads needsSync=1 items
+ * 3. sync() downloads server changes
+ * 4. Done
  *
- * NO automatic polling - keeps architecture simple
+ * No queues, no workers, just direct sync
  */
 @Singleton
 class SyncManager @Inject constructor(
@@ -48,7 +47,7 @@ class SyncManager @Inject constructor(
 ) {
     companion object {
         private const val TAG = "SyncManager"
-        private const val DEBOUNCE_DELAY_MS = 500L
+        private const val DEBOUNCE_DELAY_MS = 300L
     }
 
     private val syncScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -59,21 +58,31 @@ class SyncManager @Inject constructor(
     val syncState: StateFlow<SyncState> = _syncState.asStateFlow()
 
     /**
-     * Check if all conditions for sync are met
+     * Setup callback in repository
+     * Called during app initialization
+     */
+    fun setupSyncCallback(repository: InventoryRepository) {
+        repository.onNeedsSyncCallback = {
+            Log.d(TAG, "🔔 Sync triggered by repository")
+            sync()
+        }
+    }
+
+    /**
+     * Check conditions
      */
     fun canSync(): Boolean {
         val isAuthenticated = authService.isUserAuthenticated()
         val hasPosition = positionRepository.getPosition() != null
         val hasInternet = isNetworkAvailable()
 
-        Log.d(TAG, "Sync conditions: auth=$isAuthenticated, position=$hasPosition, internet=$hasInternet")
+        if (!isAuthenticated || !hasPosition || !hasInternet) {
+            Log.d(TAG, "Cannot sync: auth=$isAuthenticated, position=$hasPosition, internet=$hasInternet")
+        }
 
         return isAuthenticated && hasPosition && hasInternet
     }
 
-    /**
-     * Check if internet connection is available
-     */
     private fun isNetworkAvailable(): Boolean {
         val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
         val network = connectivityManager.activeNetwork ?: return false
@@ -83,40 +92,37 @@ class SyncManager @Inject constructor(
                 capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
     }
 
-    /**
-     * Clear sync error
-     */
     fun clearError() {
         _syncState.value = _syncState.value.copy(error = null)
     }
 
     /**
-     * Perform full bidirectional sync
+     * Main sync method
      *
-     * Features:
-     * - Deduplication (ignores rapid repeated calls)
-     * - Thread-safe (mutex)
-     * - Uploads local changes first, then downloads
+     * Flow:
+     * 1. Upload items with needsSync=1
+     * 2. Download server changes
+     * 3. Update UI state
      *
-     * @param forceFullDownload If true, downloads all items (ignores lastSyncTimestamp)
+     * Debouncing: ignores calls within 300ms
      */
     fun sync(forceFullDownload: Boolean = false) {
-        // Deduplication: skip if already syncing
+        // Skip if already syncing
         if (_syncState.value.isSyncing) {
-            Log.d(TAG, "⏭️ Sync already in progress, skipping")
+            Log.d(TAG, "⏭️ Already syncing, skipping")
             return
         }
 
-        // Debounce: skip if last sync was < 500ms ago
+        // Debounce: skip if last sync < 300ms ago
         val currentTime = System.currentTimeMillis()
         if (currentTime - lastSyncTriggerTime < DEBOUNCE_DELAY_MS) {
-            Log.d(TAG, "⏭️ Sync debounced (too soon after last sync)")
+            Log.d(TAG, "⏭️ Debounced (${currentTime - lastSyncTriggerTime}ms since last)")
             return
         }
         lastSyncTriggerTime = currentTime
 
         if (!canSync()) {
-            Log.d(TAG, "❌ Sync conditions not met")
+            Log.d(TAG, "❌ Cannot sync (no auth/position/internet)")
             return
         }
 
@@ -124,14 +130,12 @@ class SyncManager @Inject constructor(
             syncMutex.withLock {
                 try {
                     _syncState.value = SyncState(isSyncing = true)
-                    Log.d(TAG, "🔄 Starting FULL bidirectional sync...")
+                    Log.d(TAG, "🔄 Starting sync...")
 
                     val userId = authService.getUserId()
                     val crewName = positionRepository.getPosition()!!
 
-                    Log.d(TAG, "Syncing for crew: $crewName, user: $userId")
-
-                    // Step 1: Upload local changes
+                    // Step 1: Upload needsSync=1 items
                     val uploadResult = uploadService.uploadPendingChanges(userId, crewName)
                     uploadResult.fold(
                         onSuccess = { count ->
@@ -142,7 +146,7 @@ class SyncManager @Inject constructor(
                         }
                     )
 
-                    // Step 2: Download remote changes
+                    // Step 2: Download server changes
                     val downloadResult = downloadService.downloadChanges(
                         crewName = crewName,
                         userId = userId,
@@ -162,7 +166,7 @@ class SyncManager @Inject constructor(
                         lastSyncTime = System.currentTimeMillis()
                     )
 
-                    Log.d(TAG, "✅ FULL sync completed")
+                    Log.d(TAG, "✅ Sync completed")
 
                 } catch (e: Exception) {
                     Log.e(TAG, "❌ Sync failed", e)
@@ -177,20 +181,18 @@ class SyncManager @Inject constructor(
 
     /**
      * Sync on app startup
-     * Downloads all items on first launch
      */
     fun syncOnStartup() {
-        Log.d(TAG, "🚀 Sync on startup triggered")
+        Log.d(TAG, "🚀 Startup sync triggered")
         val isFirstSync = downloadService.getLastSyncTimestamp() == null
         sync(forceFullDownload = isFirstSync)
     }
 
     /**
-     * Force full sync - triggered by user button
-     * Resets timestamp and downloads everything
+     * Force full sync from UI button
      */
     fun forceFullSync() {
-        Log.d(TAG, "🔄 Force full sync triggered by user")
+        Log.d(TAG, "🔄 Force full sync triggered")
         downloadService.resetLastSyncTimestamp()
         sync(forceFullDownload = true)
     }

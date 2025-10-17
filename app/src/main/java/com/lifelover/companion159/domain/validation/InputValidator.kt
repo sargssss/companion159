@@ -126,14 +126,3 @@ object InputValidator {
         val neededQuantity: Int
     )
 }
-
-/**
- * Extension: Validate and execute
- * Convenience function for common validation + action pattern
- */
-inline fun <T> Result<T>.onValid(
-    crossinline action: (T) -> Unit
-): Result<T> {
-    onSuccess { action(it) }
-    return this
-}

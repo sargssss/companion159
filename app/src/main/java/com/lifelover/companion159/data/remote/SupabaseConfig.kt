@@ -8,7 +8,5 @@ object SupabaseConfig {
 
     val isConfigured: Boolean
         get() = SUPABASE_URL.isNotBlank() &&
-                SUPABASE_ANON_KEY.isNotBlank() &&
-                SUPABASE_URL != "\"\"" &&
-                SUPABASE_ANON_KEY != "\"\""
+                SUPABASE_ANON_KEY.isNotBlank()
 }

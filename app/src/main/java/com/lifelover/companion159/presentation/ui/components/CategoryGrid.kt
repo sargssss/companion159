@@ -19,9 +19,9 @@ import com.lifelover.companion159.domain.models.toStorageCategory
  */
 @Composable
 fun CategoryGrid(
+    modifier: Modifier = Modifier,
     categories: List<DisplayCategory> = DisplayCategory.entries,
-    onCategorySelected: (DisplayCategory) -> Unit,
-    modifier: Modifier = Modifier
+    onCategorySelected: (DisplayCategory) -> Unit
 ) {
     Column(
         modifier = modifier
@@ -34,38 +34,6 @@ fun CategoryGrid(
             CategoryCard(
                 category = category,
                 onClick = { onCategorySelected(category) }
-            )
-        }
-    }
-}
-
-/**
- * Single category card
- * Reusable component for category selection
- */
-@Composable
-fun CategoryCard(
-    category: DisplayCategory,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Card(
-        modifier = modifier
-            .fillMaxWidth()
-            .height(80.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
-        onClick = onClick
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(16.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = stringResource(category.titleRes),
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Medium
             )
         }
     }

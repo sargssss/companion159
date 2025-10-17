@@ -15,7 +15,7 @@ import javax.inject.Singleton
 
 @Singleton
 class DownloadSyncService @Inject constructor(
-    private val inventoryDao: InventoryDao,  // ← Для insertItem, updateItemWithNeeds
+    private val inventoryDao: InventoryDao,
     private val syncDao: SyncDao,
     private val supabaseApi: SupabaseInventoryApi,
     private val mapper: SyncMapper

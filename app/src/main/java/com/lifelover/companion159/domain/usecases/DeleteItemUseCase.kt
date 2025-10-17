@@ -1,15 +1,24 @@
 package com.lifelover.companion159.domain.usecases
 
 import android.util.Log
-import com.lifelover.companion159.data.remote.sync.SyncQueueManager
 import com.lifelover.companion159.data.repository.InventoryRepository
 import com.lifelover.companion159.domain.models.AppError
 import com.lifelover.companion159.domain.models.InventoryItem
 import javax.inject.Inject
 
+/**
+ * Use case for deleting inventory item
+ *
+ * Business rules:
+ * - Soft delete (isActive = false)
+ * - Item remains in database for sync
+ * - User can only delete items from their crew
+ * - Sync triggered automatically by repository
+ *
+ * @param repository Inventory repository for data persistence
+ */
 class DeleteItemUseCase @Inject constructor(
-    private val repository: InventoryRepository,
-    private val syncQueueManager: SyncQueueManager
+    private val repository: InventoryRepository
 ) {
     companion object {
         private const val TAG = "DeleteItemUseCase"
@@ -22,23 +31,13 @@ class DeleteItemUseCase @Inject constructor(
             Log.d(TAG, "Item name: '${item.itemName}'")
             Log.d(TAG, "Crew: ${item.crewName}")
 
-            // Step 1: Get supabaseId before deletion
-            val supabaseId = repository.getSupabaseId(item.id)
-
-            // Step 2: Delete from repository (soft delete - pure data operation)
-            Log.d(TAG, "Deleting from repository...")
+            // Soft delete in repository
+            // Repository will automatically trigger sync via callback
             repository.softDeleteItem(item.id)
+
             Log.d(TAG, "✅ Item soft deleted from database")
+            Log.d(TAG, "✅ Sync triggered automatically by repository")
 
-            // Step 3: Enqueue for sync (business logic)
-            Log.d(TAG, "Enqueueing for sync...")
-            syncQueueManager.enqueueDelete(
-                localItemId = item.id,
-                supabaseId = supabaseId
-            )
-            Log.d(TAG, "✅ Delete enqueued for sync")
-
-            Log.d(TAG, "✅ Delete completed successfully")
             Log.d(TAG, "============================")
             Result.success(Unit)
 

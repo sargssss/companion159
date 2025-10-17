@@ -1,7 +1,6 @@
 package com.lifelover.companion159.domain.usecases
 
 import android.util.Log
-import com.lifelover.companion159.data.remote.sync.SyncQueueManager
 import com.lifelover.companion159.data.repository.InventoryRepository
 import com.lifelover.companion159.domain.models.AppError
 import com.lifelover.companion159.domain.models.DisplayCategory
@@ -17,21 +16,12 @@ import javax.inject.Inject
  * - Name cannot be empty and must be 1-100 characters
  * - Quantities must be non-negative (0-999999)
  * - Display category determines storage category
- * - Item automatically queued for sync after creation
- *
- * Responsibilities:
- * - Validate all input fields
- * - Map display category to storage category
- * - Create domain model
- * - Delegate to repository for persistence
- * - Enqueue item for sync to server
+ * - Sync triggered automatically by repository
  *
  * @param repository Inventory repository for data persistence
- * @param syncQueueManager Sync queue manager for server synchronization
  */
 class AddItemUseCase @Inject constructor(
-    private val repository: InventoryRepository,
-    private val syncQueueManager: SyncQueueManager
+    private val repository: InventoryRepository
 ) {
     companion object {
         private const val TAG = "AddItemUseCase"
@@ -57,7 +47,6 @@ class AddItemUseCase @Inject constructor(
             validationResult.fold(
                 onSuccess = { validated ->
                     Log.d(TAG, "✅ Validation passed")
-                    Log.d(TAG, "Validated: name='${validated.name}', available=${validated.availableQuantity}, needed=${validated.neededQuantity}")
 
                     // Step 2: Map display category to storage category
                     val storageCategory = displayCategory.toStorageCategory()
@@ -70,20 +59,15 @@ class AddItemUseCase @Inject constructor(
                         availableQuantity = validated.availableQuantity,
                         neededQuantity = validated.neededQuantity,
                         category = storageCategory,
-                        crewName = "" // Will be set by repository based on current position
+                        crewName = "" // Will be set by repository
                     )
 
-                    // Step 4: Save to repository (pure data operation)
-                    Log.d(TAG, "Saving to repository...")
+                    // Step 4: Save to repository
+                    // Repository will automatically trigger sync via callback
                     val insertedId = repository.insertItem(item)
                     Log.d(TAG, "✅ Item inserted with ID: $insertedId")
+                    Log.d(TAG, "✅ Sync triggered automatically by repository")
 
-                    // Step 5: Enqueue for sync (business logic)
-                    Log.d(TAG, "Enqueueing for sync...")
-                    syncQueueManager.enqueueInsert(localItemId = insertedId)
-                    Log.d(TAG, "✅ Item enqueued for sync")
-
-                    Log.d(TAG, "✅ Add item completed successfully")
                     Log.d(TAG, "=========================")
                     Result.success(Unit)
                 },

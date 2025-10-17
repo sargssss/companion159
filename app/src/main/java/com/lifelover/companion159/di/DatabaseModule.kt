@@ -4,7 +4,6 @@ import android.content.Context
 import com.lifelover.companion159.data.local.dao.InventoryDao
 import com.lifelover.companion159.data.local.dao.PreferencesDao
 import com.lifelover.companion159.data.local.dao.SyncDao
-import com.lifelover.companion159.data.local.dao.SyncQueueDao
 import com.lifelover.companion159.data.local.database.InventoryDatabase
 import dagger.Module
 import dagger.Provides
@@ -47,13 +46,5 @@ object DatabaseModule {
         database: InventoryDatabase
     ): SyncDao {
         return database.syncDao()
-    }
-
-    @Provides
-    @Singleton
-    fun provideSyncQueueDao(
-        database: InventoryDatabase
-    ): SyncQueueDao {
-        return database.syncQueueDao()
     }
 }

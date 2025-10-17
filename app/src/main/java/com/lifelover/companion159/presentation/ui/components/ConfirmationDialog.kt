@@ -13,18 +13,6 @@ import androidx.compose.ui.unit.dp
  * Reusable confirmation dialog
  *
  * Generic component for any confirmation action
- * Can be used for logout, delete, or any other confirmation
- *
- * Example usage:
- * ```
- * ConfirmationDialog(
- *     title = "Вийти з аккаунту?",
- *     message = "Ви впевнені?",
- *     confirmText = "Вийти",
- *     onConfirm = { ... },
- *     onDismiss = { ... }
- * )
- * ```
  */
 @Composable
 fun ConfirmationDialog(
@@ -86,27 +74,5 @@ fun ConfirmationDialog(
                 Text(dismissText)
             }
         }
-    )
-}
-
-/**
- * Specialized logout confirmation dialog
- * Pre-configured for logout action
- */
-@Composable
-fun LogoutConfirmationDialog(
-    userEmail: String?,
-    onConfirm: () -> Unit,
-    onDismiss: () -> Unit
-) {
-    ConfirmationDialog(
-        title = "Вийти з облікового запису?",
-        message = "Ви впевнені, що хочете вийти?",
-        subtitle = userEmail ?: "Невідомий користувач",
-        confirmText = "Вийти",
-        icon = Icons.AutoMirrored.Filled.ExitToApp,
-        destructive = true,
-        onConfirm = onConfirm,
-        onDismiss = onDismiss
     )
 }

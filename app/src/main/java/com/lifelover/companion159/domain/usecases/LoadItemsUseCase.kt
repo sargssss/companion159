@@ -20,12 +20,6 @@ import javax.inject.Inject
  *   * Ammunition: items with availableQuantity > 0
  *   * Needs: items with neededQuantity > 0
  * - Return reactive Flow for real-time updates
- * - Empty list if no items match filters
- *
- * Responsibilities:
- * - Select correct repository method based on category
- * - Apply quantity filtering
- * - Provide reactive data stream
  *
  * Flow updates automatically when:
  * - New item added
@@ -45,11 +39,6 @@ class LoadItemsUseCase @Inject constructor(
     /**
      * Load items filtered by display category
      *
-     * Flow:
-     * 1. Select repository method based on category
-     * 2. Apply quantity filtering (only items with relevant quantity > 0)
-     * 3. Return Flow for reactive UI updates
-     *
      * Category mapping:
      * - Availability → getAvailabilityItems() → filter availableQuantity > 0
      * - Ammunition → getAmmunitionItems() → filter availableQuantity > 0
@@ -57,15 +46,13 @@ class LoadItemsUseCase @Inject constructor(
      *
      * @param displayCategory Display category to filter by
      * @return Flow<List<InventoryItem>> - reactive stream of filtered items
-     *
-     * @throws IllegalStateException if user not authenticated or position not set (from repository)
      */
     operator fun invoke(displayCategory: DisplayCategory): Flow<List<InventoryItem>> {
         Log.d(TAG, "=== LOAD ITEMS USE CASE ===")
         Log.d(TAG, "Display category: ${displayCategory.name}")
         Log.d(TAG, "Quantity type: ${displayCategory.quantityType.name}")
 
-        // Step 1: Get base flow from repository based on category
+        // Get base flow from repository based on category
         val baseFlow: Flow<List<InventoryItem>> = when (displayCategory) {
             is DisplayCategory.Availability -> {
                 Log.d(TAG, "Loading: Availability items (non-ammunition with availableQuantity > 0)")
@@ -81,7 +68,7 @@ class LoadItemsUseCase @Inject constructor(
             }
         }
 
-        // Step 2: Apply quantity filtering and logging
+        // Apply quantity filtering and logging
         return baseFlow
             .map { items ->
                 filterItemsByQuantityType(items, displayCategory.quantityType)
@@ -101,10 +88,6 @@ class LoadItemsUseCase @Inject constructor(
      * Only returns items where the relevant quantity > 0:
      * - AVAILABLE → availableQuantity > 0
      * - NEEDED → neededQuantity > 0
-     *
-     * @param items List of items to filter
-     * @param quantityType Type of quantity to check
-     * @return Filtered list of items
      */
     private fun filterItemsByQuantityType(
         items: List<InventoryItem>,

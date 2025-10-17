@@ -4,7 +4,6 @@ import android.util.Log
 import com.lifelover.companion159.data.local.dao.InventoryDao
 import com.lifelover.companion159.data.local.entities.toDomain
 import com.lifelover.companion159.data.remote.auth.SupabaseAuthService
-import com.lifelover.companion159.data.remote.sync.SyncQueueManager
 import com.lifelover.companion159.domain.models.InventoryItem
 import com.lifelover.companion159.domain.models.QuantityType
 import com.lifelover.companion159.domain.models.toEntity
@@ -13,17 +12,11 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Pure data layer - NO business logic
+ * Repository with direct sync triggering after each operation
  *
- * Responsibilities:
- * - CRUD operations on local database
- * - Data filtering and querying
- * - User/crew validation for security
- *
- * Does NOT:
- * - Validate input (Use Cases do this)
- * - Manage sync queue (Use Cases do this)
- * - Contain business rules (Use Cases do this)
+ * After every CRUD operation:
+ * 1. Update local DB with needsSync=1
+ * 2. Trigger immediate sync
  */
 @Singleton
 class InventoryRepository @Inject constructor(
@@ -35,18 +28,23 @@ class InventoryRepository @Inject constructor(
         private const val TAG = "InventoryRepository"
     }
 
-    // Helper methods for security
+    /**
+     * Sync trigger callback
+     * Set by SyncManager during initialization
+     */
+    var onNeedsSyncCallback: (() -> Unit)? = null
+
     private fun requireUserId(): String {
         return authService.getUserId()
-            ?: throw IllegalStateException("User must be authenticated to access inventory")
+            ?: throw IllegalStateException("User must be authenticated")
     }
 
     private fun requireCrewName(): String {
         return positionRepository.currentPosition.value
-            ?: throw IllegalStateException("Position must be set to access inventory")
+            ?: throw IllegalStateException("Position must be set")
     }
 
-    // Query methods (return Flows for reactive UI)
+    // Query methods
     fun getAvailabilityItems(): Flow<List<InventoryItem>> {
         return flow {
             val userId = requireUserId()
@@ -77,17 +75,8 @@ class InventoryRepository @Inject constructor(
         }
     }
 
-    suspend fun getAllItemsOnce(): List<InventoryItem> {
-        val userId = requireUserId()
-        val crewName = requireCrewName()
-        return dao.getAllItems(userId, crewName).map { it.toDomain() }
-    }
-
-    // Pure CRUD operations (no business logic)
-
     /**
-     * Insert item to database
-     * Returns generated item ID
+     * Insert item and trigger sync
      */
     suspend fun insertItem(item: InventoryItem): Long {
         val userId = requireUserId()
@@ -96,38 +85,30 @@ class InventoryRepository @Inject constructor(
         val entity = item.copy(crewName = crewName).toEntity(userId = userId)
         val insertedId = dao.insertItem(entity)
 
-        Log.d(TAG, "✅ Item inserted with ID: $insertedId")
+        Log.d(TAG, "✅ Item inserted: ID=$insertedId, triggering sync")
+
+        // Trigger sync immediately
+        onNeedsSyncCallback?.invoke()
+
         return insertedId
     }
 
     /**
-     * Get item by ID
-     */
-    suspend fun getItemById(itemId: Long): InventoryItem? {
-        val entity = dao.getItemById(itemId)
-        return entity?.toDomain()
-    }
-
-    /**
-     * Get Supabase ID for item
-     * Used by Use Cases to enqueue sync operations
-     */
-    suspend fun getSupabaseId(itemId: Long): Long? {
-        return dao.getItemById(itemId)?.supabaseId
-    }
-
-    /**
-     * Update full item (all fields)
+     * Update full item and trigger sync
+     *
+     * CRITICAL: Always updates ALL fields including quantities
+     * Even if quantity=0, we must send update to server
      */
     suspend fun updateFullItem(item: InventoryItem): Int {
         val userId = requireUserId()
         val crewName = requireCrewName()
 
         val existingItem = dao.getItemById(item.id)
-            ?: throw IllegalArgumentException("Item with ID ${item.id} does not exist")
+            ?: throw IllegalArgumentException("Item ${item.id} not found")
 
         validateItemOwnership(existingItem, crewName)
 
+        // Update with needsSync=1
         val updatedRows = dao.updateItemWithNeeds(
             id = item.id,
             name = item.itemName.trim(),
@@ -137,12 +118,19 @@ class InventoryRepository @Inject constructor(
             crewName = crewName
         )
 
-        Log.d(TAG, "✅ Item updated: $updatedRows rows")
+        Log.d(TAG, "✅ Item updated: $updatedRows rows, triggering sync")
+        Log.d(TAG, "   Quantities: available=${item.availableQuantity}, needed=${item.neededQuantity}")
+
+        onNeedsSyncCallback?.invoke()
+
         return updatedRows
     }
 
     /**
-     * Update single quantity field
+     * Update single quantity and trigger sync
+     *
+     * CRITICAL: When quantity becomes 0, still send update
+     * The other quantity might be > 0
      */
     suspend fun updateQuantity(
         itemId: Long,
@@ -153,40 +141,47 @@ class InventoryRepository @Inject constructor(
         val crewName = requireCrewName()
 
         val existingItem = dao.getItemById(itemId)
-            ?: throw IllegalArgumentException("Item with ID $itemId does not exist")
+            ?: throw IllegalArgumentException("Item $itemId not found")
 
         validateItemOwnership(existingItem, crewName)
 
+        // Update quantity with needsSync=1
         val updatedRows = when (quantityType) {
             QuantityType.AVAILABLE -> dao.updateQuantity(itemId, quantity)
             QuantityType.NEEDED -> dao.updateNeededQuantity(itemId, quantity)
         }
 
         Log.d(TAG, "✅ Quantity updated: ${quantityType.name}=$quantity")
+        Log.d(TAG, "   Item: ${existingItem.itemName} (ID=$itemId)")
+
+        // CRITICAL: Always sync even when quantity=0
+        // The item still exists and other quantity might be > 0
+        onNeedsSyncCallback?.invoke()
+
         return updatedRows
     }
 
     /**
-     * Soft delete item
+     * Soft delete and trigger sync
      */
     suspend fun softDeleteItem(itemId: Long): Int {
-        val userId = requireUserId()
         val crewName = requireCrewName()
 
         val existingItem = dao.getItemById(itemId)
-            ?: throw IllegalArgumentException("Item with ID $itemId does not exist")
+            ?: throw IllegalArgumentException("Item $itemId not found")
 
         validateItemOwnership(existingItem, crewName)
 
         val deletedRows = dao.softDeleteItem(itemId)
-        Log.d(TAG, "✅ Item soft deleted: $deletedRows rows")
+
+        Log.d(TAG, "✅ Item deleted: $deletedRows rows, triggering sync")
+
+        // Trigger sync immediately
+        onNeedsSyncCallback?.invoke()
+
         return deletedRows
     }
 
-    /**
-     * Validate that item belongs to current crew
-     * Security check to prevent cross-crew modifications
-     */
     private fun validateItemOwnership(
         item: com.lifelover.companion159.data.local.entities.InventoryItemEntity,
         crewName: String

@@ -15,6 +15,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.core.view.WindowCompat
 import androidx.navigation.compose.rememberNavController
+import com.lifelover.companion159.data.repository.InventoryRepository
 import com.lifelover.companion159.data.repository.PositionRepository
 import com.lifelover.companion159.presentation.theme.Companion159Theme
 import dagger.hilt.android.AndroidEntryPoint
@@ -36,6 +37,9 @@ class MainActivity : ComponentActivity() {
     @Inject
     lateinit var positionRepository: PositionRepository
 
+    @Inject
+    lateinit var inventoryRepository: InventoryRepository
+
     private val authViewModel: AuthViewModel by viewModels()
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -43,6 +47,9 @@ class MainActivity : ComponentActivity() {
 
         enableEdgeToEdge()
         WindowCompat.setDecorFitsSystemWindows(window, false)
+
+        // ✅ Setup sync callback
+        syncManager.setupSyncCallback(inventoryRepository)
 
         setContent {
             Companion159Theme {
@@ -72,7 +79,7 @@ class MainActivity : ComponentActivity() {
                         isAuthenticated = authState.isAuthenticated
                     )
 
-                    // Trigger manual sync after auth + position ready
+                    // Trigger startup sync
                     LaunchedEffect(authState.isAuthenticated, currentPosition) {
                         if (authState.isAuthenticated && currentPosition != null) {
                             Log.d(TAG, "✅ Auth + Position ready - triggering startup sync")

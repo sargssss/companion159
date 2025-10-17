@@ -20,7 +20,7 @@ class PositionRepository @Inject constructor(
     private val authService: SupabaseAuthService
 ) {
     companion object {
-        val TAG = "PositionRepository"
+        const val TAG = "PositionRepository"
         val PREDEFINED_POSITIONS = listOf(
             "Барі",
             "Редбул",

@@ -10,12 +10,6 @@ import kotlinx.coroutines.withContext
 import javax.inject.Inject
 import javax.inject.Singleton
 
-/**
- * API service for Supabase crew_inventory_items_duplicate table
- *
- * Provides CRUD operations with proper error handling
- * All operations run on IO dispatcher
- */
 @Singleton
 class SupabaseInventoryApi @Inject constructor(
     private val supabaseClient: SupabaseClient
@@ -25,20 +19,12 @@ class SupabaseInventoryApi @Inject constructor(
         private const val TABLE_NAME = "crew_inventory_items_duplicate"
     }
 
-    /**
-     * Fetch all items for a specific crew
-     * Used for initial sync and polling
-     *
-     * @param crewName Crew name to filter by
-     * @param updatedAfter Optional: only fetch items updated after this timestamp
-     * @return List of items or empty list on error
-     */
     suspend fun fetchItemsByCrewName(
         crewName: String,
         updatedAfter: String? = null
     ): Result<List<SupabaseInventoryItemDto>> = withContext(Dispatchers.IO) {
         try {
-            Log.d(TAG, "Fetching items for crew: $crewName, updatedAfter: $updatedAfter")
+            Log.d(TAG, "Fetching items for crew: $crewName")
 
             val query = supabaseClient.from(TABLE_NAME)
                 .select {
@@ -46,7 +32,6 @@ class SupabaseInventoryApi @Inject constructor(
                         eq("crew_name", crewName)
                         eq("is_active", true)
 
-                        // If updatedAfter provided, only fetch newer items
                         updatedAfter?.let { timestamp ->
                             gte("updated_at", timestamp)
                         }
@@ -64,38 +49,7 @@ class SupabaseInventoryApi @Inject constructor(
     }
 
     /**
-     * Insert new item to Supabase
-     * Returns inserted item with server-generated ID
-     *
-     * @param item Item to insert (id should be null)
-     * @return Inserted item with ID or null on error
-     */
-    suspend fun insertItem(item: SupabaseInventoryItemDto): Result<SupabaseInventoryItemDto> =
-        withContext(Dispatchers.IO) {
-            try {
-                Log.d(TAG, "Inserting item: ${item.itemName}")
-
-                val response = supabaseClient.from(TABLE_NAME)
-                    .insert(item) {
-                        select()
-                    }
-
-                val insertedItem = response.decodeSingle<SupabaseInventoryItemDto>()
-                Log.d(TAG, "✅ Inserted item with ID: ${insertedItem.id}")
-                Result.success(insertedItem)
-
-            } catch (e: Exception) {
-                Log.e(TAG, "❌ Failed to insert item: ${item.itemName}", e)
-                Result.failure(e)
-            }
-        }
-
-    /**
      * Update existing item in Supabase
-     * Uses server ID to identify item
-     *
-     * @param item Item to update (must have id)
-     * @return Updated item or null on error
      */
     suspend fun updateItem(item: SupabaseInventoryItemDto): Result<SupabaseInventoryItemDto> =
         withContext(Dispatchers.IO) {
@@ -122,38 +76,8 @@ class SupabaseInventoryApi @Inject constructor(
         }
 
     /**
-     * Soft delete item (set is_active = false)
-     * Does not physically delete the record
-     *
-     * @param supabaseId Server ID of item to delete
-     * @return Success or failure
-     */
-    suspend fun deleteItem(supabaseId: Long): Result<Unit> = withContext(Dispatchers.IO) {
-        try {
-            Log.d(TAG, "Soft deleting item: $supabaseId")
-
-            supabaseClient.from(TABLE_NAME)
-                .update(mapOf("is_active" to false)) {
-                    filter {
-                        eq("id", supabaseId)
-                    }
-                }
-
-            Log.d(TAG, "✅ Soft deleted item: $supabaseId")
-            Result.success(Unit)
-
-        } catch (e: Exception) {
-            Log.e(TAG, "❌ Failed to delete item: $supabaseId", e)
-            Result.failure(e)
-        }
-    }
-
-    /**
      * Batch insert multiple items
-     * More efficient than individual inserts
-     *
-     * @param items List of items to insert
-     * @return List of inserted items with IDs
+     * FIX: Create map manually to ensure tenant_id is included
      */
     suspend fun batchInsert(items: List<SupabaseInventoryItemDto>): Result<List<SupabaseInventoryItemDto>> =
         withContext(Dispatchers.IO) {
@@ -162,8 +86,33 @@ class SupabaseInventoryApi @Inject constructor(
 
                 Log.d(TAG, "Batch inserting ${items.size} items")
 
+                // ✅ Convert to Map manually to ensure all fields are included
+                val itemMaps = items.map { item ->
+                    buildMap {
+                        put("tenant_id", 9999)
+                        put("crew_name", item.crewName)
+                        put("item_name", item.itemName)
+                        put("available_quantity", item.availableQuantity)
+                        put("needed_quantity", item.neededQuantity)
+                        put("item_category", item.itemCategory)
+                        put("unit", item.unit)
+                        put("priority", item.priority)
+                        put("crew_type", item.crewType)
+                        put("description", item.description)
+                        put("notes", item.notes)
+                        put("last_need_updated_at", item.lastNeedUpdatedAt)
+                        put("needed_by", item.neededBy)
+                        put("created_by", item.createdBy)
+                        put("updated_by", item.updatedBy)
+                        put("metadata", item.metadata ?: emptyMap<String, String>())
+                        put("is_active", item.isActive)
+                        item.createdAt?.let { put("created_at", it) }
+                        item.updatedAt?.let { put("updated_at", it) }
+                    }
+                }
+
                 val response = supabaseClient.from(TABLE_NAME)
-                    .insert(items) {
+                    .insert(itemMaps) {
                         select()
                     }
 
@@ -177,13 +126,6 @@ class SupabaseInventoryApi @Inject constructor(
             }
         }
 
-    /**
-     * Batch update multiple items
-     * Updates each item individually (Supabase limitation)
-     *
-     * @param items List of items to update (must have IDs)
-     * @return Number of successfully updated items
-     */
     suspend fun batchUpdate(items: List<SupabaseInventoryItemDto>): Result<Int> =
         withContext(Dispatchers.IO) {
             try {
@@ -204,26 +146,4 @@ class SupabaseInventoryApi @Inject constructor(
                 Result.failure(e)
             }
         }
-
-    /**
-     * Check if item exists by ID
-     * Useful for conflict detection
-     */
-    suspend fun itemExists(supabaseId: Long): Result<Boolean> = withContext(Dispatchers.IO) {
-        try {
-            val response = supabaseClient.from(TABLE_NAME)
-                .select(Columns.Companion.raw("id")) {
-                    filter {
-                        eq("id", supabaseId)
-                    }
-                }
-
-            val exists = response.decodeList<Map<String, Long>>().isNotEmpty()
-            Result.success(exists)
-
-        } catch (e: Exception) {
-            Log.e(TAG, "❌ Failed to check if item exists: $supabaseId", e)
-            Result.failure(e)
-        }
-    }
 }
