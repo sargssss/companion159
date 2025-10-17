@@ -16,27 +16,14 @@ import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-/**
- * UI state for inventory screens
- * Contains list of items, loading state, and optional error
- */
 data class InventoryState(
     val items: List<InventoryItem> = emptyList(),
     val isLoading: Boolean = false,
     val error: AppError? = null,
-    val message: Int? = null, // String resource ID
+    val message: Int? = null,
     val currentDisplayCategory: DisplayCategory? = null
 )
 
-/**
- * ViewModel for inventory management
- *
- * Responsibilities:
- * - Load items filtered by display category (only relevant items)
- * - Validate input before repository calls
- * - Handle smart deletion through use case
- * - Provide reactive state via Flow
- */
 @HiltViewModel
 class InventoryViewModel @Inject constructor(
     private val repository: InventoryRepository,
@@ -46,26 +33,21 @@ class InventoryViewModel @Inject constructor(
     private val _state = MutableStateFlow(InventoryState())
     val state = _state.asStateFlow()
 
-    /**
-     * Load items based on DisplayCategory
-     * Applies smart filtering to show only relevant items
-     */
     fun loadItems(displayCategory: DisplayCategory) {
         viewModelScope.launch {
             try {
                 _state.update { it.copy(
+                    items = emptyList(),
                     isLoading = true,
                     currentDisplayCategory = displayCategory
                 )}
 
-                // Get base flow from repository
                 val baseFlow: Flow<List<InventoryItem>> = when (displayCategory) {
                     is DisplayCategory.Availability -> repository.getAvailabilityItems()
                     is DisplayCategory.Ammunition -> repository.getAmmunitionItems()
                     is DisplayCategory.Needs -> repository.getNeedsItems()
                 }
 
-                // Apply smart filtering
                 baseFlow
                     .map { items -> filterItemsByCategory(items, displayCategory) }
                     .collect { filteredItems ->
@@ -84,33 +66,20 @@ class InventoryViewModel @Inject constructor(
         }
     }
 
-    /**
-     * Filter items to show only relevant ones based on category
-     *
-     * Rules:
-     * - Availability: show only items with availableQuantity > 0
-     * - Ammunition: show only items with availableQuantity > 0
-     * - Needs: show only items with neededQuantity > 0
-     */
     private fun filterItemsByCategory(
         items: List<InventoryItem>,
         displayCategory: DisplayCategory
     ): List<InventoryItem> {
-        return when (displayCategory) {
-            is DisplayCategory.Availability,
-            is DisplayCategory.Ammunition -> {
+        return when (displayCategory.quantityType) {
+            com.lifelover.companion159.domain.models.QuantityType.AVAILABLE -> {
                 items.filter { it.availableQuantity > 0 }
             }
-            is DisplayCategory.Needs -> {
+            com.lifelover.companion159.domain.models.QuantityType.NEEDED -> {
                 items.filter { it.neededQuantity > 0 }
             }
         }
     }
 
-    /**
-     * Add new item with validation
-     * Validates all inputs before calling repository
-     */
     fun addNewItem(
         name: String,
         availableQuantity: Int,
@@ -118,7 +87,6 @@ class InventoryViewModel @Inject constructor(
         displayCategory: DisplayCategory
     ) {
         viewModelScope.launch {
-            // Validate inputs
             val validationResult = InputValidator.validateNewItem(
                 name = name,
                 availableQuantity = availableQuantity,
@@ -152,9 +120,6 @@ class InventoryViewModel @Inject constructor(
         }
     }
 
-    /**
-     * Update full item with validation
-     */
     fun updateFullItem(
         itemId: Long,
         newName: String,
@@ -163,7 +128,6 @@ class InventoryViewModel @Inject constructor(
         displayCategory: DisplayCategory
     ) {
         viewModelScope.launch {
-            // Validate inputs
             val validationResult = InputValidator.validateNewItem(
                 name = newName,
                 availableQuantity = newAvailableQuantity,
@@ -207,32 +171,22 @@ class InventoryViewModel @Inject constructor(
         }
     }
 
-    /**
-     * Update quantity based on display category
-     * Uses exhaustive when expression
-     */
     fun updateQuantity(
         itemId: Long,
         newQuantity: Int,
         displayCategory: DisplayCategory
     ) {
-        // Validate quantity
         val validationResult = InputValidator.validateQuantity(newQuantity)
 
         validationResult
             .onSuccess { validQuantity ->
                 viewModelScope.launch {
                     try {
-                        // Exhaustive when - all cases must be handled
-                        when (displayCategory) {
-                            is DisplayCategory.Availability,
-                            is DisplayCategory.Ammunition -> {
-                                repository.updateItemQuantity(itemId, validQuantity)
-                            }
-                            is DisplayCategory.Needs -> {
-                                repository.updateNeededQuantity(itemId, validQuantity)
-                            }
-                        }
+                        repository.updateSingleQuantity(
+                            itemId = itemId,
+                            quantity = validQuantity,
+                            quantityType = displayCategory.quantityType
+                        )
                     } catch (e: Exception) {
                         _state.update { it.copy(error = e.toAppError()) }
                     }
@@ -243,10 +197,6 @@ class InventoryViewModel @Inject constructor(
             }
     }
 
-    /**
-     * Smart delete using use case
-     * Handles business logic: zero-out or full delete
-     */
     fun deleteItem(item: InventoryItem) {
         viewModelScope.launch {
             val currentCategory = _state.value.currentDisplayCategory ?: return@launch

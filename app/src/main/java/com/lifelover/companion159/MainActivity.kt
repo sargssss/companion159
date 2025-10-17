@@ -20,9 +20,12 @@ import com.lifelover.companion159.presentation.theme.Companion159Theme
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
 import androidx.activity.viewModels
+import androidx.lifecycle.lifecycleScope
 import com.lifelover.companion159.data.remote.sync.SyncManager
 import com.lifelover.companion159.presentation.viewmodels.AuthViewModel
 import com.lifelover.companion159.workers.SyncWorker
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -31,8 +34,8 @@ class MainActivity : ComponentActivity() {
         private const val TAG = "MainActivity"
     }
 
-    /*@Inject
-    lateinit var syncManager: SyncManager*/
+    @Inject
+    lateinit var syncManager: SyncManager
 
     @Inject
     lateinit var positionRepository: PositionRepository
@@ -45,31 +48,18 @@ class MainActivity : ComponentActivity() {
         // Enable edge-to-edge display
         enableEdgeToEdge()
 
+        SyncWorker.schedulePeriodicSync(this)
+
+        lifecycleScope.launch {
+            authViewModel.state.first { it.isAuthenticated }
+
+            positionRepository.currentPosition.first { it != null }
+
+            syncManager.syncOnStartup()
+        }
+
         // Make status bar transparent
         WindowCompat.setDecorFitsSystemWindows(window, false)
-
-        fun checkConfig() {
-            Log.d("GoogleAuthTest", "=== CONFIG CHECK ===")
-            Log.d(
-                "GoogleAuthTest",
-                "GOOGLE_WEB_CLIENT_ID exists: ${BuildConfig.GOOGLE_WEB_CLIENT_ID.isNotEmpty()}"
-            )
-            Log.d(
-                "GoogleAuthTest",
-                "GOOGLE_WEB_CLIENT_ID length: ${BuildConfig.GOOGLE_WEB_CLIENT_ID.length}"
-            )
-            Log.d(
-                "GoogleAuthTest",
-                "Ends with .apps.googleusercontent.com: ${
-                    BuildConfig.GOOGLE_WEB_CLIENT_ID.endsWith(".apps.googleusercontent.com")
-                }"
-            )
-
-            // Не логуй повний ID в production!
-            if (BuildConfig.DEBUG) {
-                Log.d("GoogleAuthTest", "ID: ${BuildConfig.GOOGLE_WEB_CLIENT_ID}")
-            }
-        }
 
         setContent {
             Companion159Theme {
@@ -102,12 +92,16 @@ class MainActivity : ComponentActivity() {
                         currentPosition = currentPosition,
                         isAuthenticated = authState.isAuthenticated
                     )
+
+                    // Trigger full sync after auth + position are ready
+                    LaunchedEffect(authState.isAuthenticated, currentPosition) {
+                        if (authState.isAuthenticated && currentPosition != null) {
+                            Log.d(TAG, "✅ Auth + Position ready - triggering startup sync")
+                            syncManager.syncOnStartup()
+                        }
+                    }
                 }
             }
         }
-
-        /*SyncWorker.schedulePeriodicSync(this)
-        // Sync on startup
-        syncManager.syncOnStartup()*/
     }
 }

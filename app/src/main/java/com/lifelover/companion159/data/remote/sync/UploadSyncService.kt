@@ -34,40 +34,6 @@ class UploadSyncService @Inject constructor(
         private const val BATCH_SIZE = 50
     }
 
-    private val json = Json { ignoreUnknownKeys = true }
-
-    /**
-     * Upload all pending changes to Supabase
-     *
-     * Strategy:
-     * 1. Process offline queue first (FIFO order)
-     * 2. Upload items with needsSync = true
-     * 3. Update local DB after successful uploads
-     *
-     * @param userId Current user ID
-     * @return Number of successfully uploaded items
-     */
-    suspend fun uploadPendingChanges(userId: String?): Result<Int> = withContext(Dispatchers.IO) {
-        try {
-            Log.d(TAG, "🔄 Starting upload sync...")
-
-            var uploadedCount = 0
-
-            // Step 1: Process offline queue
-            uploadedCount += processOfflineQueue()
-
-            // Step 2: Upload items marked for sync
-            uploadedCount += uploadNeedsSyncItems(userId)
-
-            Log.d(TAG, "✅ Upload sync completed: $uploadedCount items")
-            Result.success(uploadedCount)
-
-        } catch (e: Exception) {
-            Log.e(TAG, "❌ Upload sync failed", e)
-            Result.failure(e)
-        }
-    }
-
     /**
      * Process operations from offline queue
      * FIFO order: oldest operations first
@@ -190,43 +156,6 @@ class UploadSyncService @Inject constructor(
         return result.isSuccess
     }
 
-    /**
-     * Upload items with needsSync = true
-     * Processes in batches for efficiency
-     */
-    private suspend fun uploadNeedsSyncItems(userId: String?): Int {
-        // Get all items needing sync
-        val allItems = inventoryDao.getAllItems(userId)
-        val needsSyncItems = allItems.filter { it.needsSync && it.isActive }
-
-        if (needsSyncItems.isEmpty()) {
-            Log.d(TAG, "No items need sync")
-            return 0
-        }
-
-        Log.d(TAG, "Uploading ${needsSyncItems.size} items needing sync")
-        var uploadedCount = 0
-
-        // Split into items with/without server IDs
-        val (itemsWithId, itemsWithoutId) = needsSyncItems.partition { it.supabaseId != null }
-
-        // Batch insert new items
-        if (itemsWithoutId.isNotEmpty()) {
-            uploadedCount += batchInsertItems(itemsWithoutId)
-        }
-
-        // Update existing items
-        if (itemsWithId.isNotEmpty()) {
-            uploadedCount += batchUpdateItems(itemsWithId)
-        }
-
-        return uploadedCount
-    }
-
-    /**
-     * Batch insert items without server IDs
-     * Updates local items with server IDs after successful insert
-     */
     private suspend fun batchInsertItems(items: List<InventoryItemEntity>): Int {
         if (items.isEmpty()) return 0
 
@@ -238,28 +167,31 @@ class UploadSyncService @Inject constructor(
             onSuccess = { insertedItems ->
                 Log.d(TAG, "✅ Server returned ${insertedItems.size} inserted items")
 
-                // Update local items with server IDs
+                var successCount = 0
+
                 insertedItems.forEachIndexed { index, dto ->
                     try {
                         val localItem = items.getOrNull(index)
                         val serverId = dto.id
 
                         if (localItem != null && serverId != null) {
-                            // Update supabaseId in local DB
                             inventoryDao.updateSupabaseId(
                                 localId = localItem.id,
                                 supabaseId = serverId
                             )
+
+                            // CRITICAL: Mark as synced
+                            inventoryDao.markAsSynced(localItem.id)
+
+                            successCount++
                             Log.d(TAG, "✅ Updated local item ${localItem.id} with server ID: $serverId")
-                        } else {
-                            Log.w(TAG, "⚠️ Cannot update item: localItem=$localItem, serverId=$serverId")
                         }
                     } catch (e: Exception) {
                         Log.e(TAG, "❌ Failed to update supabaseId for item at index $index", e)
                     }
                 }
 
-                insertedItems.size
+                successCount
             },
             onFailure = { error ->
                 Log.e(TAG, "❌ Batch insert failed", error)
@@ -267,20 +199,103 @@ class UploadSyncService @Inject constructor(
             }
         )
     }
-    /**
-     * Batch update items with server IDs
-     */
+
+    // Lines 250-276: Keep the fixed batchUpdateItems method from previous version
     private suspend fun batchUpdateItems(items: List<InventoryItemEntity>): Int {
+        if (items.isEmpty()) return 0
+
         val dtos = items.map { mapper.entityToDto(it) }
         val result = supabaseApi.batchUpdate(dtos)
 
         return result.fold(
-            onSuccess = { count ->
-                // Mark items as synced
-                // TODO: Update needsSync for successful items
-                count
+            onSuccess = { successCount ->
+                Log.d(TAG, "✅ Batch updated $successCount items")
+
+                items.forEach { item ->
+                    try {
+                        inventoryDao.markAsSynced(localId = item.id)
+                    } catch (e: Exception) {
+                        Log.e(TAG, "❌ Failed to mark item ${item.id} as synced", e)
+                    }
+                }
+
+                successCount
             },
-            onFailure = { 0 }
+            onFailure = { error ->
+                Log.e(TAG, "❌ Batch update failed", error)
+                0
+            }
         )
+    }
+
+    suspend fun uploadPendingChanges(
+        userId: String?,
+        crewName: String
+    ): Result<Int> = withContext(Dispatchers.IO) {
+        try {
+            Log.d(TAG, "========================================")
+            Log.d(TAG, "uploadPendingChanges called")
+            Log.d(TAG, "  userId: $userId")
+            Log.d(TAG, "  crewName: $crewName")
+
+            var uploadedCount = 0
+
+            Log.d(TAG, "Step 1: Processing offline queue...")
+            uploadedCount += processOfflineQueue()
+
+            Log.d(TAG, "Step 2: Uploading items with needsSync=true...")
+            uploadedCount += uploadNeedsSyncItems(userId, crewName)
+
+            Log.d(TAG, "✅ Upload completed: $uploadedCount items")
+            Log.d(TAG, "========================================")
+            Result.success(uploadedCount)
+
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ Upload failed", e)
+            Log.d(TAG, "========================================")
+            Result.failure(e)
+        }
+    }
+
+    private suspend fun uploadNeedsSyncItems(userId: String?, crewName: String): Int {
+        Log.d(TAG, "uploadNeedsSyncItems called")
+        Log.d(TAG, "  userId: $userId")
+        Log.d(TAG, "  crewName: $crewName")
+
+        val needsSyncItems = inventoryDao.getItemsNeedingSync(userId, crewName)
+
+        Log.d(TAG, "Found ${needsSyncItems.size} items with needsSync=true")
+
+        needsSyncItems.forEachIndexed { index, item ->
+            Log.d(TAG, "  [$index] Item: ${item.itemName}")
+            Log.d(TAG, "      id=${item.id}, supabaseId=${item.supabaseId}")
+            Log.d(TAG, "      available=${item.availableQuantity}, needed=${item.neededQuantity}")
+            Log.d(TAG, "      needsSync=${item.needsSync}, crewName=${item.crewName}")
+        }
+
+        if (needsSyncItems.isEmpty()) {
+            Log.d(TAG, "No items to upload")
+            return 0
+        }
+
+        var uploadedCount = 0
+
+        val (itemsWithId, itemsWithoutId) = needsSyncItems.partition { it.supabaseId != null }
+
+        Log.d(TAG, "Items with supabaseId: ${itemsWithId.size}")
+        Log.d(TAG, "Items without supabaseId: ${itemsWithoutId.size}")
+
+        if (itemsWithoutId.isNotEmpty()) {
+            Log.d(TAG, "Batch inserting ${itemsWithoutId.size} new items...")
+            uploadedCount += batchInsertItems(itemsWithoutId)
+        }
+
+        if (itemsWithId.isNotEmpty()) {
+            Log.d(TAG, "Batch updating ${itemsWithId.size} existing items...")
+            uploadedCount += batchUpdateItems(itemsWithId)
+        }
+
+        Log.d(TAG, "uploadNeedsSyncItems finished: $uploadedCount items uploaded")
+        return uploadedCount
     }
 }

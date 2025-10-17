@@ -6,18 +6,12 @@ import com.lifelover.companion159.data.local.entities.toDomain
 import com.lifelover.companion159.data.remote.auth.SupabaseAuthService
 import com.lifelover.companion159.data.remote.sync.SyncManager
 import com.lifelover.companion159.domain.models.InventoryItem
+import com.lifelover.companion159.domain.models.QuantityType
 import com.lifelover.companion159.domain.models.toEntity
 import kotlinx.coroutines.flow.*
 import javax.inject.Inject
 import javax.inject.Singleton
 
-/**
- * Repository for inventory operations
- * Simplified: no interface, uses extension functions instead of Mapper
- *
- * All operations require authenticated user
- * Works with local database only (offline-first)
- */
 @Singleton
 class InventoryRepository @Inject constructor(
     private val dao: InventoryDao,
@@ -29,97 +23,73 @@ class InventoryRepository @Inject constructor(
         private const val TAG = "InventoryRepository"
     }
 
-    /**
-     * Get current authenticated userId or throw exception
-     */
     private fun requireUserId(): String {
         return authService.getUserId()
             ?: throw IllegalStateException("User must be authenticated to access inventory")
     }
 
-    // ============================================================
-    // QUERY METHODS
-    // ============================================================
+    private fun requireCrewName(): String {
+        return positionRepository.currentPosition.value
+            ?: throw IllegalStateException("Position must be set to access inventory")
+    }
 
-    /**
-     * Get items for AVAILABILITY screen
-     * Shows EQUIPMENT with availableQuantity > 0
-     */
     fun getAvailabilityItems(): Flow<List<InventoryItem>> {
         return flow {
             val userId = requireUserId()
-            dao.getAvailabilityItems(userId).collect { entities ->
+            val crewName = requireCrewName()
+            dao.getAvailabilityItems(userId, crewName).collect { entities ->
                 emit(entities.map { it.toDomain() })
             }
         }
     }
 
-    /**
-     * Get items for AMMUNITION screen
-     * Shows AMMUNITION items
-     */
     fun getAmmunitionItems(): Flow<List<InventoryItem>> {
         return flow {
             val userId = requireUserId()
-            dao.getAmmunitionItems(userId).collect { entities ->
+            val crewName = requireCrewName()
+            dao.getAmmunitionItems(userId, crewName).collect { entities ->
                 emit(entities.map { it.toDomain() })
             }
         }
     }
 
-    /**
-     * Get items for NEEDS screen
-     * Shows all items with neededQuantity > 0
-     */
     fun getNeedsItems(): Flow<List<InventoryItem>> {
         return flow {
             val userId = requireUserId()
-            dao.getNeedsItems(userId).collect { entities ->
+            val crewName = requireCrewName()
+            dao.getNeedsItems(userId, crewName).collect { entities ->
                 emit(entities.map { it.toDomain() })
             }
         }
     }
 
-    /**
-     * Get all items (for export/analysis)
-     */
     suspend fun getAllItemsOnce(): List<InventoryItem> {
         val userId = requireUserId()
-        return dao.getAllItems(userId).map { it.toDomain() }
+        val crewName = requireCrewName()
+        return dao.getAllItems(userId, crewName).map { it.toDomain() }
     }
 
-    // ============================================================
-    // CREATE / UPDATE / DELETE
-    // ============================================================
-
-    /**
-     * Add new item
-     */
     suspend fun addItem(item: InventoryItem) {
         val userId = requireUserId()
-        val crewName = positionRepository.currentPosition.value  // ← змінено
-            ?: throw IllegalStateException("Position must be set before adding items")
+        val crewName = requireCrewName()
 
         val entity = item.copy(crewName = crewName).toEntity(userId = userId)
         val insertedId = dao.insertItem(entity)
-        Log.d(TAG, "✅ Item created with ID: $insertedId for user: $userId")
+        Log.d(TAG, "✅ Item created with ID: $insertedId")
 
-        syncManager.syncOnDataChange()
+        triggerLightweightUpload()
     }
 
     suspend fun updateItem(item: InventoryItem) {
         val userId = requireUserId()
-        val crewName = positionRepository.currentPosition.value  // ← змінено
-            ?: throw IllegalStateException("Position must be set")
+        val crewName = requireCrewName()
 
         val existingItem = dao.getItemById(item.id)
         if (existingItem == null) {
             throw IllegalArgumentException("Item with ID ${item.id} does not exist")
         }
 
-        if (existingItem.userId != userId) {
-            throw SecurityException("Cannot update item of another user")
-        }
+        validateItemOwnership(existingItem, crewName)
 
         val updatedRows = dao.updateItemWithNeeds(
             id = item.id,
@@ -131,68 +101,62 @@ class InventoryRepository @Inject constructor(
         )
 
         if (updatedRows > 0) {
-            Log.d(TAG, "✅ Item updated: $updatedRows rows")
+            Log.d(TAG, "✅ Item updated")
+            triggerLightweightUpload()
         }
-
-        syncManager.syncOnDataChange()
     }
 
-    /**
-     * Update available quantity only
-     */
-    suspend fun updateItemQuantity(itemId: Long, quantity: Int) {
-        val userId = requireUserId()
+    suspend fun updateSingleQuantity(
+        itemId: Long,
+        quantity: Int,
+        quantityType: QuantityType
+    ) {
+        val crewName = requireCrewName()
 
         val existingItem = dao.getItemById(itemId)
         if (existingItem == null) {
-            Log.e(TAG, "❌ Item with ID $itemId does NOT exist")
             return
         }
 
-        // Ensure user owns this item
-        if (existingItem.userId != userId) {
-            throw SecurityException("Cannot update item of another user")
+        validateItemOwnership(existingItem, crewName)
+
+        val updatedRows = when (quantityType) {
+            QuantityType.AVAILABLE -> dao.updateQuantity(itemId, quantity)
+            QuantityType.NEEDED -> dao.updateNeededQuantity(itemId, quantity)
         }
 
-        val updatedRows = dao.updateQuantity(itemId, quantity)
 
         if (updatedRows > 0) {
-            Log.d(TAG, "✅ Available quantity updated: $itemId -> $quantity")
+            triggerLightweightUpload()
         } else {
-            Log.e(TAG, "❌ Failed to update available quantity")
+            Log.e(TAG, "❌ No rows updated!")
         }
-
-        syncManager.syncOnDataChange()
     }
 
-    /**
-     * Update needed quantity only
-     */
+    private fun triggerLightweightUpload() {
+        Log.d(TAG, "triggerLightweightUpload() called")
+        val canSync = syncManager.canSync()
+        Log.d(TAG, "  canSync: $canSync")
+
+        if (canSync) {
+            Log.d(TAG, "  Calling syncManager.uploadOnlySync()")
+            syncManager.uploadOnlySync()
+        } else {
+            Log.d(TAG, "⏭️ Offline - changes queued")
+        }
+    }
+
+    suspend fun updateItemQuantity(itemId: Long, quantity: Int) {
+        updateSingleQuantity(itemId, quantity, QuantityType.AVAILABLE)
+    }
+
     suspend fun updateNeededQuantity(itemId: Long, quantity: Int) {
-        val userId = requireUserId()
-
-        val existingItem = dao.getItemById(itemId)
-        if (existingItem == null) {
-            Log.e(TAG, "❌ Item $itemId not found")
-            return
-        }
-
-        // Ensure user owns this item
-        if (existingItem.userId != userId) {
-            throw SecurityException("Cannot update item of another user")
-        }
-
-        dao.updateNeededQuantity(itemId, quantity)
-        Log.d(TAG, "✅ Needed quantity updated: $itemId -> $quantity")
-
-        syncManager.syncOnDataChange()
+        updateSingleQuantity(itemId, quantity, QuantityType.NEEDED)
     }
 
-    /**
-     * Delete item (soft delete)
-     */
     suspend fun deleteItem(id: Long) {
         val userId = requireUserId()
+        val crewName = requireCrewName()
 
         val existingItem = dao.getItemById(id)
         if (existingItem == null) {
@@ -200,14 +164,20 @@ class InventoryRepository @Inject constructor(
             return
         }
 
-        // Ensure user owns this item
-        if (existingItem.userId != userId) {
-            throw SecurityException("Cannot delete item of another user")
-        }
+        validateItemOwnership(existingItem, crewName)
 
         dao.softDeleteItem(id)
         Log.d(TAG, "✅ Item deleted: $id")
 
-        syncManager.syncOnDataChange()
+        triggerLightweightUpload()
+    }
+
+    private fun validateItemOwnership(
+        item: com.lifelover.companion159.data.local.entities.InventoryItemEntity,
+        crewName: String
+    ) {
+        if (item.crewName != crewName) {
+            throw SecurityException("Cannot modify item from different crew")
+        }
     }
 }

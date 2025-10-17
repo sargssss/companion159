@@ -76,6 +76,7 @@ fun AppNavigation(
         composable<Position> {
             PositionScreen(
                 onPositionSaved = {
+                    // Navigate to main menu
                     navController.navigate(MainMenu) {
                         popUpTo(Position) { inclusive = true }
                     }
@@ -113,7 +114,11 @@ fun AppNavigation(
                     }
                 },
                 onChangePosition = {
-                    navController.navigate(Position)
+                    // When changing position, navigate to Position screen
+                    navController.navigate(Position) {
+                        // Don't remove MainMenu from back stack
+                        // User can go back if they cancel
+                    }
                 }
             )
         }
