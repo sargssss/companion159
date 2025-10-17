@@ -37,27 +37,10 @@ interface SyncDao {
         SELECT * FROM inventory_items 
         WHERE needsSync = 1 
         AND crewName = :crewName
+        AND (userId = :userId OR userId IS NULL)
         ORDER BY lastModified DESC
     """)
     suspend fun getItemsNeedingSync(userId: String?, crewName: String): List<InventoryItemEntity>
-
-    /**
-     * Observe items needing sync in real-time
-     *
-     * Flow-based version for reactive sync
-     * Emits whenever items with needsSync=1 change
-     *
-     * @param userId Current user ID
-     * @param crewName Crew name to filter by
-     * @return Flow of items needing sync
-     */
-    @Query("""
-        SELECT * FROM inventory_items 
-        WHERE needsSync = 1 
-        AND crewName = :crewName
-        ORDER BY lastModified DESC
-    """)
-    fun observeItemsNeedingSync(userId: String?, crewName: String): Flow<List<InventoryItemEntity>>
 
     /**
      * Get count of items needing sync
@@ -75,23 +58,6 @@ interface SyncDao {
         AND (userId = :userId OR userId IS NULL)
     """)
     suspend fun getPendingSyncCount(userId: String?, crewName: String): Int
-
-    /**
-     * Observe pending sync count in real-time
-     *
-     * Flow-based version for UI indicators
-     *
-     * @param userId Current user ID
-     * @param crewName Crew name to filter by
-     * @return Flow of pending sync count
-     */
-    @Query("""
-        SELECT COUNT(*) FROM inventory_items 
-        WHERE needsSync = 1 
-        AND crewName = :crewName
-        AND (userId = :userId OR userId IS NULL)
-    """)
-    fun observePendingSyncCount(userId: String?, crewName: String): Flow<Int>
 
     /**
      * Mark item as synced

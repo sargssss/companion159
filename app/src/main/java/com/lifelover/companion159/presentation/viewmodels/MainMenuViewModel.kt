@@ -43,4 +43,11 @@ class MainMenuViewModel @Inject constructor(
             syncManager.forceFullSync()
         }
     }
+
+    /**
+     * Clear sync error message
+     */
+    fun clearError() {
+        syncManager.clearError()
+    }
 }

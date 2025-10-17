@@ -4,11 +4,11 @@ import android.util.Log
 import com.lifelover.companion159.data.local.dao.InventoryDao
 import com.lifelover.companion159.data.local.entities.toDomain
 import com.lifelover.companion159.data.remote.auth.SupabaseAuthService
+import com.lifelover.companion159.data.remote.sync.SyncQueueManager
 import com.lifelover.companion159.domain.models.InventoryItem
 import com.lifelover.companion159.domain.models.QuantityType
 import com.lifelover.companion159.domain.models.toEntity
 import kotlinx.coroutines.flow.*
-import java.util.Date
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -16,7 +16,8 @@ import javax.inject.Singleton
 class InventoryRepository @Inject constructor(
     private val dao: InventoryDao,
     private val positionRepository: PositionRepository,
-    private val authService: SupabaseAuthService
+    private val authService: SupabaseAuthService,
+    private val syncQueueManager: SyncQueueManager
 ) {
     companion object {
         private const val TAG = "InventoryRepository"
@@ -68,15 +69,36 @@ class InventoryRepository @Inject constructor(
         return dao.getAllItems(userId, crewName).map { it.toDomain() }
     }
 
+    /**
+     * Add new item
+     * Automatically enqueues INSERT operation for sync
+     */
     suspend fun addItem(item: InventoryItem) {
         val userId = requireUserId()
         val crewName = requireCrewName()
 
         val entity = item.copy(crewName = crewName).toEntity(userId = userId)
         val insertedId = dao.insertItem(entity)
-        Log.d(TAG, "✅ Item created with ID: $insertedId (sync will be triggered automatically)")
+
+        Log.d(TAG, "✅ Item created with ID: $insertedId")
+
+        // Enqueue INSERT operation
+        syncQueueManager.enqueueInsert(
+            localItemId = insertedId,
+            itemData = mapOf(
+                "itemName" to item.itemName,
+                "availableQuantity" to item.availableQuantity,
+                "neededQuantity" to item.neededQuantity,
+                "category" to item.category.name,
+                "crewName" to crewName
+            )
+        )
     }
 
+    /**
+     * Update item with all fields
+     * Automatically enqueues UPDATE operation for sync
+     */
     suspend fun updateItem(item: InventoryItem) {
         val userId = requireUserId()
         val crewName = requireCrewName()
@@ -98,10 +120,27 @@ class InventoryRepository @Inject constructor(
         )
 
         if (updatedRows > 0) {
-            Log.d(TAG, "✅ Item updated (sync will be triggered automatically)")
+            Log.d(TAG, "✅ Item updated")
+
+            // Enqueue UPDATE operation
+            syncQueueManager.enqueueUpdate(
+                localItemId = item.id,
+                supabaseId = existingItem.supabaseId,
+                itemData = mapOf(
+                    "itemName" to item.itemName,
+                    "availableQuantity" to item.availableQuantity,
+                    "neededQuantity" to item.neededQuantity,
+                    "category" to item.category.name,
+                    "crewName" to crewName
+                )
+            )
         }
     }
 
+    /**
+     * Update single quantity
+     * Automatically enqueues UPDATE operation for sync
+     */
     suspend fun updateSingleQuantity(
         itemId: Long,
         quantity: Int,
@@ -118,8 +157,6 @@ class InventoryRepository @Inject constructor(
 
         validateItemOwnership(existingItem, crewName)
 
-        // Use appropriate DAO method based on quantity type
-        // These methods automatically set needsSync = 1
         val updatedRows = when (quantityType) {
             QuantityType.AVAILABLE -> {
                 dao.updateQuantity(itemId, quantity)
@@ -130,9 +167,23 @@ class InventoryRepository @Inject constructor(
         }
 
         if (updatedRows > 0) {
-            Log.d(TAG, "✅ Item quantity updated: ${quantityType.name}=$quantity (sync will be triggered)")
-        } else {
-            Log.e(TAG, "❌ No rows updated for item $itemId!")
+            Log.d(TAG, "✅ Item quantity updated: ${quantityType.name}=$quantity")
+
+            // Get updated item for queue
+            val updatedItem = dao.getItemById(itemId)!!
+
+            // Enqueue UPDATE operation
+            syncQueueManager.enqueueUpdate(
+                localItemId = itemId,
+                supabaseId = existingItem.supabaseId,
+                itemData = mapOf(
+                    "itemName" to updatedItem.itemName,
+                    "availableQuantity" to updatedItem.availableQuantity,
+                    "neededQuantity" to updatedItem.neededQuantity,
+                    "category" to updatedItem.category.name,
+                    "crewName" to crewName
+                )
+            )
         }
     }
 
@@ -144,6 +195,10 @@ class InventoryRepository @Inject constructor(
         updateSingleQuantity(itemId, quantity, QuantityType.NEEDED)
     }
 
+    /**
+     * Soft delete item
+     * Automatically enqueues DELETE operation for sync
+     */
     suspend fun deleteItem(id: Long) {
         val userId = requireUserId()
         val crewName = requireCrewName()
@@ -157,7 +212,13 @@ class InventoryRepository @Inject constructor(
         validateItemOwnership(existingItem, crewName)
 
         dao.softDeleteItem(id)
-        Log.d(TAG, "✅ Item deleted: $id (sync will be triggered automatically)")
+        Log.d(TAG, "✅ Item deleted: $id")
+
+        // Enqueue DELETE operation
+        syncQueueManager.enqueueDelete(
+            localItemId = id,
+            supabaseId = existingItem.supabaseId
+        )
     }
 
     private fun validateItemOwnership(

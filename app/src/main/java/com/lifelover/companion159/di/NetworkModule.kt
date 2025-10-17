@@ -13,7 +13,8 @@ import com.lifelover.companion159.data.remote.sync.DownloadSyncService
 import com.lifelover.companion159.data.remote.api.SupabaseInventoryApi
 import com.lifelover.companion159.data.remote.sync.SyncManager
 import com.lifelover.companion159.data.remote.sync.SyncMapper
-import com.lifelover.companion159.data.remote.sync.SyncOrchestrator
+import com.lifelover.companion159.data.remote.sync.SyncQueueManager
+import com.lifelover.companion159.data.remote.sync.SyncQueueProcessor
 import com.lifelover.companion159.data.remote.sync.UploadSyncService
 import com.lifelover.companion159.data.repository.InventoryRepository
 import com.lifelover.companion159.data.repository.PositionRepository
@@ -27,6 +28,7 @@ import io.github.jan.supabase.auth.Auth
 import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.postgrest.Postgrest
 import io.github.jan.supabase.postgrest.postgrest
+import kotlinx.serialization.json.Json
 import javax.inject.Singleton
 
 @Module
@@ -85,20 +87,6 @@ object NetworkModule {
         return PositionRepository(preferencesDao, authService)
     }
 
-    /**
-     * Provide InventoryRepository WITHOUT syncManager
-     * Sync handled by SyncOrchestrator
-     */
-    @Provides
-    @Singleton
-    fun provideInventoryRepository(
-        dao: InventoryDao,
-        positionRepository: PositionRepository,
-        authService: SupabaseAuthService
-    ): InventoryRepository {
-        return InventoryRepository(dao, positionRepository, authService)
-    }
-
     @Provides
     @Singleton
     fun provideSyncMapper(): SyncMapper {
@@ -124,18 +112,46 @@ object NetworkModule {
         return DownloadSyncService(inventoryDao, syncDao, api, mapper)
     }
 
-    /**
-     * Provide SyncOrchestrator for automatic sync
-     */
     @Provides
     @Singleton
-    fun provideSyncOrchestrator(
-        @ApplicationContext context: Context,
+    fun provideJson(): Json {
+        return Json {
+            ignoreUnknownKeys = true
+            encodeDefaults = true
+        }
+    }
+
+    @Provides
+    @Singleton
+    fun provideSyncQueueManager(
+        syncQueueDao: SyncQueueDao,
+        json: Json,
+        @ApplicationContext context: Context
+    ): SyncQueueManager {
+        return SyncQueueManager(syncQueueDao, json, context)
+    }
+
+    @Provides
+    @Singleton
+    fun provideSyncQueueProcessor(
+        syncQueueDao: SyncQueueDao,
+        inventoryDao: InventoryDao,
         syncDao: SyncDao,
-        authService: SupabaseAuthService,
+        api: SupabaseInventoryApi,
+        mapper: SyncMapper,
+        json: Json
+    ): SyncQueueProcessor {
+        return SyncQueueProcessor(syncQueueDao, inventoryDao, syncDao, api, mapper, json)
+    }
+
+    @Provides
+    @Singleton
+    fun provideInventoryRepository(
+        dao: InventoryDao,
         positionRepository: PositionRepository,
-        uploadService: UploadSyncService
-    ): SyncOrchestrator {
-        return SyncOrchestrator(context, syncDao, authService, positionRepository, uploadService)
+        authService: SupabaseAuthService,
+        syncQueueManager: SyncQueueManager
+    ): InventoryRepository {
+        return InventoryRepository(dao, positionRepository, authService, syncQueueManager)
     }
 }
