@@ -8,6 +8,7 @@ import androidx.room.TypeConverters
 import com.lifelover.companion159.data.local.entities.Converters
 import com.lifelover.companion159.data.local.dao.InventoryDao
 import com.lifelover.companion159.data.local.dao.PreferencesDao
+import com.lifelover.companion159.data.local.dao.SyncDao
 import com.lifelover.companion159.data.local.dao.SyncQueueDao
 import com.lifelover.companion159.data.local.entities.InventoryItemEntity
 import com.lifelover.companion159.data.local.entities.PreferencesEntity
@@ -19,7 +20,7 @@ import com.lifelover.companion159.data.local.entities.SyncQueueEntity
         PreferencesEntity::class,
         SyncQueueEntity::class
     ],
-    version = 1,  // increment version
+    version = 1,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -28,6 +29,8 @@ abstract class InventoryDatabase : RoomDatabase() {
     abstract fun inventoryDao(): InventoryDao
 
     abstract fun preferencesDao(): PreferencesDao
+
+    abstract fun syncDao(): SyncDao
 
     abstract fun syncQueueDao(): SyncQueueDao
 

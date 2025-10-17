@@ -4,7 +4,7 @@ import android.content.Context
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.util.Log
-import com.lifelover.companion159.data.local.dao.InventoryDao
+import com.lifelover.companion159.data.local.dao.SyncDao
 import com.lifelover.companion159.data.remote.auth.SupabaseAuthService
 import com.lifelover.companion159.data.repository.PositionRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -16,18 +16,12 @@ import javax.inject.Singleton
 /**
  * Orchestrates automatic synchronization based on database changes
  *
- * Strategy:
- * - Observes items with needsSync=true via Flow
- * - Debounces rapid changes (500ms)
- * - Only uploads when online + authenticated + position set
- * - Runs on dedicated coroutine scope
- *
- * Call startObserving() once from Application.onCreate()
+ * Uses SyncDao for sync-specific queries
  */
 @Singleton
 class SyncOrchestrator @Inject constructor(
     @ApplicationContext private val context: Context,
-    private val dao: InventoryDao,
+    private val syncDao: SyncDao,
     private val authService: SupabaseAuthService,
     private val positionRepository: PositionRepository,
     private val uploadService: UploadSyncService
@@ -35,73 +29,87 @@ class SyncOrchestrator @Inject constructor(
     companion object {
         private const val TAG = "SyncOrchestrator"
         private const val DEBOUNCE_MS = 500L
+        private const val POLL_INTERVAL_MS = 1000L
     }
 
-    // Dedicated scope for sync operations
     private val syncScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     private val _isSyncing = MutableStateFlow(false)
     val isSyncing: StateFlow<Boolean> = _isSyncing.asStateFlow()
 
-    /**
-     * Start observing database changes and trigger sync
-     * Call this once from Application.onCreate()
-     */
     @OptIn(FlowPreview::class)
     fun startObserving() {
         syncScope.launch {
             Log.d(TAG, "🔄 Starting sync observation...")
 
-            // Combine all required conditions
+            // Create a Flow that polls for items needing sync
+            val itemsNeedingSyncFlow = flow {
+                while (true) {
+                    val userId = authService.getUserId()
+                    val position = positionRepository.getPosition()
+
+                    if (userId != null && position != null) {
+                        // ✅ ВИКОРИСТОВУЄМО SyncDao
+                        val items = syncDao.getItemsNeedingSync(userId, position)
+
+                        if (items.isNotEmpty()) {
+                            Log.d(TAG, "📋 Found ${items.size} items needing sync:")
+                            items.forEach { item ->
+                                Log.d(
+                                    TAG,
+                                    "  - ${item.itemName}: available=${item.availableQuantity}, needed=${item.neededQuantity}, isActive=${item.isActive}"
+                                )
+                            }
+                        }
+
+                        emit(items)
+                    } else {
+                        emit(emptyList())
+                    }
+
+                    delay(POLL_INTERVAL_MS)
+                }
+            }
+                .distinctUntilChanged()
+                .debounce(DEBOUNCE_MS)
+
             combine(
                 authService.isAuthenticated,
                 positionRepository.currentPosition,
-                flow {
-                    // Poll for items needing sync every second
-                    while (true) {
-                        val userId = authService.getUserId()
-                        val position = positionRepository.getPosition()
-
-                        if (userId != null && position != null) {
-                            val items = dao.getItemsNeedingSync(userId, position)
-                            emit(items)
-                        } else {
-                            emit(emptyList())
-                        }
-
-                        delay(1000) // Check every second
-                    }
-                }
+                itemsNeedingSyncFlow
             ) { isAuth, position, items ->
                 SyncTrigger(isAuth, position, items)
             }
-                .debounce(DEBOUNCE_MS) // Wait 500ms after last change
                 .filter { trigger ->
-                    // Only sync if all conditions met
-                    trigger.isAuthenticated &&
+                    val canSync = trigger.isAuthenticated &&
                             trigger.position != null &&
                             trigger.itemsNeedingSync.isNotEmpty() &&
                             isNetworkAvailable()
+
+                    if (!canSync) {
+                        if (trigger.itemsNeedingSync.isNotEmpty()) {
+                            Log.d(
+                                TAG,
+                                "⏸️ Cannot sync yet: auth=${trigger.isAuthenticated}, position=${trigger.position != null}, network=${isNetworkAvailable()}"
+                            )
+                        }
+                    }
+
+                    canSync
                 }
                 .collect { trigger ->
-                    Log.d(TAG, "🔄 Auto-sync triggered: ${trigger.itemsNeedingSync.size} items")
+                    Log.d(TAG, "🚀 Auto-sync triggered: ${trigger.itemsNeedingSync.size} items")
                     performUploadSync(trigger.position!!)
                 }
         }
     }
 
-    /**
-     * Data class for sync trigger conditions
-     */
     private data class SyncTrigger(
         val isAuthenticated: Boolean,
         val position: String?,
         val itemsNeedingSync: List<com.lifelover.companion159.data.local.entities.InventoryItemEntity>
     )
 
-    /**
-     * Perform upload synchronization
-     */
     private suspend fun performUploadSync(crewName: String) {
         if (_isSyncing.value) {
             Log.d(TAG, "⏭️ Sync already in progress")
@@ -110,6 +118,7 @@ class SyncOrchestrator @Inject constructor(
 
         try {
             _isSyncing.value = true
+            Log.d(TAG, "⬆️ Starting upload sync...")
 
             val userId = authService.getUserId()
             uploadService.uploadPendingChanges(userId, crewName)
@@ -117,7 +126,7 @@ class SyncOrchestrator @Inject constructor(
                     Log.d(TAG, "✅ Auto-sync completed: $count items uploaded")
                 }
                 .onFailure { error ->
-                    Log.e(TAG, "❌ Auto-sync failed: ${error.message}")
+                    Log.e(TAG, "❌ Auto-sync failed: ${error.message}", error)
                 }
 
         } finally {
@@ -125,11 +134,9 @@ class SyncOrchestrator @Inject constructor(
         }
     }
 
-    /**
-     * Check network availability
-     */
     private fun isNetworkAvailable(): Boolean {
-        val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+        val connectivityManager =
+            context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
         val network = connectivityManager.activeNetwork ?: return false
         val capabilities = connectivityManager.getNetworkCapabilities(network) ?: return false
 
@@ -137,9 +144,6 @@ class SyncOrchestrator @Inject constructor(
                 capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
     }
 
-    /**
-     * Stop observing (call from Application.onDestroy if needed)
-     */
     fun stopObserving() {
         syncScope.cancel()
         Log.d(TAG, "Sync orchestrator stopped")

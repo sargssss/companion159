@@ -20,12 +20,8 @@ import com.lifelover.companion159.presentation.theme.Companion159Theme
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
 import androidx.activity.viewModels
-import androidx.lifecycle.lifecycleScope
 import com.lifelover.companion159.data.remote.sync.SyncManager
 import com.lifelover.companion159.presentation.viewmodels.AuthViewModel
-import com.lifelover.companion159.workers.SyncWorker
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.launch
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -45,20 +41,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Enable edge-to-edge display
         enableEdgeToEdge()
-
-        SyncWorker.schedulePeriodicSync(this)
-
-        lifecycleScope.launch {
-            authViewModel.state.first { it.isAuthenticated }
-
-            positionRepository.currentPosition.first { it != null }
-
-            syncManager.syncOnStartup()
-        }
-
-        // Make status bar transparent
         WindowCompat.setDecorFitsSystemWindows(window, false)
 
         setContent {
@@ -66,11 +49,9 @@ class MainActivity : ComponentActivity() {
                 val darkTheme = isSystemInDarkTheme()
 
                 SideEffect {
-                    // Set status bar to transparent with appropriate icons
                     window.statusBarColor = Color.Transparent.toArgb()
                     window.navigationBarColor = Color.Transparent.toArgb()
 
-                    // Set light/dark status bar icons based on theme
                     WindowCompat.getInsetsController(window, window.decorView).apply {
                         isAppearanceLightStatusBars = !darkTheme
                         isAppearanceLightNavigationBars = !darkTheme
@@ -82,9 +63,7 @@ class MainActivity : ComponentActivity() {
                     color = MaterialTheme.colorScheme.background
                 ) {
                     val navController = rememberNavController()
-
                     val authState by authViewModel.state.collectAsState()
-
                     val currentPosition = positionRepository.currentPosition.collectAsState().value
 
                     AppNavigation(
@@ -93,7 +72,7 @@ class MainActivity : ComponentActivity() {
                         isAuthenticated = authState.isAuthenticated
                     )
 
-                    // Trigger full sync after auth + position are ready
+                    // Trigger manual sync after auth + position ready
                     LaunchedEffect(authState.isAuthenticated, currentPosition) {
                         if (authState.isAuthenticated && currentPosition != null) {
                             Log.d(TAG, "✅ Auth + Position ready - triggering startup sync")

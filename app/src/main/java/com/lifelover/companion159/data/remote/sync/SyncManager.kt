@@ -4,10 +4,7 @@ import android.content.Context
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.util.Log
-import com.lifelover.companion159.data.local.dao.SyncQueueDao
-import com.lifelover.companion159.data.local.entities.InventoryItemEntity
 import com.lifelover.companion159.data.remote.auth.SupabaseAuthService
-import com.lifelover.companion159.data.remote.dto.SupabaseInventoryItemDto
 import com.lifelover.companion159.data.repository.PositionRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
@@ -30,21 +27,15 @@ data class SyncState(
 )
 
 /**
- * Central sync manager
+ * Manual sync manager
  *
- * Coordinates all sync operations between local Room DB and Supabase
+ * Handles manual sync operations triggered by UI buttons
+ * Automatic sync handled by SyncOrchestrator
  *
  * Responsibilities:
- * - Check sync conditions (auth + position + network)
- * - Orchestrate upload and download sync
- * - Manage sync state
- * - Handle offline queue
- *
- * Sync triggers:
- * - App startup (if conditions met)
- * - Data changes (instant)
- * - Network reconnection
- * - Periodic background (via WorkManager)
+ * - Manual full sync (download + upload)
+ * - Force full sync from UI button
+ * - Sync state management for UI
  */
 @Singleton
 class SyncManager @Inject constructor(
@@ -52,8 +43,7 @@ class SyncManager @Inject constructor(
     private val authService: SupabaseAuthService,
     private val positionRepository: PositionRepository,
     private val uploadService: UploadSyncService,
-    private val downloadService: DownloadSyncService,
-    private val syncQueueDao: SyncQueueDao
+    private val downloadService: DownloadSyncService
 ) {
     companion object {
         private const val TAG = "SyncManager"
@@ -66,11 +56,6 @@ class SyncManager @Inject constructor(
 
     /**
      * Check if all conditions for sync are met
-     *
-     * Required:
-     * - User is authenticated
-     * - Position is selected
-     * - Internet connection available
      */
     fun canSync(): Boolean {
         val isAuthenticated = authService.isUserAuthenticated()
@@ -80,20 +65,6 @@ class SyncManager @Inject constructor(
         Log.d(TAG, "Sync conditions: auth=$isAuthenticated, position=$hasPosition, internet=$hasInternet")
 
         return isAuthenticated && hasPosition && hasInternet
-    }
-
-    /**
-     * Sync after data change
-     * Uploads changes immediately (if online)
-     */
-    fun syncOnDataChange() {
-        if (!canSync()) {
-            Log.d(TAG, "Offline - changes queued for later sync")
-            return
-        }
-
-        Log.d(TAG, "Sync on data change triggered")
-        sync(forceFullDownload = false)
     }
 
     /**
@@ -109,14 +80,6 @@ class SyncManager @Inject constructor(
     }
 
     /**
-     * Get pending queue size
-     * Useful for UI indicators
-     */
-    suspend fun getPendingQueueSize(): Int {
-        return syncQueueDao.getQueueSize()
-    }
-
-    /**
      * Clear sync error
      */
     fun clearError() {
@@ -125,15 +88,11 @@ class SyncManager @Inject constructor(
 
     /**
      * Perform full bidirectional sync
-     * Used ONLY after authentication and manual sync button
      *
      * Process:
-     * 1. Check sync conditions
-     * 2. Upload local changes
-     * 3. Download remote changes
-     * 4. Update sync state
-     *
-     * @param forceFullDownload If true, download all items (ignore lastSync)
+     * 1. Upload local changes
+     * 2. Download remote changes
+     * 3. Update sync state
      */
     fun sync(forceFullDownload: Boolean = false) {
         if (_syncState.value.isSyncing) {
@@ -156,7 +115,7 @@ class SyncManager @Inject constructor(
 
                 Log.d(TAG, "Syncing for crew: $crewName, user: $userId")
 
-                // Step 1: Upload local changes FOR THIS CREW
+                // Step 1: Upload local changes
                 val uploadResult = uploadService.uploadPendingChanges(userId, crewName)
                 uploadResult.fold(
                     onSuccess = { count ->
@@ -167,7 +126,7 @@ class SyncManager @Inject constructor(
                     }
                 )
 
-                // Step 2: Download remote changes FOR THIS CREW
+                // Step 2: Download remote changes
                 val downloadResult = downloadService.downloadChanges(
                     crewName = crewName,
                     userId = userId,
@@ -181,9 +140,6 @@ class SyncManager @Inject constructor(
                         Log.e(TAG, "❌ Download failed: ${error.message}")
                     }
                 )
-
-                // Step 3: Cleanup old failed operations
-                syncQueueDao.cleanupOldFailedOperations()
 
                 _syncState.value = SyncState(
                     isSyncing = false,
@@ -204,21 +160,15 @@ class SyncManager @Inject constructor(
 
     /**
      * Sync on app startup
-     * Performs FULL sync with download (first sync or after long time)
      */
     fun syncOnStartup() {
         Log.d(TAG, "🚀 Sync on startup triggered")
-
-        // Check if this is first sync
         val isFirstSync = downloadService.getLastSyncTimestamp() == null
-
-        // Full sync on startup
         sync(forceFullDownload = isFirstSync)
     }
 
     /**
      * Sync on network reconnection
-     * Upload queued changes, then download updates
      */
     fun syncOnReconnect() {
         Log.d(TAG, "📶 Sync on reconnect triggered")
@@ -227,65 +177,10 @@ class SyncManager @Inject constructor(
 
     /**
      * Force full sync - triggered by user button
-     * Downloads all items regardless of lastSync timestamp
-     *
-     * Use cases:
-     * - Manual sync button in UI
-     * - User wants to refresh all data
      */
     fun forceFullSync() {
         Log.d(TAG, "🔄 Force full sync triggered by user")
         downloadService.resetLastSyncTimestamp()
         sync(forceFullDownload = true)
-    }
-
-    fun uploadOnlySync() {
-        Log.d(TAG, "========================================")
-        Log.d(TAG, "uploadOnlySync() called")
-
-        if (_syncState.value.isSyncing) {
-            Log.d(TAG, "⏭️ Sync already in progress, skipping")
-            Log.d(TAG, "========================================")
-            return
-        }
-
-        if (!canSync()) {
-            Log.d(TAG, "❌ Cannot sync - conditions not met")
-            Log.d(TAG, "========================================")
-            return
-        }
-
-        syncScope.launch {
-            try {
-                Log.d(TAG, "⬆️ Starting upload-only sync...")
-
-                val userId = authService.getUserId()
-                val crewName = positionRepository.getPosition()
-
-                Log.d(TAG, "  userId: $userId")
-                Log.d(TAG, "  crewName: $crewName")
-
-                if (crewName == null) {
-                    Log.e(TAG, "❌ Cannot sync - no crew selected")
-                    Log.d(TAG, "========================================")
-                    return@launch
-                }
-
-                val uploadResult = uploadService.uploadPendingChanges(userId, crewName)
-                uploadResult.fold(
-                    onSuccess = { count ->
-                        Log.d(TAG, "✅ Uploaded $count items for crew: $crewName")
-                    },
-                    onFailure = { error ->
-                        Log.e(TAG, "❌ Upload failed: ${error.message}", error)
-                    }
-                )
-                Log.d(TAG, "========================================")
-
-            } catch (e: Exception) {
-                Log.e(TAG, "❌ Upload-only sync exception", e)
-                Log.d(TAG, "========================================")
-            }
-        }
     }
 }

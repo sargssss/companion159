@@ -8,9 +8,22 @@ import com.lifelover.companion159.domain.models.StorageCategory
 import kotlinx.coroutines.flow.Flow
 import java.util.Date
 
+/**
+ * DAO for inventory item operations
+ *
+ * Focus: UI queries and basic CRUD
+ * Sync-specific queries moved to SyncDao
+ */
 @Dao
 interface InventoryDao {
 
+    // ========================================
+    // UI QUERIES - Filtered for display
+    // ========================================
+
+    /**
+     * Get availability items (non-ammunition with availableQuantity > 0)
+     */
     @Query("""
         SELECT * FROM inventory_items 
         WHERE isActive = 1 
@@ -22,6 +35,9 @@ interface InventoryDao {
     """)
     fun getAvailabilityItems(userId: String?, crewName: String): Flow<List<InventoryItemEntity>>
 
+    /**
+     * Get ammunition items (with availableQuantity > 0)
+     */
     @Query("""
         SELECT * FROM inventory_items 
         WHERE isActive = 1 
@@ -32,6 +48,9 @@ interface InventoryDao {
     """)
     fun getAmmunitionItems(userId: String?, crewName: String): Flow<List<InventoryItemEntity>>
 
+    /**
+     * Get needs items (with neededQuantity > 0)
+     */
     @Query("""
         SELECT * FROM inventory_items 
         WHERE isActive = 1 
@@ -42,12 +61,25 @@ interface InventoryDao {
     """)
     fun getNeedsItems(userId: String?, crewName: String): Flow<List<InventoryItemEntity>>
 
+    // ========================================
+    // BASIC CRUD OPERATIONS
+    // ========================================
+
+    /**
+     * Get single item by ID
+     */
     @Query("SELECT * FROM inventory_items WHERE id = :id")
     suspend fun getItemById(id: Long): InventoryItemEntity?
 
+    /**
+     * Insert new item
+     */
     @Insert
     suspend fun insertItem(item: InventoryItemEntity): Long
 
+    /**
+     * Update item with all fields including needs
+     */
     @Query("""
         UPDATE inventory_items 
         SET itemName = :name,
@@ -69,6 +101,9 @@ interface InventoryDao {
         timestamp: Date = Date()
     ): Int
 
+    /**
+     * Update only available quantity
+     */
     @Query("""
         UPDATE inventory_items 
         SET availableQuantity = :quantity,
@@ -82,6 +117,9 @@ interface InventoryDao {
         timestamp: Date = Date()
     ): Int
 
+    /**
+     * Update only needed quantity
+     */
     @Query("""
         UPDATE inventory_items 
         SET neededQuantity = :quantity,
@@ -95,6 +133,9 @@ interface InventoryDao {
         timestamp: Date = Date()
     ): Int
 
+    /**
+     * Soft delete - mark as inactive
+     */
     @Query("""
         UPDATE inventory_items 
         SET isActive = 0,
@@ -107,62 +148,13 @@ interface InventoryDao {
         timestamp: Date = Date()
     ): Int
 
+    /**
+     * Get all items (for debugging)
+     */
     @Query("""
         SELECT * FROM inventory_items 
         WHERE crewName = :crewName
         AND (userId = :userId OR userId IS NULL)
     """)
     suspend fun getAllItems(userId: String?, crewName: String): List<InventoryItemEntity>
-
-    @Query("""
-        UPDATE inventory_items 
-        SET supabaseId = :supabaseId,
-            lastSynced = :timestamp,
-            needsSync = 0
-        WHERE id = :localId
-    """)
-    suspend fun updateSupabaseId(
-        localId: Long,
-        supabaseId: Long,
-        timestamp: Long = System.currentTimeMillis()
-    )
-
-    @Query("""
-        UPDATE inventory_items 
-        SET lastSynced = :timestamp,
-            needsSync = 0
-        WHERE id = :localId
-    """)
-    suspend fun markAsSynced(
-        localId: Long,
-        timestamp: Long = System.currentTimeMillis()
-    )
-
-    @Query("""
-    SELECT * FROM inventory_items 
-    WHERE needsSync = 1 
-    AND crewName = :crewName
-    AND (userId = :userId OR userId IS NULL)
-""")
-    suspend fun getItemsNeedingSync(userId: String?, crewName: String): List<InventoryItemEntity>
-
-    @Query("""
-        SELECT * FROM inventory_items 
-        WHERE supabaseId = :supabaseId
-        AND (userId = :userId OR userId IS NULL)
-        LIMIT 1
-    """)
-    suspend fun getItemBySupabaseId(supabaseId: Long, userId: String?): InventoryItemEntity?
-
-    /**
-     * Observe items needing sync in real-time
-     * Used by SyncOrchestrator for automatic sync
-     */
-    @Query("""
-        SELECT * FROM inventory_items 
-        WHERE needsSync = 1 
-        AND crewName = :crewName
-        AND (userId = :userId OR userId IS NULL)
-    """)
-    fun observeItemsNeedingSync(userId: String?, crewName: String): Flow<List<InventoryItemEntity>>
 }

@@ -3,6 +3,7 @@ package com.lifelover.companion159.di
 import android.content.Context
 import com.lifelover.companion159.data.local.dao.InventoryDao
 import com.lifelover.companion159.data.local.dao.PreferencesDao
+import com.lifelover.companion159.data.local.dao.SyncDao
 import com.lifelover.companion159.data.local.dao.SyncQueueDao
 import com.lifelover.companion159.data.local.database.InventoryDatabase
 import dagger.Module
@@ -25,6 +26,15 @@ object DatabaseModule {
     }
 
     @Provides
+    @Singleton
+    fun provideInventoryDao(
+        database: InventoryDatabase
+    ): InventoryDao {
+        return database.inventoryDao()
+    }
+
+    @Provides
+    @Singleton
     fun providePreferencesDao(
         database: InventoryDatabase
     ): PreferencesDao {
@@ -33,10 +43,10 @@ object DatabaseModule {
 
     @Provides
     @Singleton
-    fun provideInventoryDao(
+    fun provideSyncDao(
         database: InventoryDatabase
-    ): InventoryDao {
-        return database.inventoryDao()
+    ): SyncDao {
+        return database.syncDao()
     }
 
     @Provides

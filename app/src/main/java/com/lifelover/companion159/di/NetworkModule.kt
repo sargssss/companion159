@@ -4,6 +4,7 @@ import android.content.Context
 import com.lifelover.companion159.data.local.UserPreferences
 import com.lifelover.companion159.data.local.dao.InventoryDao
 import com.lifelover.companion159.data.local.dao.PreferencesDao
+import com.lifelover.companion159.data.local.dao.SyncDao
 import com.lifelover.companion159.data.local.dao.SyncQueueDao
 import com.lifelover.companion159.data.remote.SupabaseClient as AppSupabaseClient
 import com.lifelover.companion159.data.remote.auth.GoogleAuthService
@@ -114,23 +115,13 @@ object NetworkModule {
 
     @Provides
     @Singleton
-    fun provideUploadSyncService(
-        dao: InventoryDao,
-        queueDao: SyncQueueDao,
-        api: SupabaseInventoryApi,
-        mapper: SyncMapper
-    ): UploadSyncService {
-        return UploadSyncService(dao, queueDao, api, mapper)
-    }
-
-    @Provides
-    @Singleton
     fun provideDownloadSyncService(
-        dao: InventoryDao,
+        inventoryDao: InventoryDao,
+        syncDao: SyncDao,
         api: SupabaseInventoryApi,
         mapper: SyncMapper
     ): DownloadSyncService {
-        return DownloadSyncService(dao, api, mapper)
+        return DownloadSyncService(inventoryDao, syncDao, api, mapper)
     }
 
     /**
@@ -140,27 +131,11 @@ object NetworkModule {
     @Singleton
     fun provideSyncOrchestrator(
         @ApplicationContext context: Context,
-        dao: InventoryDao,
+        syncDao: SyncDao,
         authService: SupabaseAuthService,
         positionRepository: PositionRepository,
         uploadService: UploadSyncService
     ): SyncOrchestrator {
-        return SyncOrchestrator(context, dao, authService, positionRepository, uploadService)
-    }
-
-    /**
-     * Keep SyncManager for manual sync button
-     */
-    @Provides
-    @Singleton
-    fun provideSyncManager(
-        @ApplicationContext context: Context,
-        authService: SupabaseAuthService,
-        positionRepository: PositionRepository,
-        uploadService: UploadSyncService,
-        downloadService: DownloadSyncService,
-        queueDao: SyncQueueDao
-    ): SyncManager {
-        return SyncManager(context, authService, positionRepository, uploadService, downloadService, queueDao)
+        return SyncOrchestrator(context, syncDao, authService, positionRepository, uploadService)
     }
 }
