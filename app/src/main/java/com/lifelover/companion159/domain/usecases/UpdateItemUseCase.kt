@@ -1,6 +1,7 @@
 package com.lifelover.companion159.domain.usecases
 
 import android.util.Log
+import com.lifelover.companion159.data.remote.sync.SyncQueueManager
 import com.lifelover.companion159.data.repository.InventoryRepository
 import com.lifelover.companion159.domain.models.AppError
 import com.lifelover.companion159.domain.models.DisplayCategory
@@ -9,57 +10,14 @@ import com.lifelover.companion159.domain.models.toStorageCategory
 import com.lifelover.companion159.domain.validation.InputValidator
 import javax.inject.Inject
 
-/**
- * Use case for updating existing inventory item (full update)
- *
- * Business rules:
- * - Item must exist in database
- * - Name cannot be empty and must be 1-100 characters
- * - Quantities must be non-negative (0-999999)
- * - User can only update items from their crew
- * - Changes automatically queued for sync
- *
- * Responsibilities:
- * - Validate all input fields
- * - Map display category to storage category
- * - Create updated domain model
- * - Delegate to repository for persistence
- *
- * Use this when:
- * - Editing item through AddEditItemScreen
- * - Updating name AND quantities together
- *
- * For single quantity updates, use UpdateQuantityUseCase instead
- *
- * @param repository Inventory repository for data persistence
- */
 class UpdateItemUseCase @Inject constructor(
-    private val repository: InventoryRepository
+    private val repository: InventoryRepository,
+    private val syncQueueManager: SyncQueueManager
 ) {
     companion object {
         private const val TAG = "UpdateItemUseCase"
     }
 
-    /**
-     * Update existing item with validation
-     *
-     * Flow:
-     * 1. Validate input (name, quantities)
-     * 2. Map display category → storage category
-     * 3. Create updated InventoryItem domain model
-     * 4. Save to repository (triggers sync queue)
-     *
-     * @param itemId ID of item to update (must exist)
-     * @param newName New item name (will be trimmed)
-     * @param newAvailableQuantity New available quantity (>= 0)
-     * @param newNeededQuantity New needed quantity (>= 0)
-     * @param displayCategory Display category (Availability/Ammunition/Needs)
-     * @return Result.success(Unit) on success, Result.failure(AppError) on validation/persistence error
-     *
-     * @throws IllegalStateException if user not authenticated or position not set (from repository)
-     * @throws IllegalArgumentException if item with itemId doesn't exist (from repository)
-     * @throws SecurityException if trying to modify other crew's item (from repository)
-     */
     suspend operator fun invoke(
         itemId: Long,
         newName: String,
@@ -82,7 +40,6 @@ class UpdateItemUseCase @Inject constructor(
             validationResult.fold(
                 onSuccess = { validated ->
                     Log.d(TAG, "✅ Validation passed")
-                    Log.d(TAG, "Validated: name='${validated.name}', available=${validated.availableQuantity}, needed=${validated.neededQuantity}")
 
                     // Step 2: Map display category to storage category
                     val storageCategory = displayCategory.toStorageCategory()
@@ -98,11 +55,23 @@ class UpdateItemUseCase @Inject constructor(
                         crewName = "" // Will be validated by repository
                     )
 
-                    // Step 4: Update in repository
+                    // Step 4: Update in repository (pure data operation)
                     Log.d(TAG, "Updating in repository...")
-                    repository.updateItem(item)
+                    repository.updateFullItem(item)
+                    Log.d(TAG, "✅ Item updated in database")
 
-                    Log.d(TAG, "✅ Item updated successfully")
+                    // Step 5: Get supabaseId for sync
+                    val supabaseId = repository.getSupabaseId(itemId)
+
+                    // Step 6: Enqueue for sync (business logic)
+                    Log.d(TAG, "Enqueueing for sync...")
+                    syncQueueManager.enqueueUpdate(
+                        localItemId = itemId,
+                        supabaseId = supabaseId
+                    )
+                    Log.d(TAG, "✅ Item enqueued for sync")
+
+                    Log.d(TAG, "✅ Update completed successfully")
                     Log.d(TAG, "============================")
                     Result.success(Unit)
                 },

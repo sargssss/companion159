@@ -1,54 +1,20 @@
 package com.lifelover.companion159.domain.usecases
 
 import android.util.Log
+import com.lifelover.companion159.data.remote.sync.SyncQueueManager
 import com.lifelover.companion159.data.repository.InventoryRepository
 import com.lifelover.companion159.domain.models.AppError
 import com.lifelover.companion159.domain.models.InventoryItem
 import javax.inject.Inject
 
-/**
- * Use case for deleting inventory item
- *
- * Business rules:
- * - Item must exist in database
- * - Soft delete (marks as inactive, doesn't physically remove)
- * - User can only delete items from their crew
- * - Delete operation automatically queued for sync
- * - Item removed from UI immediately after soft delete
- *
- * Responsibilities:
- * - Validate item exists
- * - Delegate to repository for soft delete
- * - Handle errors gracefully
- *
- * Note: Repository handles all deletion logic including:
- * - Ownership validation
- * - Soft delete (isActive = false)
- * - Sync queue enqueue
- *
- * @param repository Inventory repository for data persistence
- */
 class DeleteItemUseCase @Inject constructor(
-    private val repository: InventoryRepository
+    private val repository: InventoryRepository,
+    private val syncQueueManager: SyncQueueManager
 ) {
     companion object {
         private const val TAG = "DeleteItemUseCase"
     }
 
-    /**
-     * Delete item (soft delete)
-     *
-     * Flow:
-     * 1. Log delete operation
-     * 2. Call repository.deleteItem() (soft delete)
-     * 3. Repository enqueues DELETE to sync queue
-     *
-     * @param item Item to delete
-     * @return Result.success(Unit) on success, Result.failure(AppError) on error
-     *
-     * @throws IllegalStateException if user not authenticated or position not set (from repository)
-     * @throws SecurityException if trying to delete other crew's item (from repository)
-     */
     suspend operator fun invoke(item: InventoryItem): Result<Unit> {
         return try {
             Log.d(TAG, "=== DELETE ITEM USE CASE ===")
@@ -56,11 +22,23 @@ class DeleteItemUseCase @Inject constructor(
             Log.d(TAG, "Item name: '${item.itemName}'")
             Log.d(TAG, "Crew: ${item.crewName}")
 
-            // Delete from repository (soft delete + sync queue)
-            Log.d(TAG, "Deleting from repository...")
-            repository.deleteItem(item.id)
+            // Step 1: Get supabaseId before deletion
+            val supabaseId = repository.getSupabaseId(item.id)
 
-            Log.d(TAG, "✅ Item deleted successfully")
+            // Step 2: Delete from repository (soft delete - pure data operation)
+            Log.d(TAG, "Deleting from repository...")
+            repository.softDeleteItem(item.id)
+            Log.d(TAG, "✅ Item soft deleted from database")
+
+            // Step 3: Enqueue for sync (business logic)
+            Log.d(TAG, "Enqueueing for sync...")
+            syncQueueManager.enqueueDelete(
+                localItemId = item.id,
+                supabaseId = supabaseId
+            )
+            Log.d(TAG, "✅ Delete enqueued for sync")
+
+            Log.d(TAG, "✅ Delete completed successfully")
             Log.d(TAG, "============================")
             Result.success(Unit)
 

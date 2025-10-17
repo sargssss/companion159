@@ -12,17 +12,30 @@ import kotlinx.coroutines.flow.*
 import javax.inject.Inject
 import javax.inject.Singleton
 
+/**
+ * Pure data layer - NO business logic
+ *
+ * Responsibilities:
+ * - CRUD operations on local database
+ * - Data filtering and querying
+ * - User/crew validation for security
+ *
+ * Does NOT:
+ * - Validate input (Use Cases do this)
+ * - Manage sync queue (Use Cases do this)
+ * - Contain business rules (Use Cases do this)
+ */
 @Singleton
 class InventoryRepository @Inject constructor(
     private val dao: InventoryDao,
     private val positionRepository: PositionRepository,
-    private val authService: SupabaseAuthService,
-    private val syncQueueManager: SyncQueueManager
+    private val authService: SupabaseAuthService
 ) {
     companion object {
         private const val TAG = "InventoryRepository"
     }
 
+    // Helper methods for security
     private fun requireUserId(): String {
         return authService.getUserId()
             ?: throw IllegalStateException("User must be authenticated to access inventory")
@@ -33,6 +46,7 @@ class InventoryRepository @Inject constructor(
             ?: throw IllegalStateException("Position must be set to access inventory")
     }
 
+    // Query methods (return Flows for reactive UI)
     fun getAvailabilityItems(): Flow<List<InventoryItem>> {
         return flow {
             val userId = requireUserId()
@@ -69,35 +83,48 @@ class InventoryRepository @Inject constructor(
         return dao.getAllItems(userId, crewName).map { it.toDomain() }
     }
 
+    // Pure CRUD operations (no business logic)
+
     /**
-     * Add new item
-     * Automatically enqueues INSERT operation for sync
+     * Insert item to database
+     * Returns generated item ID
      */
-    suspend fun addItem(item: InventoryItem) {
+    suspend fun insertItem(item: InventoryItem): Long {
         val userId = requireUserId()
         val crewName = requireCrewName()
 
         val entity = item.copy(crewName = crewName).toEntity(userId = userId)
         val insertedId = dao.insertItem(entity)
 
-        Log.d(TAG, "✅ Item created with ID: $insertedId")
-
-        // Enqueue INSERT operation (only ID needed)
-        syncQueueManager.enqueueInsert(localItemId = insertedId)
+        Log.d(TAG, "✅ Item inserted with ID: $insertedId")
+        return insertedId
     }
 
     /**
-     * Update item with all fields
-     * Automatically enqueues UPDATE operation for sync
+     * Get item by ID
      */
-    suspend fun updateItem(item: InventoryItem) {
+    suspend fun getItemById(itemId: Long): InventoryItem? {
+        val entity = dao.getItemById(itemId)
+        return entity?.toDomain()
+    }
+
+    /**
+     * Get Supabase ID for item
+     * Used by Use Cases to enqueue sync operations
+     */
+    suspend fun getSupabaseId(itemId: Long): Long? {
+        return dao.getItemById(itemId)?.supabaseId
+    }
+
+    /**
+     * Update full item (all fields)
+     */
+    suspend fun updateFullItem(item: InventoryItem): Int {
         val userId = requireUserId()
         val crewName = requireCrewName()
 
         val existingItem = dao.getItemById(item.id)
-        if (existingItem == null) {
-            throw IllegalArgumentException("Item with ID ${item.id} does not exist")
-        }
+            ?: throw IllegalArgumentException("Item with ID ${item.id} does not exist")
 
         validateItemOwnership(existingItem, crewName)
 
@@ -110,91 +137,56 @@ class InventoryRepository @Inject constructor(
             crewName = crewName
         )
 
-        if (updatedRows > 0) {
-            Log.d(TAG, "✅ Item updated")
-
-            // Enqueue UPDATE operation (only IDs needed)
-            syncQueueManager.enqueueUpdate(
-                localItemId = item.id,
-                supabaseId = existingItem.supabaseId
-            )
-        }
+        Log.d(TAG, "✅ Item updated: $updatedRows rows")
+        return updatedRows
     }
 
     /**
-     * Update single quantity
-     * Automatically enqueues UPDATE operation for sync
+     * Update single quantity field
      */
-    suspend fun updateSingleQuantity(
+    suspend fun updateQuantity(
         itemId: Long,
         quantity: Int,
         quantityType: QuantityType
-    ) {
+    ): Int {
         val userId = requireUserId()
         val crewName = requireCrewName()
 
         val existingItem = dao.getItemById(itemId)
-        if (existingItem == null) {
-            Log.w(TAG, "⚠️ Item $itemId not found")
-            return
-        }
+            ?: throw IllegalArgumentException("Item with ID $itemId does not exist")
 
         validateItemOwnership(existingItem, crewName)
 
         val updatedRows = when (quantityType) {
-            QuantityType.AVAILABLE -> {
-                dao.updateQuantity(itemId, quantity)
-            }
-            QuantityType.NEEDED -> {
-                dao.updateNeededQuantity(itemId, quantity)
-            }
+            QuantityType.AVAILABLE -> dao.updateQuantity(itemId, quantity)
+            QuantityType.NEEDED -> dao.updateNeededQuantity(itemId, quantity)
         }
 
-        if (updatedRows > 0) {
-            Log.d(TAG, "✅ Item quantity updated: ${quantityType.name}=$quantity")
-
-            // Enqueue UPDATE operation (only IDs needed)
-            syncQueueManager.enqueueUpdate(
-                localItemId = itemId,
-                supabaseId = existingItem.supabaseId
-            )
-        }
-    }
-
-    suspend fun updateItemQuantity(itemId: Long, quantity: Int) {
-        updateSingleQuantity(itemId, quantity, QuantityType.AVAILABLE)
-    }
-
-    suspend fun updateNeededQuantity(itemId: Long, quantity: Int) {
-        updateSingleQuantity(itemId, quantity, QuantityType.NEEDED)
+        Log.d(TAG, "✅ Quantity updated: ${quantityType.name}=$quantity")
+        return updatedRows
     }
 
     /**
      * Soft delete item
-     * Automatically enqueues DELETE operation for sync
      */
-    suspend fun deleteItem(id: Long) {
+    suspend fun softDeleteItem(itemId: Long): Int {
         val userId = requireUserId()
         val crewName = requireCrewName()
 
-        val existingItem = dao.getItemById(id)
-        if (existingItem == null) {
-            Log.w(TAG, "⚠️ Item $id not found")
-            return
-        }
+        val existingItem = dao.getItemById(itemId)
+            ?: throw IllegalArgumentException("Item with ID $itemId does not exist")
 
         validateItemOwnership(existingItem, crewName)
 
-        dao.softDeleteItem(id)
-        Log.d(TAG, "✅ Item deleted: $id")
-
-        // Enqueue DELETE operation (only IDs needed)
-        syncQueueManager.enqueueDelete(
-            localItemId = id,
-            supabaseId = existingItem.supabaseId
-        )
+        val deletedRows = dao.softDeleteItem(itemId)
+        Log.d(TAG, "✅ Item soft deleted: $deletedRows rows")
+        return deletedRows
     }
 
+    /**
+     * Validate that item belongs to current crew
+     * Security check to prevent cross-crew modifications
+     */
     private fun validateItemOwnership(
         item: com.lifelover.companion159.data.local.entities.InventoryItemEntity,
         crewName: String

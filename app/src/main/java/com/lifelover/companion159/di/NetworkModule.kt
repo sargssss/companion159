@@ -80,6 +80,14 @@ object NetworkModule {
 
     @Provides
     @Singleton
+    fun provideSyncQueueManager(
+        syncQueueDao: SyncQueueDao
+    ): SyncQueueManager {
+        return SyncQueueManager(syncQueueDao)
+    }
+
+    @Provides
+    @Singleton
     fun providePositionRepository(
         preferencesDao: PreferencesDao,
         authService: SupabaseAuthService
@@ -123,11 +131,35 @@ object NetworkModule {
 
     @Provides
     @Singleton
-    fun provideSyncQueueManager(
-        syncQueueDao: SyncQueueDao,
-        @ApplicationContext context: Context
-    ): SyncQueueManager {
-        return SyncQueueManager(syncQueueDao, context)
+    fun provideInventoryRepository(
+        dao: InventoryDao,
+        positionRepository: PositionRepository,
+        authService: SupabaseAuthService
+    ): InventoryRepository {
+        return InventoryRepository(dao, positionRepository, authService)
+    }
+
+    @Provides
+    @Singleton
+    fun provideUploadSyncService(
+        inventoryDao: InventoryDao,
+        syncDao: SyncDao,
+        api: SupabaseInventoryApi,
+        mapper: SyncMapper
+    ): UploadSyncService {
+        return UploadSyncService(inventoryDao, syncDao, api, mapper)
+    }
+
+    @Provides
+    @Singleton
+    fun provideSyncManager(
+        @ApplicationContext context: Context,
+        authService: SupabaseAuthService,
+        positionRepository: PositionRepository,
+        uploadService: UploadSyncService,
+        downloadService: DownloadSyncService
+    ): SyncManager {
+        return SyncManager(context, authService, positionRepository, uploadService, downloadService)
     }
 
     @Provides
@@ -140,16 +172,5 @@ object NetworkModule {
         mapper: SyncMapper
     ): SyncQueueProcessor {
         return SyncQueueProcessor(syncQueueDao, inventoryDao, syncDao, api, mapper)
-    }
-
-    @Provides
-    @Singleton
-    fun provideInventoryRepository(
-        dao: InventoryDao,
-        positionRepository: PositionRepository,
-        authService: SupabaseAuthService,
-        syncQueueManager: SyncQueueManager
-    ): InventoryRepository {
-        return InventoryRepository(dao, positionRepository, authService, syncQueueManager)
     }
 }

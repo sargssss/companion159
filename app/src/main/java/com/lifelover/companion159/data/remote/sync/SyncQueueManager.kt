@@ -26,47 +26,30 @@ import javax.inject.Singleton
  */
 @Singleton
 class SyncQueueManager @Inject constructor(
-    private val syncQueueDao: SyncQueueDao,
-    @ApplicationContext private val context: Context
+    private val syncQueueDao: SyncQueueDao
 ) {
     companion object {
         private const val TAG = "SyncQueueManager"
     }
 
-    /**
-     * Enqueue INSERT operation
-     * Called after adding new item to local DB
-     *
-     * @param localItemId ID of newly created item
-     */
     suspend fun enqueueInsert(localItemId: Long) = withContext(Dispatchers.IO) {
         try {
             val operation = SyncQueueEntity(
                 operationType = SyncOperationType.INSERT,
                 localItemId = localItemId,
                 supabaseId = null,
-                itemData = null, // No data needed - will fetch from DB
+                itemData = null,
                 status = SyncQueueStatus.PENDING
             )
 
             val queueId = syncQueueDao.enqueue(operation)
             Log.d(TAG, "✅ INSERT queued: localId=$localItemId, queueId=$queueId")
 
-            // Trigger worker immediately
-            triggerWorker()
-
         } catch (e: Exception) {
             Log.e(TAG, "❌ Failed to enqueue INSERT", e)
         }
     }
 
-    /**
-     * Enqueue UPDATE operation
-     * Called after updating existing item in local DB
-     *
-     * @param localItemId ID of updated item
-     * @param supabaseId Supabase ID (if synced before)
-     */
     suspend fun enqueueUpdate(
         localItemId: Long,
         supabaseId: Long?
@@ -76,67 +59,41 @@ class SyncQueueManager @Inject constructor(
                 operationType = SyncOperationType.UPDATE,
                 localItemId = localItemId,
                 supabaseId = supabaseId,
-                itemData = null, // No data needed - will fetch from DB
+                itemData = null,
                 status = SyncQueueStatus.PENDING
             )
 
             val queueId = syncQueueDao.enqueue(operation)
             Log.d(TAG, "✅ UPDATE queued: localId=$localItemId, supabaseId=$supabaseId, queueId=$queueId")
 
-            // Trigger worker immediately
-            triggerWorker()
-
         } catch (e: Exception) {
             Log.e(TAG, "❌ Failed to enqueue UPDATE", e)
         }
     }
 
-    /**
-     * Enqueue DELETE operation
-     * Called after soft-deleting item in local DB
-     *
-     * @param localItemId ID of deleted item
-     * @param supabaseId Supabase ID (needed for server deletion)
-     */
     suspend fun enqueueDelete(localItemId: Long, supabaseId: Long?) = withContext(Dispatchers.IO) {
         try {
             val operation = SyncQueueEntity(
                 operationType = SyncOperationType.DELETE,
                 localItemId = localItemId,
                 supabaseId = supabaseId,
-                itemData = null, // No data needed
+                itemData = null,
                 status = SyncQueueStatus.PENDING
             )
 
             val queueId = syncQueueDao.enqueue(operation)
             Log.d(TAG, "✅ DELETE queued: localId=$localItemId, supabaseId=$supabaseId, queueId=$queueId")
 
-            // Trigger worker immediately
-            triggerWorker()
-
         } catch (e: Exception) {
             Log.e(TAG, "❌ Failed to enqueue DELETE", e)
         }
     }
 
-    /**
-     * Get queue size (for UI display)
-     */
     suspend fun getQueueSize(): Int = withContext(Dispatchers.IO) {
         syncQueueDao.getQueueSize()
     }
 
-    /**
-     * Check if queue is empty
-     */
     suspend fun isQueueEmpty(): Boolean = withContext(Dispatchers.IO) {
         syncQueueDao.getQueueSize() == 0
-    }
-
-    /**
-     * Trigger immediate sync worker after enqueue
-     */
-    private fun triggerWorker() {
-        SyncWorker.triggerImmediateSync(context)
     }
 }

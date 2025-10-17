@@ -13,7 +13,6 @@ class CompanionApplication : Application(), Configuration.Provider {
 
     @Inject
     lateinit var workerFactory: HiltWorkerFactory
-
     override val workManagerConfiguration: Configuration
         get() = Configuration.Builder()
             .setWorkerFactory(workerFactory)
@@ -25,6 +24,6 @@ class CompanionApplication : Application(), Configuration.Provider {
         Log.d("CompanionApplication", "🚀 Application started")
 
         // Schedule periodic sync worker
-        SyncWorker.schedulePeriodicSync(this)
+        //SyncWorker.schedulePeriodicSync(this)
     }
 }

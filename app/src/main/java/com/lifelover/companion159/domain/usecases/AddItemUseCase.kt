@@ -1,6 +1,7 @@
 package com.lifelover.companion159.domain.usecases
 
 import android.util.Log
+import com.lifelover.companion159.data.remote.sync.SyncQueueManager
 import com.lifelover.companion159.data.repository.InventoryRepository
 import com.lifelover.companion159.domain.models.AppError
 import com.lifelover.companion159.domain.models.DisplayCategory
@@ -23,34 +24,19 @@ import javax.inject.Inject
  * - Map display category to storage category
  * - Create domain model
  * - Delegate to repository for persistence
+ * - Enqueue item for sync to server
  *
  * @param repository Inventory repository for data persistence
+ * @param syncQueueManager Sync queue manager for server synchronization
  */
 class AddItemUseCase @Inject constructor(
-    private val repository: InventoryRepository
+    private val repository: InventoryRepository,
+    private val syncQueueManager: SyncQueueManager
 ) {
     companion object {
         private const val TAG = "AddItemUseCase"
     }
 
-    /**
-     * Add new item with validation
-     *
-     * Flow:
-     * 1. Validate input (name, quantities)
-     * 2. Map display category → storage category
-     * 3. Create InventoryItem domain model
-     * 4. Save to repository (triggers sync queue)
-     *
-     * @param name Item name (will be trimmed)
-     * @param availableQuantity Available quantity (>= 0)
-     * @param neededQuantity Needed quantity (>= 0)
-     * @param displayCategory Display category (Availability/Ammunition/Needs)
-     * @return Result.success(Unit) on success, Result.failure(AppError) on validation/persistence error
-     *
-     * @throws IllegalStateException if user not authenticated or position not set (from repository)
-     * @throws SecurityException if trying to modify other crew's data (from repository)
-     */
     suspend operator fun invoke(
         name: String,
         availableQuantity: Int,
@@ -87,11 +73,17 @@ class AddItemUseCase @Inject constructor(
                         crewName = "" // Will be set by repository based on current position
                     )
 
-                    // Step 4: Save to repository
+                    // Step 4: Save to repository (pure data operation)
                     Log.d(TAG, "Saving to repository...")
-                    repository.addItem(item)
+                    val insertedId = repository.insertItem(item)
+                    Log.d(TAG, "✅ Item inserted with ID: $insertedId")
 
-                    Log.d(TAG, "✅ Item added successfully")
+                    // Step 5: Enqueue for sync (business logic)
+                    Log.d(TAG, "Enqueueing for sync...")
+                    syncQueueManager.enqueueInsert(localItemId = insertedId)
+                    Log.d(TAG, "✅ Item enqueued for sync")
+
+                    Log.d(TAG, "✅ Add item completed successfully")
                     Log.d(TAG, "=========================")
                     Result.success(Unit)
                 },
