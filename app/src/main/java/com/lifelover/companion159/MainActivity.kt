@@ -86,20 +86,24 @@ class MainActivity : ComponentActivity() {
                 ) {
                     val navController = rememberNavController()
                     val authState by authViewModel.state.collectAsState()
-                    val currentPosition = positionRepository.currentPosition.collectAsState().value
+                    val currentPosition by positionRepository.currentPosition.collectAsState()
 
-                    AppNavigation(
-                        navController = navController,
-                        currentPosition = currentPosition,
-                        isAuthenticated = authState.isAuthenticated,
-                        positionRepository = positionRepository
-                    )
-
+                    // Trigger sync when authenticated AND position is set
                     LaunchedEffect(authState.isAuthenticated, currentPosition) {
-                        if (authState.isAuthenticated && currentPosition != null) {
+                        Log.d(TAG, "Auth/Position state: isAuth=${authState.isAuthenticated}, position='$currentPosition'")
+
+                        if (authState.isAuthenticated && !currentPosition.isNullOrBlank()) {
+                            Log.d(TAG, "🔄 Triggering sync on startup")
                             syncOrchestrator.syncOnStartup()
                         }
                     }
+
+                    // Navigation uses both auth and position from flows
+                    AppNavigation(
+                        navController = navController,
+                        isAuthenticated = authState.isAuthenticated,
+                        positionRepository = positionRepository
+                    )
                 }
             }
         }
@@ -107,7 +111,6 @@ class MainActivity : ComponentActivity() {
 
     private fun startBackgroundSyncService() {
         Log.d(TAG, "🚀 Starting background sync service")
-
         val intent = Intent(this, SyncBackgroundService::class.java)
         startService(intent)
     }

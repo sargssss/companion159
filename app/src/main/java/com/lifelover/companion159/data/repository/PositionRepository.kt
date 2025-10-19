@@ -92,6 +92,34 @@ class PositionRepository @Inject constructor(
         }
     }
 
+    /**
+     * Clear current position
+     * Called when user logs out
+     *
+     * Clears:
+     * 1. Local database (preferences table)
+     * 2. No effect on Supabase (position is local-only)
+     */
+    suspend fun clearPosition() {
+        withContext(Dispatchers.IO) {
+            try {
+                Log.d(TAG, "🗑️ Clearing position...")
+
+                // Clear from local database
+                val emptyPreferences = PreferencesEntity(
+                    id = 1,
+                    position = null
+                )
+                preferencesDao.insertOrUpdatePreferences(emptyPreferences)
+
+                Log.d(TAG, "✅ Position cleared successfully")
+            } catch (e: Exception) {
+                Log.e(TAG, "❌ Failed to clear position", e)
+                throw e
+            }
+        }
+    }
+
     fun getAutocompleteSuggestions(input: String): List<String> {
         if (input.isBlank()) return PREDEFINED_POSITIONS
 

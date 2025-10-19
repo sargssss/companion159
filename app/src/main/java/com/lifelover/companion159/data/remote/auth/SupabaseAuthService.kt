@@ -3,6 +3,7 @@ package com.lifelover.companion159.data.remote.auth
 import android.content.Context
 import android.util.Log
 import com.lifelover.companion159.data.local.UserPreferences
+import com.lifelover.companion159.data.repository.PositionRepository
 import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.auth.Auth
 import io.github.jan.supabase.auth.auth
@@ -87,8 +88,15 @@ class SupabaseAuthService @Inject constructor(
     }
 
     /**
-     * Sign out
-     * Clears login time so position will be re-shown on next login
+     * Sign out from all services
+     * Clears user session and position
+     *
+     * Cleanup:
+     * 1. Sign out from Supabase Auth
+     * 2. Sign out from Google
+     * 3. Clear user ID from preferences
+     * 4. Clear position (user must re-select on next login)
+     * 5. Clear login timestamp
      */
     suspend fun signOut() {
         try {
