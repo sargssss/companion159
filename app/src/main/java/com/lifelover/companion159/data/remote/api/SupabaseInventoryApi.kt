@@ -1,10 +1,10 @@
+// data/remote/api/SupabaseInventoryApi.kt
 package com.lifelover.companion159.data.remote.api
 
 import android.util.Log
 import com.lifelover.companion159.data.remote.dto.SupabaseInventoryItemDto
 import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.postgrest.from
-import io.github.jan.supabase.postgrest.query.Columns
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
@@ -19,6 +19,9 @@ class SupabaseInventoryApi @Inject constructor(
         private const val TABLE_NAME = "crew_inventory_items_duplicate"
     }
 
+    /**
+     * Fetch items from server
+     */
     suspend fun fetchItemsByCrewName(
         crewName: String,
         updatedAfter: String? = null
@@ -49,13 +52,36 @@ class SupabaseInventoryApi @Inject constructor(
     }
 
     /**
-     * Update existing item in Supabase
+     * Insert single item
      */
-    suspend fun updateItem(item: SupabaseInventoryItemDto): Result<SupabaseInventoryItemDto> =
+    suspend fun insertSingleItem(item: SupabaseInventoryItemDto): Result<SupabaseInventoryItemDto> =
+        withContext(Dispatchers.IO) {
+            try {
+                Log.d(TAG, "Inserting item: ${item.itemName}")
+
+                val response = supabaseClient.from(TABLE_NAME)
+                    .insert(item) {
+                        select()
+                    }
+
+                val inserted = response.decodeSingle<SupabaseInventoryItemDto>()
+                Log.d(TAG, "✅ Inserted with ID: ${inserted.id}")
+                Result.success(inserted)
+
+            } catch (e: Exception) {
+                Log.e(TAG, "❌ Insert failed", e)
+                Result.failure(e)
+            }
+        }
+
+    /**
+     * Update single item
+     */
+    suspend fun updateSingleItem(item: SupabaseInventoryItemDto): Result<SupabaseInventoryItemDto> =
         withContext(Dispatchers.IO) {
             try {
                 require(item.id != null) { "Item must have ID for update" }
-                Log.d(TAG, "Updating item: ${item.id} - ${item.itemName}")
+                Log.d(TAG, "Updating item: ${item.id}")
 
                 val response = supabaseClient.from(TABLE_NAME)
                     .update(item) {
@@ -65,84 +91,12 @@ class SupabaseInventoryApi @Inject constructor(
                         select()
                     }
 
-                val updatedItem = response.decodeSingle<SupabaseInventoryItemDto>()
-                Log.d(TAG, "✅ Updated item: ${updatedItem.id}")
-                Result.success(updatedItem)
+                val updated = response.decodeSingle<SupabaseInventoryItemDto>()
+                Log.d(TAG, "✅ Updated item: ${updated.id}")
+                Result.success(updated)
 
             } catch (e: Exception) {
-                Log.e(TAG, "❌ Failed to update item: ${item.id}", e)
-                Result.failure(e)
-            }
-        }
-
-    /**
-     * Batch insert multiple items
-     * FIX: Create map manually to ensure tenant_id is included
-     */
-    suspend fun batchInsert(items: List<SupabaseInventoryItemDto>): Result<List<SupabaseInventoryItemDto>> =
-        withContext(Dispatchers.IO) {
-            try {
-                if (items.isEmpty()) return@withContext Result.success(emptyList())
-
-                Log.d(TAG, "Batch inserting ${items.size} items")
-
-                // ✅ Convert to Map manually to ensure all fields are included
-                val itemMaps = items.map { item ->
-                    buildMap {
-                        put("tenant_id", 9999)
-                        put("crew_name", item.crewName)
-                        put("item_name", item.itemName)
-                        put("available_quantity", item.availableQuantity)
-                        put("needed_quantity", item.neededQuantity)
-                        put("item_category", item.itemCategory)
-                        put("unit", item.unit)
-                        put("priority", item.priority)
-                        put("crew_type", item.crewType)
-                        put("description", item.description)
-                        put("notes", item.notes)
-                        put("last_need_updated_at", item.lastNeedUpdatedAt)
-                        put("needed_by", item.neededBy)
-                        put("created_by", item.createdBy)
-                        put("updated_by", item.updatedBy)
-                        put("metadata", item.metadata ?: emptyMap<String, String>())
-                        put("is_active", item.isActive)
-                        item.createdAt?.let { put("created_at", it) }
-                        item.updatedAt?.let { put("updated_at", it) }
-                    }
-                }
-
-                val response = supabaseClient.from(TABLE_NAME)
-                    .insert(itemMaps) {
-                        select()
-                    }
-
-                val insertedItems = response.decodeList<SupabaseInventoryItemDto>()
-                Log.d(TAG, "✅ Batch inserted ${insertedItems.size} items")
-                Result.success(insertedItems)
-
-            } catch (e: Exception) {
-                Log.e(TAG, "❌ Batch insert failed", e)
-                Result.failure(e)
-            }
-        }
-
-    suspend fun batchUpdate(items: List<SupabaseInventoryItemDto>): Result<Int> =
-        withContext(Dispatchers.IO) {
-            try {
-                if (items.isEmpty()) return@withContext Result.success(0)
-
-                Log.d(TAG, "Batch updating ${items.size} items")
-
-                var successCount = 0
-                items.forEach { item ->
-                    updateItem(item).onSuccess { successCount++ }
-                }
-
-                Log.d(TAG, "✅ Batch updated $successCount/${items.size} items")
-                Result.success(successCount)
-
-            } catch (e: Exception) {
-                Log.e(TAG, "❌ Batch update failed", e)
+                Log.e(TAG, "❌ Update failed", e)
                 Result.failure(e)
             }
         }

@@ -7,27 +7,32 @@ import java.text.SimpleDateFormat
 import java.util.*
 
 /**
- * Mapper between Room entities and Supabase DTOs
+ * Single mapper for all Local ↔ Remote transformations
+ *
+ * Consolidates:
+ * - Entity → DTO (for upload)
+ * - DTO → Entity (for download)
+ * - Conflict resolution timestamps
+ * - Category mapping
  */
-object SyncMapper {
+object SimpleSyncMapper {
 
     private val iso8601Format = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSXXX", Locale.US).apply {
         timeZone = TimeZone.getTimeZone("UTC")
     }
 
     /**
-     * Convert Room Entity to Supabase DTO
-     * Used for uploading local data to server
+     * Entity → DTO for server upload
      */
     fun entityToDto(entity: InventoryItemEntity): SupabaseInventoryItemDto {
         return SupabaseInventoryItemDto(
             id = entity.supabaseId,
-            tenantId = 9999, // ✅ Fixed value required by Supabase
+            tenantId = 0,
             crewName = entity.crewName,
             itemName = entity.itemName,
             availableQuantity = entity.availableQuantity,
             neededQuantity = entity.neededQuantity,
-            itemCategory = mapCategoryToSupabase(entity.category),
+            itemCategory = mapCategoryToRemote(entity.category),
             unit = "шт.",
             priority = entity.priority,
             isActive = entity.isActive,
@@ -37,44 +42,43 @@ object SyncMapper {
     }
 
     /**
-     * Convert Supabase DTO to Room Entity
+     * DTO → Entity for local storage (new item from server)
      */
-    fun dtoToEntity(
+    fun dtoToNewEntity(
         dto: SupabaseInventoryItemDto,
-        userId: String?,
-        markAsSynced: Boolean = true
+        userId: String?
     ): InventoryItemEntity {
         return InventoryItemEntity(
-            id = 0,
+            id = 0, // Room will generate
+            tenantId = 0,
             supabaseId = dto.id,
-            userId = userId,
-            crewName = dto.crewName,
             itemName = dto.itemName,
             availableQuantity = dto.availableQuantity,
             neededQuantity = dto.neededQuantity,
-            category = mapCategoryFromSupabase(dto.itemCategory),
+            category = mapCategoryFromRemote(dto.itemCategory),
+            userId = userId,
+            crewName = dto.crewName,
             priority = dto.priority,
             isActive = dto.isActive,
             createdAt = parseDate(dto.createdAt) ?: Date(),
             lastModified = parseDate(dto.updatedAt) ?: Date(),
-            lastSynced = if (markAsSynced) Date() else null,
-            needsSync = !markAsSynced
+            lastSynced = Date(), // Mark as synced since it came from server
+            needsSync = false,
         )
     }
 
     /**
-     * Update existing Room entity with Supabase DTO data
+     * DTO → Entity for merging with existing local item
      */
-    fun updateEntityFromDto(
-        existingEntity: InventoryItemEntity,
+    fun dtoToExistingEntity(
+        existing: InventoryItemEntity,
         dto: SupabaseInventoryItemDto
     ): InventoryItemEntity {
-        return existingEntity.copy(
-            supabaseId = dto.id,
+        return existing.copy(
             itemName = dto.itemName,
             availableQuantity = dto.availableQuantity,
             neededQuantity = dto.neededQuantity,
-            category = mapCategoryFromSupabase(dto.itemCategory),
+            category = mapCategoryFromRemote(dto.itemCategory),
             priority = dto.priority,
             isActive = dto.isActive,
             lastModified = parseDate(dto.updatedAt) ?: Date(),
@@ -84,19 +88,28 @@ object SyncMapper {
     }
 
     /**
-     * Map StorageCategory enum to Supabase item_category string
+     * Check if remote version is newer
      */
-    private fun mapCategoryToSupabase(category: StorageCategory): String {
+    fun isRemoteNewer(
+        localModified: Date,
+        remoteUpdatedAt: String?
+    ): Boolean {
+        val remoteDate = remoteUpdatedAt?.let { parseDate(it) } ?: return false
+        return remoteDate.after(localModified)
+    }
+
+    // ========================================
+    // Helper functions
+    // ========================================
+
+    private fun mapCategoryToRemote(category: StorageCategory): String {
         return when (category) {
             StorageCategory.AMMUNITION -> "БК"
             StorageCategory.EQUIPMENT -> "Обладнання"
         }
     }
 
-    /**
-     * Map Supabase item_category string to StorageCategory enum
-     */
-    private fun mapCategoryFromSupabase(category: String?): StorageCategory {
+    private fun mapCategoryFromRemote(category: String?): StorageCategory {
         return when (category?.trim()) {
             "БК" -> StorageCategory.AMMUNITION
             "Обладнання" -> StorageCategory.EQUIPMENT
@@ -104,16 +117,10 @@ object SyncMapper {
         }
     }
 
-    /**
-     * Format Date to ISO 8601 string for Supabase
-     */
     private fun formatDate(date: Date?): String? {
         return date?.let { iso8601Format.format(it) }
     }
 
-    /**
-     * Parse ISO 8601 string from Supabase to Date
-     */
     private fun parseDate(dateString: String?): Date? {
         return try {
             dateString?.let { iso8601Format.parse(it) }

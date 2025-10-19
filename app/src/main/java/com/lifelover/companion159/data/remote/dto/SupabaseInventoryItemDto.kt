@@ -1,5 +1,6 @@
 package com.lifelover.companion159.data.remote.dto
 
+import kotlinx.serialization.EncodeDefault
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
@@ -12,7 +13,8 @@ data class SupabaseInventoryItemDto(
     val id: Long? = null,
 
     @SerialName("tenant_id")
-    val tenantId: Long = 9999,
+    @EncodeDefault(EncodeDefault.Mode.ALWAYS)
+    val tenantId: Int = 0,
 
     @SerialName("crew_name")
     val crewName: String,
@@ -67,17 +69,4 @@ data class SupabaseInventoryItemDto(
 
     @SerialName("updated_at")
     val updatedAt: String? = null
-)
-
-@Serializable
-data class SupabaseResponse<T>(
-    val data: List<T>? = null,
-    val error: SupabaseError? = null
-)
-
-@Serializable
-data class SupabaseError(
-    val message: String,
-    val code: String? = null,
-    val details: String? = null
 )

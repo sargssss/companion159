@@ -1,3 +1,4 @@
+// di/SyncModule.kt
 package com.lifelover.companion159.di
 
 import android.content.Context
@@ -5,10 +6,8 @@ import com.lifelover.companion159.data.local.dao.InventoryDao
 import com.lifelover.companion159.data.local.dao.SyncDao
 import com.lifelover.companion159.data.remote.api.SupabaseInventoryApi
 import com.lifelover.companion159.data.remote.auth.SupabaseAuthService
-import com.lifelover.companion159.data.remote.sync.DownloadSyncService
-import com.lifelover.companion159.data.remote.sync.SyncManager
-import com.lifelover.companion159.data.remote.sync.SyncMapper
-import com.lifelover.companion159.data.remote.sync.UploadSyncService
+import com.lifelover.companion159.data.remote.sync.SimpleSyncService
+import com.lifelover.companion159.data.remote.sync.SyncOrchestrator
 import com.lifelover.companion159.data.repository.PositionRepository
 import dagger.Module
 import dagger.Provides
@@ -21,44 +20,24 @@ import javax.inject.Singleton
 @InstallIn(SingletonComponent::class)
 object SyncModule {
 
-
     @Provides
     @Singleton
-    fun provideSyncMapper(): SyncMapper {
-        return SyncMapper
-    }
-
-    @Provides
-    @Singleton
-    fun provideDownloadSyncService(
+    fun provideSyncService(
         inventoryDao: InventoryDao,
         syncDao: SyncDao,
-        api: SupabaseInventoryApi,
-        mapper: SyncMapper
-    ): DownloadSyncService {
-        return DownloadSyncService(inventoryDao, syncDao, api, mapper)
+        api: SupabaseInventoryApi
+    ): SimpleSyncService {
+        return SimpleSyncService(inventoryDao, syncDao, api)
     }
 
     @Provides
     @Singleton
-    fun provideUploadSyncService(
-        inventoryDao: InventoryDao,
-        syncDao: SyncDao,
-        api: SupabaseInventoryApi,
-        mapper: SyncMapper
-    ): UploadSyncService {
-        return UploadSyncService(inventoryDao, syncDao, api, mapper)
-    }
-
-    @Provides
-    @Singleton
-    fun provideSyncManager(
+    fun provideSyncOrchestrator(
         @ApplicationContext context: Context,
         authService: SupabaseAuthService,
         positionRepository: PositionRepository,
-        uploadService: UploadSyncService,
-        downloadService: DownloadSyncService
-    ): SyncManager {
-        return SyncManager(context, authService, positionRepository, uploadService, downloadService)
+        syncService: SimpleSyncService
+    ): SyncOrchestrator {
+        return SyncOrchestrator(context, authService, positionRepository, syncService)
     }
 }

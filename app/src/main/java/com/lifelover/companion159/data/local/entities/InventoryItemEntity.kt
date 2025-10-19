@@ -20,6 +20,7 @@ data class InventoryItemEntity(
     val itemName: String,
     val availableQuantity: Int = 0,
     val neededQuantity: Int = 0,
+    val tenantId: Int = 0,
 
     // Category - using domain StorageCategory directly
     val category: StorageCategory,

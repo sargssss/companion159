@@ -21,7 +21,7 @@ import com.lifelover.companion159.presentation.theme.Companion159Theme
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
 import androidx.activity.viewModels
-import com.lifelover.companion159.data.remote.sync.SyncManager
+import com.lifelover.companion159.data.remote.sync.SyncOrchestrator
 import com.lifelover.companion159.presentation.viewmodels.AuthViewModel
 
 @AndroidEntryPoint
@@ -32,7 +32,7 @@ class MainActivity : ComponentActivity() {
     }
 
     @Inject
-    lateinit var syncManager: SyncManager
+    lateinit var syncOrchestrator: SyncOrchestrator
 
     @Inject
     lateinit var positionRepository: PositionRepository
@@ -49,7 +49,9 @@ class MainActivity : ComponentActivity() {
         WindowCompat.setDecorFitsSystemWindows(window, false)
 
         // ✅ Setup sync callback
-        syncManager.setupSyncCallback(inventoryRepository)
+        //syncManager.setupSyncCallback(inventoryRepository)
+
+        syncOrchestrator.setupRepositoryCallback(inventoryRepository)
 
         setContent {
             Companion159Theme {
@@ -79,11 +81,9 @@ class MainActivity : ComponentActivity() {
                         isAuthenticated = authState.isAuthenticated
                     )
 
-                    // Trigger startup sync
                     LaunchedEffect(authState.isAuthenticated, currentPosition) {
                         if (authState.isAuthenticated && currentPosition != null) {
-                            Log.d(TAG, "✅ Auth + Position ready - triggering startup sync")
-                            syncManager.syncOnStartup()
+                            syncOrchestrator.syncOnStartup()
                         }
                     }
                 }

@@ -2,13 +2,12 @@ package com.lifelover.companion159.presentation.viewmodels
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.lifelover.companion159.data.remote.sync.SyncManager
+import com.lifelover.companion159.data.remote.sync.SyncOrchestrator
 import com.lifelover.companion159.data.remote.sync.SyncState
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 /**
@@ -20,34 +19,21 @@ import javax.inject.Inject
  */
 @HiltViewModel
 class MainMenuViewModel @Inject constructor(
-    private val syncManager: SyncManager
+    private val syncOrchestrator: SyncOrchestrator
 ) : ViewModel() {
 
-    /**
-     * Observe sync state for UI
-     * Shows loading indicator and last sync time
-     */
-    val syncState: StateFlow<SyncState> = syncManager.syncState
+    val syncState: StateFlow<SyncState> = syncOrchestrator.syncState
         .stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000),
             initialValue = SyncState()
         )
 
-    /**
-     * Trigger manual full sync from UI button
-     * Downloads all items and uploads pending changes
-     */
     fun triggerManualSync() {
-        viewModelScope.launch {
-            syncManager.forceFullSync()
-        }
+        syncOrchestrator.forceFullSync()
     }
 
-    /**
-     * Clear sync error message
-     */
     fun clearError() {
-        syncManager.clearError()
+        syncOrchestrator.clearError()
     }
 }
