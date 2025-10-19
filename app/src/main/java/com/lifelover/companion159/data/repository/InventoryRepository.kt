@@ -119,7 +119,10 @@ class InventoryRepository @Inject constructor(
         )
 
         Log.d(TAG, "✅ Item updated: $updatedRows rows, triggering sync")
-        Log.d(TAG, "   Quantities: available=${item.availableQuantity}, needed=${item.neededQuantity}")
+        Log.d(
+            TAG,
+            "   Quantities: available=${item.availableQuantity}, needed=${item.neededQuantity}"
+        )
 
         onNeedsSyncCallback?.invoke()
 
@@ -159,27 +162,6 @@ class InventoryRepository @Inject constructor(
         onNeedsSyncCallback?.invoke()
 
         return updatedRows
-    }
-
-    /**
-     * Soft delete and trigger sync
-     */
-    suspend fun softDeleteItem(itemId: Long): Int {
-        val crewName = requireCrewName()
-
-        val existingItem = dao.getItemById(itemId)
-            ?: throw IllegalArgumentException("Item $itemId not found")
-
-        validateItemOwnership(existingItem, crewName)
-
-        val deletedRows = dao.softDeleteItem(itemId)
-
-        Log.d(TAG, "✅ Item deleted: $deletedRows rows, triggering sync")
-
-        // Trigger sync immediately
-        onNeedsSyncCallback?.invoke()
-
-        return deletedRows
     }
 
     private fun validateItemOwnership(

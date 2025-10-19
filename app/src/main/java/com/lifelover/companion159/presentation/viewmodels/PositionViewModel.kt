@@ -66,16 +66,13 @@ class PositionViewModel @Inject constructor(
      */
     fun savePosition(position: String) {
         viewModelScope.launch {
-            // Validate input
             val validationResult = InputValidator.validatePosition(position)
 
             validationResult
                 .onSuccess { validPosition ->
                     try {
                         _state.update { it.copy(isLoading = true, error = null) }
-
                         positionRepository.savePosition(validPosition)
-
                         _state.update {
                             it.copy(
                                 isLoading = false,

@@ -1,19 +1,15 @@
 package com.lifelover.companion159
 
-import android.util.Log
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.remember
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.toRoute
 import com.lifelover.companion159.data.remote.SupabaseConfig
-import com.lifelover.companion159.data.repository.PositionRepository
 import com.lifelover.companion159.domain.models.DisplayCategory
 import com.lifelover.companion159.presentation.ui.auth.LoginScreen
 import com.lifelover.companion159.presentation.ui.inventory.AddEditItemScreen
@@ -57,12 +53,6 @@ fun AppNavigation(
         !SupabaseConfig.isConfigured -> MainMenu
         !isAuthenticated -> Login
         else -> Position
-    }
-
-    fun redirect () {
-        navController.navigate(Position) {
-            popUpTo(MainMenu) { inclusive = true }
-        }
     }
 
     NavHost(

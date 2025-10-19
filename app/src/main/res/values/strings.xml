@@ -126,4 +126,10 @@
     <string name="content_description_back_button">Повернутися назад</string>
     <string name="content_description_save_button">Зберегти зміни</string>
     <string name="sync">Синхронізація</string>
+
+    <string name="delete_item_from_category">Видалити \"%1$s\" з \"%2$s\"?</string>
+    <string name="delete_explanation_simple">Елемент буде видалено з цієї категорії</string>
+    <string name="delete_explanation_with_needed">Елемент залишиться в категорії \"Потреби\" з кількістю %1$d</string>
+    <string name="delete_explanation_with_available">Елемент залишиться в категорії \"Наявність\" з кількістю %1$d</string>
+
 </resources>

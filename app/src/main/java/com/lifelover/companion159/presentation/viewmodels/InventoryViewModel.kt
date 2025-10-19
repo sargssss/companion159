@@ -197,12 +197,16 @@ class InventoryViewModel @Inject constructor(
     }
 
     /**
-     * Delete item
+     * Delete item from current display category
+     * Sets relevant quantity to 0, keeping other quantity intact
      * Uses DeleteItemUseCase for business logic
      */
-    fun deleteItem(item: InventoryItem) {
+    fun deleteItem(item: InventoryItem, displayCategory: DisplayCategory) {
         viewModelScope.launch {
-            deleteItemUseCase(item).fold(
+            deleteItemUseCase(
+                itemId = item.id,
+                displayCategory = displayCategory
+            ).fold(
                 onSuccess = {
                     _state.update {
                         it.copy(

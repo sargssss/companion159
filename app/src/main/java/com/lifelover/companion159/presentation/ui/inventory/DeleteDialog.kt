@@ -12,6 +12,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import com.lifelover.companion159.R
+import com.lifelover.companion159.domain.models.DisplayCategory
 import com.lifelover.companion159.domain.models.InventoryItem
 import com.lifelover.companion159.presentation.ui.components.DestructiveButton
 import com.lifelover.companion159.presentation.ui.components.SecondaryButton

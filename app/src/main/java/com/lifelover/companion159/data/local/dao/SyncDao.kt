@@ -137,42 +137,4 @@ interface SyncDao {
         ORDER BY createdAt DESC
     """)
     suspend fun getAllItemsForSync(userId: String?, crewName: String): List<InventoryItemEntity>
-
-    /**
-     * Reset all sync flags
-     *
-     * DANGEROUS: Sets needsSync=1 for all items
-     * Use only for force full sync or troubleshooting
-     *
-     * @param crewName Crew name to reset
-     */
-    @Query("""
-        UPDATE inventory_items 
-        SET needsSync = 1
-        WHERE crewName = :crewName
-    """)
-    suspend fun resetSyncFlags(crewName: String): Int
-
-    /**
-     * Get items by sync status
-     *
-     * Useful for debugging and monitoring
-     *
-     * @param needsSync Sync status to filter by
-     * @param crewName Crew name to filter by
-     * @param userId Current user ID
-     * @return List of items matching status
-     */
-    @Query("""
-        SELECT * FROM inventory_items 
-        WHERE needsSync = :needsSync
-        AND crewName = :crewName
-        AND (userId = :userId OR userId IS NULL)
-        ORDER BY lastModified DESC
-    """)
-    suspend fun getItemsBySyncStatus(
-        needsSync: Boolean,
-        crewName: String,
-        userId: String?
-    ): List<InventoryItemEntity>
 }
