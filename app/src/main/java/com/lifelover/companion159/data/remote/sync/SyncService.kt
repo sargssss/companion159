@@ -21,13 +21,13 @@ import javax.inject.Singleton
  * 2. Download server items to local DB
  */
 @Singleton
-class SimpleSyncService @Inject constructor(
+class SyncService @Inject constructor(
     private val inventoryDao: InventoryDao,
     private val syncDao: SyncDao,
     private val api: SupabaseInventoryApi
 ) {
     companion object {
-        private const val TAG = "SimpleSyncService"
+        private const val TAG = "SyncService"
 
         // ✅ Helper для форматування дати
         private fun formatDate(date: java.util.Date?): String? {

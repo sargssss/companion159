@@ -6,7 +6,7 @@ import com.lifelover.companion159.data.local.dao.InventoryDao
 import com.lifelover.companion159.data.local.dao.SyncDao
 import com.lifelover.companion159.data.remote.api.SupabaseInventoryApi
 import com.lifelover.companion159.data.remote.auth.SupabaseAuthService
-import com.lifelover.companion159.data.remote.sync.SimpleSyncService
+import com.lifelover.companion159.data.remote.sync.SyncService
 import com.lifelover.companion159.data.remote.sync.SyncOrchestrator
 import com.lifelover.companion159.data.repository.PositionRepository
 import dagger.Module
@@ -26,8 +26,8 @@ object SyncModule {
         inventoryDao: InventoryDao,
         syncDao: SyncDao,
         api: SupabaseInventoryApi
-    ): SimpleSyncService {
-        return SimpleSyncService(inventoryDao, syncDao, api)
+    ): SyncService {
+        return SyncService(inventoryDao, syncDao, api)
     }
 
     @Provides
@@ -36,7 +36,7 @@ object SyncModule {
         @ApplicationContext context: Context,
         authService: SupabaseAuthService,
         positionRepository: PositionRepository,
-        syncService: SimpleSyncService
+        syncService: SyncService
     ): SyncOrchestrator {
         return SyncOrchestrator(context, authService, positionRepository, syncService)
     }

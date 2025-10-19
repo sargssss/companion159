@@ -28,6 +28,7 @@ object AppModule {
         return Json {
             ignoreUnknownKeys = true
             encodeDefaults = true
+            explicitNulls = false
         }
     }
 }

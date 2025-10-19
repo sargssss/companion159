@@ -15,7 +15,7 @@ import java.util.*
  * - Conflict resolution timestamps
  * - Category mapping
  */
-object SimpleSyncMapper {
+object SyncMapper {
 
     private val iso8601Format = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSXXX", Locale.US).apply {
         timeZone = TimeZone.getTimeZone("UTC")

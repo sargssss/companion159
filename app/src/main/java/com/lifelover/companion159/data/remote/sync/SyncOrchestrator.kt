@@ -32,7 +32,7 @@ class SyncOrchestrator @Inject constructor(
     @ApplicationContext private val context: Context,
     private val authService: SupabaseAuthService,
     private val positionRepository: PositionRepository,
-    private val syncService: SimpleSyncService
+    private val syncService: SyncService
 ) {
     companion object {
         private const val TAG = "SyncOrchestrator"

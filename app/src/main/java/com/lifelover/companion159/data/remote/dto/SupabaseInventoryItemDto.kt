@@ -23,10 +23,10 @@ data class SupabaseInventoryItemDto(
     val itemName: String,
 
     @SerialName("available_quantity")
-    val availableQuantity: Int = 0,
+    val availableQuantity: Int,
 
     @SerialName("needed_quantity")
-    val neededQuantity: Int = 0,
+    val neededQuantity: Int,
 
     @SerialName("item_category")
     val itemCategory: String? = null,
