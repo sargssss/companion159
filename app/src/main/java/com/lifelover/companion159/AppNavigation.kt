@@ -1,11 +1,9 @@
 package com.lifelover.companion159
 
-import android.util.Log
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.remember
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavHostController
@@ -56,17 +54,39 @@ fun AppNavigation(
 ) {
     val TAG = "AppNavigation"
 
-    val startDestination = when {
+    // Calculate current destination based on auth state
+    val currentDestination = when {
         !SupabaseConfig.isConfigured -> MainMenu
         !isAuthenticated -> Login
         positionRepository.shouldShowPositionSelection() -> Position
         else -> MainMenu
     }
 
-    Log.d(TAG, "🚀 Starting at: ${startDestination::class.simpleName}")
-    Log.d(TAG, "   authenticated: $isAuthenticated")
-    Log.d(TAG, "   currentPosition: $currentPosition")
-    Log.d(TAG, "   shouldShowPosition: ${positionRepository.shouldShowPositionSelection()}")
+    // Initial destination - only set once when NavHost is created
+    val startDestination = remember {
+        when {
+            !SupabaseConfig.isConfigured -> MainMenu
+            !isAuthenticated -> Login
+            positionRepository.shouldShowPositionSelection() -> Position
+            else -> MainMenu
+        }
+    }
+
+    // Navigate to correct destination when state changes
+    LaunchedEffect(currentDestination) {
+        // Only navigate if destination changed and it's not the same as current
+        val currentBackStackEntry = navController.currentBackStackEntry
+        val currentRoute = currentBackStackEntry?.destination?.route
+
+        // Navigate only if destination actually changed
+        if (currentDestination::class.simpleName != currentRoute) {
+            navController.navigate(currentDestination) {
+                // Clear back stack for major state transitions
+                popUpTo(0) { inclusive = true }
+                launchSingleTop = true
+            }
+        }
+    }
 
     NavHost(
         navController = navController,
