@@ -1,5 +1,6 @@
 package com.lifelover.companion159.presentation.ui.inventory
 
+import android.util.Log
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -116,6 +117,7 @@ fun InventoryScreen(
                             item = item,
                             displayCategory = displayCategory,
                             onQuantityChange = { newQuantity ->
+                                Log.d("InventoryScreen", "Quantity change: ${item.itemName} → $newQuantity")
                                 viewModel.updateQuantity(item.id, newQuantity, displayCategory)
                             },
                             onDelete = { itemToDelete = item },

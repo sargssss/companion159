@@ -17,6 +17,13 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
@@ -26,16 +33,60 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.lifelover.companion159.R
+import kotlinx.coroutines.FlowPreview
+import kotlinx.coroutines.flow.debounce
 
 /**
- * Reusable quantity input section
+ * Reusable quantity input section with proper debounced changes
+ *
+ * Features:
+ * - Increment/decrement buttons for quick adjustments
+ * - Direct text input for precise quantity entry
+ * - Input validation (0-999999 range)
+ * - Debounced callbacks (500ms) that cancels previous pending calls
+ *
+ * Debounce logic:
+ * - User changes trigger local state update immediately (responsive UI)
+ * - Actual callback fires only after 500ms of inactivity
+ * - If user changes value again within 500ms → previous callback is cancelled
+ * - New callback scheduled for the updated value
+ * - Prevents multiple rapid sync operations and network requests
+ *
+ * Example:
+ * - User types: 1 → 10 → 100 (within 500ms each)
+ * - Only one callback fires with final value (100) after 500ms of no changes
+ * - NOT three separate callbacks for each intermediate value
  */
+@OptIn(FlowPreview::class)
 @Composable
 fun QuantitySection(
     title: String,
     quantity: Int,
     onQuantityChange: (Int) -> Unit
 ) {
+    // Local state for immediate UI updates (responsive input)
+    var localQuantity by remember { mutableIntStateOf(quantity) }
+
+    // Get latest callback to use in LaunchedEffect
+    val latestOnQuantityChange by rememberUpdatedState(onQuantityChange)
+
+    // Debounce logic: observe local quantity changes with 500ms debounce
+    // Previous pending calls are automatically cancelled when new value arrives
+    LaunchedEffect(Unit) {
+        snapshotFlow { localQuantity }
+            .debounce(500L) // Wait 500ms of inactivity before emitting
+            .collect { debouncedValue ->
+                latestOnQuantityChange(debouncedValue)
+            }
+    }
+
+    // Sync external quantity changes to local state
+    LaunchedEffect(quantity) {
+        if (localQuantity != quantity) {
+            localQuantity = quantity
+        }
+    }
+
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text(
             text = title,
@@ -56,9 +107,10 @@ fun QuantitySection(
                 horizontalArrangement = Arrangement.Center,
                 verticalAlignment = Alignment.CenterVertically
             ) {
+                // Decrement button
                 FilledIconButton(
-                    onClick = { if (quantity > 0) onQuantityChange(quantity - 1) },
-                    enabled = quantity > 0,
+                    onClick = { if (localQuantity > 0) localQuantity-- },
+                    enabled = localQuantity > 0,
                     modifier = Modifier.size(48.dp)
                 ) {
                     Icon(
@@ -70,17 +122,21 @@ fun QuantitySection(
 
                 Spacer(modifier = Modifier.width(16.dp))
 
+                // Text input with validation
                 OutlinedTextField(
-                    value = quantity.toString(),
+                    value = localQuantity.toString(),
                     onValueChange = { value ->
                         if (value.isEmpty()) {
-                            onQuantityChange(0)
+                            // Allow empty input (user may continue typing)
+                            localQuantity = 0
                         } else {
+                            // Parse and validate input
                             value.toIntOrNull()?.let { newQty ->
                                 if (newQty in 0..999999) {
-                                    onQuantityChange(newQty)
+                                    // Valid range - update local state
+                                    localQuantity = newQty
                                 }
-                                // Silently ignore out-of-range, or show error
+                                // Out of range - silently ignore (no UI update)
                             }
                         }
                     },
@@ -91,13 +147,16 @@ fun QuantitySection(
                         textAlign = TextAlign.Center
                     ),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    isError = quantity < 0 || quantity > 999999
+                    isError = localQuantity < 0 || localQuantity > 999999
                 )
 
                 Spacer(modifier = Modifier.width(16.dp))
 
+                // Increment button
                 FilledIconButton(
-                    onClick = { onQuantityChange(quantity + 1) },
+                    onClick = {
+                        if (localQuantity < 999999) localQuantity++
+                    },
                     modifier = Modifier.size(48.dp)
                 ) {
                     Icon(

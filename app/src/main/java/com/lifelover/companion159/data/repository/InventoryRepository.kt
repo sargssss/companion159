@@ -7,6 +7,7 @@ import com.lifelover.companion159.data.remote.auth.SupabaseAuthService
 import com.lifelover.companion159.domain.models.InventoryItem
 import com.lifelover.companion159.domain.models.QuantityType
 import com.lifelover.companion159.domain.models.toEntity
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.*
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -17,7 +18,10 @@ import javax.inject.Singleton
  * After every CRUD operation:
  * 1. Update local DB with needsSync=1
  * 2. Trigger immediate sync
+ *
+ * FIXED: Eliminated Flow wrapping anti-pattern and memory leaks
  */
+@OptIn(ExperimentalCoroutinesApi::class)
 @Singleton
 class InventoryRepository @Inject constructor(
     private val dao: InventoryDao,
@@ -44,36 +48,114 @@ class InventoryRepository @Inject constructor(
             ?: throw IllegalStateException("Position must be set")
     }
 
-    // Query methods
+    /**
+     * FIXED: Direct map instead of wrapping Flow in flow
+     * Benefits:
+     * - No anti-pattern Flow wrapping
+     * - Single subscription to DAO
+     * - Automatic unsubscribe when collector disconnects
+     * - Better memory management
+     *
+     * Flow chain:
+     * DAO returns StateFlow<List<Entity>> (cold)
+     * → flatMapLatest gets current userId + crewName
+     * → map transforms Entity to Domain
+     * → Result: Flow<List<InventoryItem>>
+     */
     fun getAvailabilityItems(): Flow<List<InventoryItem>> {
-        return flow {
-            val userId = requireUserId()
-            val crewName = requireCrewName()
-            dao.getAvailabilityItems(userId, crewName).collect { entities ->
-                emit(entities.map { it.toDomain() })
+        Log.d(TAG, "Creating flow: Availability items")
+
+        return positionRepository.currentPosition
+            .flatMapLatest { crewName ->
+                // Only subscribe to DAO when crew name changes
+                if (crewName == null) {
+                    flowOf(emptyList())
+                } else {
+                    try {
+                        val userId = requireUserId()
+                        dao.getAvailabilityItems(userId, crewName)
+                            .map { entities ->
+                                // Transform domain layer once per emission
+                                entities.map { it.toDomain() }
+                            }
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Error loading availability items", e)
+                        flowOf(emptyList())
+                    }
+                }
             }
-        }
+            .distinctUntilChanged()  // Skip duplicate emissions
+            .catch { error ->
+                Log.e(TAG, "Error in availability flow", error)
+                emit(emptyList())
+            }
     }
 
+    /**
+     * FIXED: Same pattern as getAvailabilityItems
+     * Returns ammunition items (availableQuantity > 0)
+     */
     fun getAmmunitionItems(): Flow<List<InventoryItem>> {
-        return flow {
-            val userId = requireUserId()
-            val crewName = requireCrewName()
-            dao.getAmmunitionItems(userId, crewName).collect { entities ->
-                emit(entities.map { it.toDomain() })
+        Log.d(TAG, "Creating flow: Ammunition items")
+
+        return positionRepository.currentPosition
+            .flatMapLatest { crewName ->
+                if (crewName == null) {
+                    flowOf(emptyList())
+                } else {
+                    try {
+                        val userId = requireUserId()
+                        dao.getAmmunitionItems(userId, crewName)
+                            .map { entities ->
+                                entities.map { it.toDomain() }
+                            }
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Error loading ammunition items", e)
+                        flowOf(emptyList())
+                    }
+                }
             }
-        }
+            .distinctUntilChanged()
+            .catch { error ->
+                Log.e(TAG, "Error in ammunition flow", error)
+                emit(emptyList())
+            }
     }
 
+    /**
+     * FIXED: Same pattern as getAvailabilityItems
+     * Returns needs items (neededQuantity > 0)
+     */
     fun getNeedsItems(): Flow<List<InventoryItem>> {
-        return flow {
-            val userId = requireUserId()
-            val crewName = requireCrewName()
-            dao.getNeedsItems(userId, crewName).collect { entities ->
-                emit(entities.map { it.toDomain() })
+        Log.d(TAG, "Creating flow: Needs items")
+
+        return positionRepository.currentPosition
+            .flatMapLatest { crewName ->
+                if (crewName == null) {
+                    flowOf(emptyList())
+                } else {
+                    try {
+                        val userId = requireUserId()
+                        dao.getNeedsItems(userId, crewName)
+                            .map { entities ->
+                                entities.map { it.toDomain() }
+                            }
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Error loading needs items", e)
+                        flowOf(emptyList())
+                    }
+                }
             }
-        }
+            .distinctUntilChanged()
+            .catch { error ->
+                Log.e(TAG, "Error in needs flow", error)
+                emit(emptyList())
+            }
     }
+
+    // ==========================================
+    // CRUD OPERATIONS
+    // ==========================================
 
     /**
      * Insert item and trigger sync
@@ -109,7 +191,7 @@ class InventoryRepository @Inject constructor(
         validateItemOwnership(existingItem, crewName)
 
         // Update with needsSync=1
-        val updatedRows = dao.updateItemWithNeeds(
+        val updatedRows = dao.updateLocalItem(
             id = item.id,
             name = item.itemName.trim(),
             availableQuantity = item.availableQuantity,
@@ -134,6 +216,18 @@ class InventoryRepository @Inject constructor(
      *
      * CRITICAL: When quantity becomes 0, still send update
      * The other quantity might be > 0
+     *
+     * Execution flow:
+     * 1. Validate item exists
+     * 2. Validate item belongs to current crew
+     * 3. Update DB with needsSync=1
+     * 4. Trigger sync callback only after DB update succeeds
+     * 5. Return number of updated rows
+     *
+     * Sync protection:
+     * - Sync callback fires AFTER DB update completes
+     * - Multiple rapid calls debounced at UI layer (500ms)
+     * - Sync layer protected by mutex against concurrent operations
      */
     suspend fun updateQuantity(
         itemId: Long,
@@ -154,12 +248,16 @@ class InventoryRepository @Inject constructor(
             QuantityType.NEEDED -> dao.updateNeededQuantity(itemId, quantity)
         }
 
-        Log.d(TAG, "✅ Quantity updated: ${quantityType.name}=$quantity")
-        Log.d(TAG, "   Item: ${existingItem.itemName} (ID=$itemId)")
+        Log.d(TAG, "✅ DB updated: $updatedRows rows affected")
 
-        // CRITICAL: Always sync even when quantity=0
-        // The item still exists and other quantity might be > 0
-        onNeedsSyncCallback?.invoke()
+        // CRITICAL: Trigger sync AFTER DB update succeeds
+        // This ensures we only sync if DB operation was successful
+        if (updatedRows > 0) {
+            Log.d(TAG, "🔄 Triggering sync callback")
+            onNeedsSyncCallback?.invoke()
+        } else {
+            Log.w(TAG, "⚠️ No rows updated - skipping sync trigger")
+        }
 
         return updatedRows
     }

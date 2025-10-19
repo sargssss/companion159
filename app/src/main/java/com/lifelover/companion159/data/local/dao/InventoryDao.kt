@@ -91,7 +91,7 @@ interface InventoryDao {
             lastModified = :timestamp
         WHERE id = :id
     """)
-    suspend fun updateItemWithNeeds(
+    suspend fun updateLocalItem(
         id: Long,
         name: String,
         availableQuantity: Int,

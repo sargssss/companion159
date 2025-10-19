@@ -59,7 +59,7 @@ object SyncMapper {
      * @param userId Current user ID for item ownership
      * @return Entity ready for local database insert
      */
-    fun dtoToNewEntity(
+    fun dtoToNewLocalEntity(
         dto: SupabaseInventoryItemDto,
         userId: String?
     ): InventoryItemEntity {
@@ -89,7 +89,7 @@ object SyncMapper {
      * @param dto Remote data from server
      * @return Updated entity ready for database update
      */
-    fun dtoToExistingEntity(
+    fun dtoToExistingLocalEntity(
         existing: InventoryItemEntity,
         dto: SupabaseInventoryItemDto
     ): InventoryItemEntity {

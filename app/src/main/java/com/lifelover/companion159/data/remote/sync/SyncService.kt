@@ -179,6 +179,9 @@ class SyncService @Inject constructor(
 
             if (remoteItems.isEmpty()) {
                 Log.d(TAG, "✅ No server changes")
+                // Update timestamp EVEN if no items (incremental sync completed)
+                lastSyncTimestamp = Date()
+                Log.d(TAG, "⏰ Updated lastSyncTimestamp to: ${SyncDateUtils.formatForSync(lastSyncTimestamp)}")
                 Log.d(TAG, "========== DOWNLOAD END ==========")
                 return@withContext Result.success(0)
             }
@@ -202,7 +205,7 @@ class SyncService @Inject constructor(
                             deletedCount++
                             Log.d(TAG, "✅ Soft deleted: ${remoteDto.itemName}")
                         }
-                        return@forEach // Skip other processing for deleted items
+                        return@forEach
                     }
 
                     // Find existing local item
@@ -210,7 +213,7 @@ class SyncService @Inject constructor(
 
                     if (localItem == null) {
                         // New from server - INSERT
-                        val entity = SyncMapper.dtoToNewEntity(remoteDto, userId)
+                        val entity = SyncMapper.dtoToNewLocalEntity(remoteDto, userId)
                         inventoryDao.insertItem(entity)
                         mergedCount++
                         Log.d(TAG, "✅ Inserted from server: ${remoteDto.itemName}")
@@ -219,8 +222,8 @@ class SyncService @Inject constructor(
                         // Existing locally - check if remote is newer (MERGE CONFLICT RESOLUTION)
                         if (SyncMapper.isRemoteNewer(localItem.lastModified, remoteDto.updatedAt)) {
                             // Remote is newer - UPDATE local with remote
-                            val updatedEntity = SyncMapper.dtoToExistingEntity(localItem, remoteDto)
-                            inventoryDao.updateItemWithNeeds(
+                            val updatedEntity = SyncMapper.dtoToExistingLocalEntity(localItem, remoteDto)
+                            inventoryDao.updateLocalItem(
                                 id = updatedEntity.id,
                                 name = updatedEntity.itemName,
                                 availableQuantity = updatedEntity.availableQuantity,
@@ -243,7 +246,9 @@ class SyncService @Inject constructor(
             }
 
             // Update last sync timestamp for next incremental sync
+            // CRITICAL: Do this AFTER processing all items
             lastSyncTimestamp = Date()
+            Log.d(TAG, "⏰ Updated lastSyncTimestamp to: ${SyncDateUtils.formatForSync(lastSyncTimestamp)}")
 
             Log.d(TAG, "✅ Download completed: $mergedCount merged, $deletedCount deleted")
             Log.d(TAG, "========== DOWNLOAD END ==========")

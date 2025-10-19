@@ -23,7 +23,8 @@ import javax.inject.Singleton
 data class SyncState(
     val isSyncing: Boolean = false,
     val lastSyncTime: Long? = null,
-    val error: String? = null
+    val error: String? = null,
+    val pendingSyncs: Int = 0  // Track queued sync requests
 )
 
 @Singleton
@@ -42,6 +43,9 @@ class SyncOrchestrator @Inject constructor(
     private val syncMutex = Mutex()
     private var lastSyncTriggerTime = 0L
 
+    // Track if sync is queued while another is in progress
+    private var syncQueuedWhileBusy = false
+
     private val _syncState = MutableStateFlow(SyncState())
     val syncState: StateFlow<SyncState> = _syncState.asStateFlow()
 
@@ -49,9 +53,18 @@ class SyncOrchestrator @Inject constructor(
         repository.onNeedsSyncCallback = { triggerSync() }
     }
 
+    /**
+     * Trigger sync with queue support
+     *
+     * If sync is already running:
+     * - Mark that another sync is needed (queued)
+     * - When current sync finishes, queued sync will run automatically
+     * - This prevents losing changes when user edits items rapidly
+     */
     fun triggerSync(forceFullDownload: Boolean = false) {
         if (_syncState.value.isSyncing) {
-            Log.d(TAG, "⏭️ Already syncing")
+            Log.d(TAG, "⏭️ Already syncing - queueing next sync")
+            syncQueuedWhileBusy = true
             return
         }
 
@@ -69,6 +82,13 @@ class SyncOrchestrator @Inject constructor(
 
         syncScope.launch {
             performSync(forceFullDownload)
+
+            // Check if sync was queued while we were syncing
+            if (syncQueuedWhileBusy) {
+                syncQueuedWhileBusy = false
+                Log.d(TAG, "🔄 Queued sync detected - running again")
+                performSync(forceFullDownload = false)
+            }
         }
     }
 
@@ -76,29 +96,44 @@ class SyncOrchestrator @Inject constructor(
         syncMutex.withLock {
             try {
                 _syncState.value = SyncState(isSyncing = true)
-                Log.d(TAG, "🔄 SYNC START")
+                Log.d(TAG, "========== SYNC START ==========")
+                Log.d(TAG, "Force full download: $forceFullDownload")
 
                 val userId = authService.getUserId()
                 val crewName = positionRepository.getPosition()!!
 
-                // Upload
-                syncService.uploadPendingItems(userId, crewName)
-                    .onFailure { Log.e(TAG, "Upload error: ${it.message}") }
+                Log.d(TAG, "Syncing for userId=$userId, crewName=$crewName")
 
-                // Download
-                syncService.downloadServerItems(
+                // Upload pending items
+                val uploadResult = syncService.uploadPendingItems(userId, crewName)
+                uploadResult
+                    .onSuccess { count ->
+                        Log.d(TAG, "✅ Upload: $count items")
+                    }
+                    .onFailure { error ->
+                        Log.e(TAG, "⚠️ Upload error: ${error.message}")
+                    }
+
+                // Download server changes
+                val downloadResult = syncService.downloadServerItems(
                     crewName = crewName,
                     userId = userId,
                     forceFullSync = forceFullDownload
                 )
-                    .onFailure { Log.e(TAG, "Download error: ${it.message}") }
+                downloadResult
+                    .onSuccess { count ->
+                        Log.d(TAG, "✅ Download: $count items")
+                    }
+                    .onFailure { error ->
+                        Log.e(TAG, "⚠️ Download error: ${error.message}")
+                    }
 
                 _syncState.value = SyncState(
                     isSyncing = false,
                     lastSyncTime = System.currentTimeMillis()
                 )
 
-                Log.d(TAG, "🔄 SYNC END ✅")
+                Log.d(TAG, "========== SYNC END ✅ ==========")
 
             } catch (e: Exception) {
                 Log.e(TAG, "❌ Sync failed", e)
@@ -106,6 +141,7 @@ class SyncOrchestrator @Inject constructor(
                     isSyncing = false,
                     error = e.message
                 )
+                Log.d(TAG, "========== SYNC END ❌ ==========")
             }
         }
     }
