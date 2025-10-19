@@ -30,12 +30,18 @@ android {
             localProperties.load(FileInputStream(localPropertiesFile))
         }
 
-        buildConfigField("String", "SUPABASE_URL",
-            "\"${localProperties.getProperty("SUPABASE_URL", "")}\"")
-        buildConfigField("String", "SUPABASE_ANON_KEY",
-            "\"${localProperties.getProperty("SUPABASE_ANON_KEY", "")}\"")
-        buildConfigField("String", "GOOGLE_WEB_CLIENT_ID",
-            "\"${localProperties.getProperty("GOOGLE_WEB_CLIENT_ID", "")}\"")
+        buildConfigField(
+            "String", "SUPABASE_URL",
+            "\"${localProperties.getProperty("SUPABASE_URL", "")}\""
+        )
+        buildConfigField(
+            "String", "SUPABASE_ANON_KEY",
+            "\"${localProperties.getProperty("SUPABASE_ANON_KEY", "")}\""
+        )
+        buildConfigField(
+            "String", "GOOGLE_WEB_CLIENT_ID",
+            "\"${localProperties.getProperty("GOOGLE_WEB_CLIENT_ID", "")}\""
+        )
     }
 
     buildTypes {
@@ -90,6 +96,8 @@ dependencies {
     implementation("com.jakewharton.retrofit:retrofit2-kotlinx-serialization-converter:1.0.0")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.0")
 
+    // For ServiceCompat
+    implementation("androidx.core:core:1.12.0")
 
     // Kotlinx Serialization
     implementation(libs.kotlinx.serialization.json)

@@ -1,23 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="com.lifelover.companion159"
-    xmlns:tools="http://schemas.android.com/tools">
+    package="com.lifelover.companion159">
 
-    <!-- Існуючі permissions -->
-    <uses-permission android:name="android.permission.INTERNET"/>
-    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
-    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <!-- Network monitoring -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <!-- For boot completion -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
-
-    <!-- НОВІ КРИТИЧНІ permissions для фонової роботи -->
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC"
-        android:minSdkVersion="34" />
-    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-
-    <!-- Для Android 12+ (API 31+) - точні алярми -->
-    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
-    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
 
     <application
         android:name=".CompanionApplication"
@@ -30,12 +20,15 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.Companion159">
 
+        <service
+            android:name=".data.remote.sync.SyncBackgroundService"
+            android:enabled="true"
+            android:exported="false"
+            android:foregroundServiceType="specialUse" />
 
-        <!-- ==================== ACTIVITIES ==================== -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
-            android:label="@string/app_name"
             android:theme="@style/Theme.Companion159">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />

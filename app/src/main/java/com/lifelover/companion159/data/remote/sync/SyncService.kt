@@ -260,5 +260,9 @@ class SyncService @Inject constructor(
         lastSyncTimestamp = null
     }
 
+    suspend fun getPendingSyncCount(userId: String?, crewName: String): Int {
+        return syncDao.getPendingSyncCount(userId, crewName)
+    }
+
     fun getLastSyncTimestamp(): Date? = lastSyncTimestamp
 }

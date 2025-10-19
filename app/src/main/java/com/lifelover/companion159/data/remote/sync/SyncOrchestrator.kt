@@ -111,9 +111,18 @@ class SyncOrchestrator @Inject constructor(
     }
 
     private fun canSync(): Boolean {
-        return authService.isUserAuthenticated() &&
-                positionRepository.getPosition() != null &&
-                hasNetworkConnection()
+        // Check if there's a saved userId (user logged in before)
+        val hasSavedUser = authService.getUserId() != null
+
+        val hasPosition = positionRepository.getPosition() != null
+        val hasNetwork = hasNetworkConnection()
+
+        Log.d(TAG, "canSync check:")
+        Log.d(TAG, "  hasSavedUser: $hasSavedUser")
+        Log.d(TAG, "  hasPosition: $hasPosition")
+        Log.d(TAG, "  hasNetwork: $hasNetwork")
+
+        return hasSavedUser && hasPosition && hasNetwork
     }
 
     private fun hasNetworkConnection(): Boolean {

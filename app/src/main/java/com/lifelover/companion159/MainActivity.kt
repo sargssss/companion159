@@ -1,5 +1,7 @@
 package com.lifelover.companion159
 
+import android.content.Intent
+import android.os.Build
 import android.os.Bundle
 import android.util.Log
 import androidx.activity.ComponentActivity
@@ -21,7 +23,9 @@ import com.lifelover.companion159.presentation.theme.Companion159Theme
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
 import androidx.activity.viewModels
+import com.lifelover.companion159.data.remote.sync.SyncBackgroundService
 import com.lifelover.companion159.data.remote.sync.SyncOrchestrator
+import com.lifelover.companion159.di.PermissionHelper
 import com.lifelover.companion159.presentation.viewmodels.AuthViewModel
 
 @AndroidEntryPoint
@@ -40,6 +44,9 @@ class MainActivity : ComponentActivity() {
     @Inject
     lateinit var inventoryRepository: InventoryRepository
 
+    @Inject
+    lateinit var permissionHelper: PermissionHelper
+
     private val authViewModel: AuthViewModel by viewModels()
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -49,6 +56,15 @@ class MainActivity : ComponentActivity() {
         WindowCompat.setDecorFitsSystemWindows(window, false)
 
         syncOrchestrator.setupRepositoryCallback(inventoryRepository)
+
+        // Check permissions and start background service
+        if (permissionHelper.hasAllPermissions()) {
+            Log.d(TAG, "✅ All permissions granted - starting sync service")
+            startBackgroundSyncService()
+        } else {
+            Log.w(TAG, "⚠️ Some permissions missing (but will attempt to start anyway)")
+            startBackgroundSyncService()
+        }
 
         setContent {
             Companion159Theme {
@@ -87,5 +103,12 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    private fun startBackgroundSyncService() {
+        Log.d(TAG, "🚀 Starting background sync service")
+
+        val intent = Intent(this, SyncBackgroundService::class.java)
+        startService(intent)
     }
 }
