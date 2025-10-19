@@ -4,16 +4,6 @@ import com.lifelover.companion159.domain.models.AppError
 
 /**
  * Centralized input validation logic
- *
- * Provides type-safe validation with specific error types
- * All validation rules in one place for consistency
- *
- * Usage:
- * ```
- * InputValidator.validateItemName(name)
- *     .onSuccess { validName -> ... }
- *     .onFailure { error -> showError(error) }
- * ```
  */
 object InputValidator {
 
@@ -30,6 +20,7 @@ object InputValidator {
             trimmed.isBlank() -> Result.failure(
                 AppError.Validation.EmptyField(fieldName = "name")
             )
+
             trimmed.length > 100 -> Result.failure(
                 AppError.Validation.OutOfRange(
                     fieldName = "name",
@@ -37,6 +28,7 @@ object InputValidator {
                     max = 100
                 )
             )
+
             else -> Result.success(trimmed)
         }
     }
@@ -56,6 +48,7 @@ object InputValidator {
                     max = null
                 )
             )
+
             quantity > 999999 -> Result.failure(
                 AppError.Validation.OutOfRange(
                     fieldName = fieldName,
@@ -63,15 +56,21 @@ object InputValidator {
                     max = 999999
                 )
             )
+
             else -> Result.success(quantity)
         }
     }
 
     /**
-     * Validate position/crew name
+     * Validate and format position/crew name
      * Rules:
      * - Cannot be blank
      * - Length between 2-50 characters
+     * - First letter uppercase, rest lowercase
+     * - Trim whitespace
+     *
+     * @param position Raw position input
+     * @return Result with formatted position string
      */
     fun validatePosition(position: String): Result<String> {
         val trimmed = position.trim()
@@ -80,6 +79,7 @@ object InputValidator {
             trimmed.isBlank() -> Result.failure(
                 AppError.Validation.EmptyField(fieldName = "position")
             )
+
             trimmed.length < 2 -> Result.failure(
                 AppError.Validation.OutOfRange(
                     fieldName = "position",
@@ -87,6 +87,7 @@ object InputValidator {
                     max = 50
                 )
             )
+
             trimmed.length > 50 -> Result.failure(
                 AppError.Validation.OutOfRange(
                     fieldName = "position",
@@ -94,13 +95,20 @@ object InputValidator {
                     max = 50
                 )
             )
-            else -> Result.success(trimmed)
+
+            else -> Result.success(formatPosition(trimmed))
         }
     }
 
     /**
-     * Validate item for creation
-     * Combines multiple validation rules
+     * Format position string
+     * Rules:
+     * - First letter uppercase
+     * - Rest lowercase
+     * - Already trimmed (caller must trim first)
+     *
+     * @param position Valid trimmed position string
+     * @return Formatted position
      */
     fun validateNewItem(
         name: String,
@@ -114,6 +122,22 @@ object InputValidator {
                 neededQuantity = validateQuantity(neededQuantity, "neededQuantity").getOrThrow()
             )
         }
+    }
+
+    /**
+     * Format position string
+     * Rules:
+     * - First letter uppercase
+     * - Rest lowercase
+     * - Already trimmed (caller must trim first)
+     *
+     * @param position Valid trimmed position string
+     * @return Formatted position
+     */
+    private fun formatPosition(position: String): String {
+        return position
+            .lowercase()
+            .replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }
     }
 
     /**

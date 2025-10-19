@@ -132,4 +132,8 @@
     <string name="delete_explanation_with_needed">Елемент залишиться в категорії \"Потреби\" з кількістю %1$d</string>
     <string name="delete_explanation_with_available">Елемент залишиться в категорії \"Наявність\" з кількістю %1$d</string>
 
+    <string name="current_position">Поточна позиція</string>
+    <string name="position_label_short">Поз.</string>
+    <string name="inventory">Інвентар</string>
+    <string name="start_position">Поточна позиція</string>
 </resources>

@@ -32,6 +32,16 @@ import com.lifelover.companion159.presentation.ui.components.CategoryGrid
 import com.lifelover.companion159.presentation.ui.components.UserMenu
 import com.lifelover.companion159.presentation.viewmodels.AuthViewModel
 import com.lifelover.companion159.presentation.viewmodels.MainMenuViewModel
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.ui.Alignment
+import com.lifelover.companion159.presentation.ui.components.PositionStatusCard
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -44,18 +54,10 @@ fun MainMenuScreen(
 ) {
     val authState by authViewModel.state.collectAsState()
     val syncState by mainMenuViewModel.syncState.collectAsState()
+    val currentPosition by mainMenuViewModel.currentPosition.collectAsState()
+
     var showLogoutDialog by remember { mutableStateOf(false) }
 
-    // Show sync success message
-    var showSyncSuccess by remember { mutableStateOf(false) }
-
-    LaunchedEffect(syncState.lastSyncTime) {
-        if (syncState.lastSyncTime != null && !syncState.isSyncing) {
-            showSyncSuccess = true
-        }
-    }
-
-    // Handle logout navigation
     LaunchedEffect(authState.hasExplicitlyLoggedOut) {
         if (authState.hasExplicitlyLoggedOut) {
             authViewModel.clearLogoutFlag()
@@ -67,13 +69,15 @@ fun MainMenuScreen(
         topBar = {
             TopAppBar(
                 title = {
-                    Text(
-                        text = stringResource(id = R.string.in_stock),
-                        fontWeight = FontWeight.Bold
-                    )
+                    Column {
+                        Text(
+                            text = stringResource(id = R.string.inventory),
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
                 },
                 actions = {
-                    // Manual sync button (for force full sync)
+                    // Manual sync button
                     IconButton(
                         onClick = { mainMenuViewModel.triggerManualSync() },
                         enabled = !syncState.isSyncing
@@ -106,44 +110,24 @@ fun MainMenuScreen(
                     )
                 }
             )
-        },
-        snackbarHost = {
-            // Show success message
-            if (showSyncSuccess) {
-                Snackbar(
-                    modifier = Modifier.padding(16.dp),
-                    action = {
-                        TextButton(onClick = { showSyncSuccess = false }) {
-                            Text("OK")
-                        }
-                    }
-                ) {
-                    Text("✅ Синхронізація завершена")
-                }
-            }
-
-            // Show error message
-            syncState.error?.let { error ->
-                Snackbar(
-                    modifier = Modifier.padding(16.dp),
-                    containerColor = MaterialTheme.colorScheme.errorContainer,
-                    contentColor = MaterialTheme.colorScheme.onErrorContainer,
-                    action = {
-                        TextButton(onClick = { mainMenuViewModel.clearError() }) {
-                            Text("OK")
-                        }
-                    }
-                ) {
-                    Text("❌ Помилка синхронізації: $error")
-                }
-            }
         }
     ) { paddingValues ->
-        // Category grid
-        CategoryGrid(
-            modifier = Modifier.padding(paddingValues),
-            onCategorySelected = onDisplayCategorySelected
-        )
+        Column(
+            modifier = Modifier.padding(paddingValues)
+        ) {
+            if (!currentPosition.isNullOrEmpty()) {
+                PositionStatusCard(
+                    position = currentPosition!!,
+                    onChangePosition = onChangePosition
+                )
+            }
+
+            // Category grid
+            CategoryGrid(
+                modifier = Modifier.padding(vertical = 8.dp),
+                onCategorySelected = onDisplayCategorySelected
+            )
+        }
     }
 
     // Logout confirmation

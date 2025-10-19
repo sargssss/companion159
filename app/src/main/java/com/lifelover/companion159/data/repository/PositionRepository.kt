@@ -63,18 +63,19 @@ class PositionRepository @Inject constructor(
     /**
      * Save selected position
      * Also updates Supabase user metadata with crew_name
+     * Position is already formatted by validator
      */
     suspend fun savePosition(position: String) {
         withContext(Dispatchers.IO) {
             try {
-                // Save to local database
+                // Save to local database (position already formatted)
                 val entity = PreferencesEntity(
                     id = 1,
                     position = position
                 )
                 preferencesDao.insertOrUpdatePreferences(entity)
 
-                // Update Supabase metadata
+                // Update Supabase metadata (position already formatted)
                 authService.updateUserCrewName(position).fold(
                     onSuccess = {
                         Log.d(TAG, "✅ Position saved: $position (local + Supabase)")

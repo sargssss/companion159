@@ -28,7 +28,7 @@ data class PositionState(
  *
  * Responsibilities:
  * - Manage user position/crew name
- * - Validate position input
+ * - Validate and format position input
  * - Provide autocomplete suggestions
  */
 @HiltViewModel
@@ -62,17 +62,22 @@ class PositionViewModel @Inject constructor(
     }
 
     /**
-     * Save position with validation
+     * Save position with validation and formatting
+     * Position is validated and formatted before saving
      */
     fun savePosition(position: String) {
         viewModelScope.launch {
+            // Validate input - returns formatted position
             val validationResult = InputValidator.validatePosition(position)
 
             validationResult
                 .onSuccess { validPosition ->
                     try {
                         _state.update { it.copy(isLoading = true, error = null) }
+
+                        // Save formatted position to repository
                         positionRepository.savePosition(validPosition)
+
                         _state.update {
                             it.copy(
                                 isLoading = false,
