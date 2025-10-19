@@ -182,10 +182,9 @@ class InventoryViewModel @Inject constructor(
             updateQuantityUseCase(
                 itemId = itemId,
                 newQuantity = newQuantity,
-                displayCategory = displayCategory
+                quantityType = displayCategory.quantityType
             ).fold(
                 onSuccess = {
-                    // No success message for inline quantity updates
                     _state.update { it.copy(error = null) }
                 },
                 onFailure = { error ->

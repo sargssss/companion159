@@ -73,8 +73,15 @@ fun QuantitySection(
                 OutlinedTextField(
                     value = quantity.toString(),
                     onValueChange = { value ->
-                        value.toIntOrNull()?.let { newQty ->
-                            if (newQty >= 0) onQuantityChange(newQty)
+                        if (value.isEmpty()) {
+                            onQuantityChange(0)
+                        } else {
+                            value.toIntOrNull()?.let { newQty ->
+                                if (newQty in 0..999999) {
+                                    onQuantityChange(newQty)
+                                }
+                                // Silently ignore out-of-range, or show error
+                            }
                         }
                     },
                     modifier = Modifier.width(100.dp),
@@ -83,7 +90,8 @@ fun QuantitySection(
                         fontWeight = FontWeight.Bold,
                         textAlign = TextAlign.Center
                     ),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    isError = quantity < 0 || quantity > 999999
                 )
 
                 Spacer(modifier = Modifier.width(16.dp))

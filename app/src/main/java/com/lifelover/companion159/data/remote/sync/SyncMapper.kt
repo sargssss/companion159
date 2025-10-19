@@ -3,26 +3,35 @@ package com.lifelover.companion159.data.remote.sync
 import com.lifelover.companion159.data.local.entities.InventoryItemEntity
 import com.lifelover.companion159.data.remote.dto.SupabaseInventoryItemDto
 import com.lifelover.companion159.domain.models.StorageCategory
-import java.text.SimpleDateFormat
-import java.util.*
+import java.util.Date
 
 /**
- * Single mapper for all Local ↔ Remote transformations
+ * Centralized mapper for all local ↔ remote transformations
  *
- * Consolidates:
- * - Entity → DTO (for upload)
- * - DTO → Entity (for download)
- * - Conflict resolution timestamps
- * - Category mapping
+ * Single source of truth for:
+ * - Entity ↔ DTO conversions
+ * - Category name mappings
+ * - Date formatting for sync
+ * - Conflict resolution logic
+ *
+ * By consolidating all transformations here, we ensure:
+ * 1. Consistency across sync operations
+ * 2. Easy to update when server schema changes
+ * 3. No transformation logic scattered in Service layer
+ * 4. Reusable by different sync implementations (Supabase, REST, etc.)
  */
 object SyncMapper {
 
-    private val iso8601Format = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSXXX", Locale.US).apply {
-        timeZone = TimeZone.getTimeZone("UTC")
-    }
+    // ========================================
+    // Entity ↔ DTO Transformations
+    // ========================================
 
     /**
-     * Entity → DTO for server upload
+     * Convert local entity to remote DTO for upload
+     * Handles all transformations: dates, categories, fields
+     *
+     * @param entity Local database entity
+     * @return DTO ready for server upload
      */
     fun entityToDto(entity: InventoryItemEntity): SupabaseInventoryItemDto {
         return SupabaseInventoryItemDto(
@@ -36,21 +45,26 @@ object SyncMapper {
             unit = "шт.",
             priority = entity.priority,
             isActive = entity.isActive,
-            createdAt = formatDate(entity.createdAt),
-            updatedAt = formatDate(entity.lastModified)
+            createdAt = SyncDateUtils.formatForSync(entity.createdAt),
+            updatedAt = SyncDateUtils.formatForSync(entity.lastModified)
         )
     }
 
     /**
-     * DTO → Entity for local storage (new item from server)
+     * Convert remote DTO to new local entity
+     * Used when server has items not in local DB
+     * Creates fresh entity with default sync markers
+     *
+     * @param dto Remote data from server
+     * @param userId Current user ID for item ownership
+     * @return Entity ready for local database insert
      */
     fun dtoToNewEntity(
         dto: SupabaseInventoryItemDto,
         userId: String?
     ): InventoryItemEntity {
         return InventoryItemEntity(
-            id = 0, // Room will generate
-            tenantId = 0,
+            id = 0, // Room will auto-generate
             supabaseId = dto.id,
             itemName = dto.itemName,
             availableQuantity = dto.availableQuantity,
@@ -60,15 +74,20 @@ object SyncMapper {
             crewName = dto.crewName,
             priority = dto.priority,
             isActive = dto.isActive,
-            createdAt = parseDate(dto.createdAt) ?: Date(),
-            lastModified = parseDate(dto.updatedAt) ?: Date(),
-            lastSynced = Date(), // Mark as synced since it came from server
-            needsSync = false,
+            createdAt = SyncDateUtils.parseFromSync(dto.createdAt) ?: Date(),
+            lastModified = SyncDateUtils.parseFromSync(dto.updatedAt) ?: Date(),
+            lastSynced = Date(),
+            needsSync = false
         )
     }
 
     /**
-     * DTO → Entity for merging with existing local item
+     * Merge remote DTO into existing local entity
+     * Updates only sync-relevant fields, preserves local-only data
+     *
+     * @param existing Current local entity to merge into
+     * @param dto Remote data from server
+     * @return Updated entity ready for database update
      */
     fun dtoToExistingEntity(
         existing: InventoryItemEntity,
@@ -81,35 +100,24 @@ object SyncMapper {
             category = mapCategoryFromRemote(dto.itemCategory),
             priority = dto.priority,
             isActive = dto.isActive,
-            lastModified = parseDate(dto.updatedAt) ?: Date(),
+            lastModified = SyncDateUtils.parseFromSync(dto.updatedAt) ?: Date(),
             lastSynced = Date(),
             needsSync = false
         )
     }
 
+    // ========================================
+    // Category Mapping
+    // ========================================
+
     /**
-     * Check if remote version is newer
+     * Map remote category string to StorageCategory enum
+     * Handles null and unknown values gracefully
+     *
+     * @param category Remote category string (e.g., "БК", "Обладнання")
+     * @return StorageCategory - defaults to EQUIPMENT for unknown values
      */
-    fun isRemoteNewer(
-        localModified: Date,
-        remoteUpdatedAt: String?
-    ): Boolean {
-        val remoteDate = remoteUpdatedAt?.let { parseDate(it) } ?: return false
-        return remoteDate.after(localModified)
-    }
-
-    // ========================================
-    // Helper functions
-    // ========================================
-
-    private fun mapCategoryToRemote(category: StorageCategory): String {
-        return when (category) {
-            StorageCategory.AMMUNITION -> "БК"
-            StorageCategory.EQUIPMENT -> "Обладнання"
-        }
-    }
-
-    private fun mapCategoryFromRemote(category: String?): StorageCategory {
+    fun mapCategoryFromRemote(category: String?): StorageCategory {
         return when (category?.trim()) {
             "БК" -> StorageCategory.AMMUNITION
             "Обладнання" -> StorageCategory.EQUIPMENT
@@ -117,15 +125,40 @@ object SyncMapper {
         }
     }
 
-    private fun formatDate(date: Date?): String? {
-        return date?.let { iso8601Format.format(it) }
+    /**
+     * Map StorageCategory enum to remote string
+     * Ensures consistent naming for server communication
+     *
+     * @param category Local StorageCategory
+     * @return Remote category string compatible with server schema
+     */
+    fun mapCategoryToRemote(category: StorageCategory): String {
+        return when (category) {
+            StorageCategory.AMMUNITION -> "БК"
+            StorageCategory.EQUIPMENT -> "Обладнання"
+        }
     }
 
-    private fun parseDate(dateString: String?): Date? {
-        return try {
-            dateString?.let { iso8601Format.parse(it) }
-        } catch (e: Exception) {
-            null
-        }
+    // ========================================
+    // Conflict Resolution
+    // ========================================
+
+    /**
+     * Determine if remote version is newer than local
+     * Compares timestamps for merge conflict resolution
+     *
+     * Used in download sync to decide whether to update local item
+     * with server data or keep local version
+     *
+     * @param localModified Local modification timestamp
+     * @param remoteUpdatedAt Remote update timestamp string (ISO8601)
+     * @return true if remote is newer, false otherwise or on parse error
+     */
+    fun isRemoteNewer(
+        localModified: Date,
+        remoteUpdatedAt: String?
+    ): Boolean {
+        val remoteDate = remoteUpdatedAt?.let { SyncDateUtils.parseFromSync(it) } ?: return false
+        return remoteDate.after(localModified)
     }
 }

@@ -4,7 +4,6 @@ import android.util.Log
 import com.lifelover.companion159.data.local.dao.InventoryDao
 import com.lifelover.companion159.data.local.dao.SyncDao
 import com.lifelover.companion159.data.remote.api.SupabaseInventoryApi
-import com.lifelover.companion159.data.remote.dto.SupabaseInventoryItemDto
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.encodeToString
@@ -14,11 +13,18 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Single sync service - maksimalno proste
+ * Orchestrates synchronization between local DB and remote server
  *
- * Робить 2 речі:
- * 1. Upload pending items to server
- * 2. Download server items to local DB
+ * Responsibilities:
+ * - Upload pending local changes (needsSync=1)
+ * - Download server changes (forceFullSync or since lastSyncTime)
+ * - Merge conflict resolution (remote vs local timestamps)
+ * - Handle deleted items (isActive=false)
+ *
+ * Does NOT handle:
+ * - Data transformations (delegated to SyncMapper)
+ * - Date formatting (delegated to SyncDateUtils)
+ * - Connectivity checks (delegated to SyncOrchestrator)
  */
 @Singleton
 class SyncService @Inject constructor(
@@ -28,20 +34,22 @@ class SyncService @Inject constructor(
 ) {
     companion object {
         private const val TAG = "SyncService"
-
-        // ✅ Helper для форматування дати
-        private fun formatDate(date: java.util.Date?): String? {
-            if (date == null) return null
-            return java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSZ", java.util.Locale.US)
-                .apply { timeZone = java.util.TimeZone.getTimeZone("UTC") }
-                .format(date)
-        }
     }
 
     private var lastSyncTimestamp: Date? = null
 
     /**
-     * Upload всіх items з needsSync=true
+     * Upload all pending items (needsSync=1) to server
+     *
+     * For each pending item:
+     * - Transform to DTO using SyncMapper
+     * - INSERT if new (supabaseId=null)
+     * - UPDATE if existing (supabaseId set)
+     * - Mark as synced on success
+     *
+     * @param userId Current authenticated user ID
+     * @param crewName User's crew/position for filtering
+     * @return Number of items successfully uploaded
      */
     suspend fun uploadPendingItems(
         userId: String?,
@@ -61,55 +69,19 @@ class SyncService @Inject constructor(
 
             var uploadedCount = 0
 
-            // Process each item
+            // Process each pending item
             pendingItems.forEach { entity ->
                 try {
-                    // ✅ Log entity ПЕРЕД створенням DTO
-                    Log.d(TAG, "Entity from DB:")
-                    Log.d(TAG, "  id: ${entity.id}")
-                    Log.d(TAG, "  itemName: ${entity.itemName}")
-                    Log.d(TAG, "  availableQuantity: ${entity.availableQuantity}")
-                    Log.d(TAG, "  neededQuantity: ${entity.neededQuantity}")
-                    Log.d(TAG, "  priority: ${entity.priority}")
-                    Log.d(TAG, "  category: ${entity.category}")
-                    Log.d(TAG, "  isActive: ${entity.isActive}")
-                    Log.d(TAG, "  supabaseId: ${entity.supabaseId}")
+                    Log.d(TAG, "Processing entity: ${entity.itemName}")
 
-                    // Create DTO
-                    val dto = SupabaseInventoryItemDto(
-                        id = entity.supabaseId,
-                        tenantId = 9999,
-                        crewName = entity.crewName,
-                        itemName = entity.itemName,
-                        availableQuantity = entity.availableQuantity,
-                        neededQuantity = entity.neededQuantity,
-                        itemCategory = entity.category.name,
-                        unit = "шт.",
-                        priority = entity.priority,
-                        isActive = entity.isActive,
-                        createdAt = entity.createdAt?.time?.let {
-                            java.text.SimpleDateFormat(
-                                "yyyy-MM-dd'T'HH:mm:ss.SSSZ",
-                                java.util.Locale.US
-                            )
-                                .apply { timeZone = java.util.TimeZone.getTimeZone("UTC") }
-                                .format(it)
-                        },
-                        updatedAt = entity.lastModified?.time?.let {
-                            java.text.SimpleDateFormat(
-                                "yyyy-MM-dd'T'HH:mm:ss.SSSZ",
-                                java.util.Locale.US
-                            )
-                                .apply { timeZone = java.util.TimeZone.getTimeZone("UTC") }
-                                .format(it)
-                        }
-                    )
+                    // Transform using mapper (all conversion logic centralized)
+                    val dto = SyncMapper.entityToDto(entity)
 
-                    // Log DTO
+                    // Log DTO for debugging sync issues
                     val json = Json { prettyPrint = true }.encodeToString(dto)
                     Log.d(TAG, "📤 Sending to Supabase:\n$json")
 
-                    // Upload
+                    // Upload (new vs existing)
                     if (dto.id == null) {
                         // New item - INSERT
                         Log.d(TAG, "➕ INSERT: ${entity.itemName}")
@@ -160,7 +132,22 @@ class SyncService @Inject constructor(
     }
 
     /**
-     * Download всіх items з сервера
+     * Download all items from server and merge with local DB
+     *
+     * Sync strategy (timestamp-based incremental):
+     * - Full sync (forceFullSync=true): fetch ALL server items, update local completely
+     * - Incremental: fetch only items modified since lastSyncTimestamp
+     *
+     * Merge logic for each remote item:
+     * 1. If local doesn't exist → INSERT (new from server)
+     * 2. If local exists and remote is newer → UPDATE local with remote
+     * 3. If local exists and local is newer → KEEP local (will re-upload on next sync)
+     * 4. If remote is deleted (isActive=false) → SOFT DELETE local
+     *
+     * @param crewName Filter by crew/position
+     * @param userId Current user ID
+     * @param forceFullSync If true, fetch all items; if false, only modified since lastSync
+     * @return Number of items processed (merged + deleted)
      */
     suspend fun downloadServerItems(
         crewName: String,
@@ -170,19 +157,18 @@ class SyncService @Inject constructor(
         try {
             Log.d(TAG, "========== DOWNLOAD START ==========")
 
+            // Determine filter: full sync or incremental since last sync
             val updatedAfter = if (forceFullSync) {
                 null
             } else {
-                lastSyncTimestamp?.let {
-                    java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSZ", java.util.Locale.US)
-                        .apply { timeZone = java.util.TimeZone.getTimeZone("UTC") }
-                        .format(it)
-                }
+                lastSyncTimestamp?.let { SyncDateUtils.formatForSync(it) }
             }
 
             Log.d(TAG, "📥 Fetching from server for crew: $crewName")
             Log.d(TAG, "   Updated after: $updatedAfter")
+            Log.d(TAG, "   Force full sync: $forceFullSync")
 
+            // Fetch from server
             val remoteItems = api.fetchItemsByCrewName(crewName, updatedAfter)
                 .getOrElse { error ->
                     Log.e(TAG, "❌ Fetch failed: ${error.message}")
@@ -198,73 +184,55 @@ class SyncService @Inject constructor(
             }
 
             var mergedCount = 0
+            var deletedCount = 0
 
+            // Process each remote item
             remoteItems.forEach { remoteDto ->
                 try {
                     val supabaseId = remoteDto.id ?: return@forEach
 
+                    // Handle deleted items from server
+                    if (!remoteDto.isActive) {
+                        Log.d(TAG, "🗑️ Processing deleted item: ${remoteDto.itemName}")
+
+                        val localItem = syncDao.getItemBySupabaseId(supabaseId, userId)
+                        if (localItem != null && localItem.isActive) {
+                            inventoryDao.softDeleteItem(localItem.id)
+                            syncDao.markAsSynced(localItem.id)
+                            deletedCount++
+                            Log.d(TAG, "✅ Soft deleted: ${remoteDto.itemName}")
+                        }
+                        return@forEach // Skip other processing for deleted items
+                    }
+
+                    // Find existing local item
                     val localItem = syncDao.getItemBySupabaseId(supabaseId, userId)
 
                     if (localItem == null) {
-                        // New from server
-                        val entity =
-                            com.lifelover.companion159.data.local.entities.InventoryItemEntity(
-                                id = 0,
-                                supabaseId = supabaseId,
-                                itemName = remoteDto.itemName,
-                                availableQuantity = remoteDto.availableQuantity,
-                                neededQuantity = remoteDto.neededQuantity,
-                                category = com.lifelover.companion159.domain.models.StorageCategory.valueOf(
-                                    remoteDto.itemCategory?.let {
-                                        if (it == "БК") "AMMUNITION" else "EQUIPMENT"
-                                    } ?: "EQUIPMENT"
-                                ),
-                                userId = userId,
-                                crewName = remoteDto.crewName,
-                                priority = remoteDto.priority,
-                                isActive = remoteDto.isActive,
-                                createdAt = Date(),
-                                lastModified = Date(),
-                                lastSynced = Date(),
-                                needsSync = false
-                            )
-
+                        // New from server - INSERT
+                        val entity = SyncMapper.dtoToNewEntity(remoteDto, userId)
                         inventoryDao.insertItem(entity)
                         mergedCount++
                         Log.d(TAG, "✅ Inserted from server: ${remoteDto.itemName}")
 
                     } else {
-                        // Update if server is newer
-                        val remoteDate = remoteDto.updatedAt?.let {
-                            try {
-                                java.text.SimpleDateFormat(
-                                    "yyyy-MM-dd'T'HH:mm:ss.SSSZ",
-                                    java.util.Locale.US
-                                )
-                                    .apply { timeZone = java.util.TimeZone.getTimeZone("UTC") }
-                                    .parse(it)
-                            } catch (e: Exception) {
-                                Date()
-                            }
-                        } ?: Date()
-
-                        if (remoteDate.after(localItem.lastModified)) {
+                        // Existing locally - check if remote is newer (MERGE CONFLICT RESOLUTION)
+                        if (SyncMapper.isRemoteNewer(localItem.lastModified, remoteDto.updatedAt)) {
+                            // Remote is newer - UPDATE local with remote
+                            val updatedEntity = SyncMapper.dtoToExistingEntity(localItem, remoteDto)
                             inventoryDao.updateItemWithNeeds(
-                                id = localItem.id,
-                                name = remoteDto.itemName,
-                                availableQuantity = remoteDto.availableQuantity,
-                                neededQuantity = remoteDto.neededQuantity,
-                                category = com.lifelover.companion159.domain.models.StorageCategory.valueOf(
-                                    remoteDto.itemCategory?.let {
-                                        if (it == "БК") "AMMUNITION" else "EQUIPMENT"
-                                    } ?: "EQUIPMENT"
-                                ),
-                                crewName = remoteDto.crewName
+                                id = updatedEntity.id,
+                                name = updatedEntity.itemName,
+                                availableQuantity = updatedEntity.availableQuantity,
+                                neededQuantity = updatedEntity.neededQuantity,
+                                category = updatedEntity.category,
+                                crewName = updatedEntity.crewName
                             )
-                            syncDao.markAsSynced(localItem.id)
+                            syncDao.markAsSynced(updatedEntity.id)
                             mergedCount++
-                            Log.d(TAG, "✅ Updated from server: ${remoteDto.itemName}")
+                            Log.d(TAG, "✅ Updated from server (remote is newer): ${remoteDto.itemName}")
                         } else {
+                            // Local is newer - KEEP local (will re-upload on next sync)
                             Log.d(TAG, "⏭️ Skipped (local is newer): ${remoteDto.itemName}")
                         }
                     }
@@ -274,11 +242,12 @@ class SyncService @Inject constructor(
                 }
             }
 
+            // Update last sync timestamp for next incremental sync
             lastSyncTimestamp = Date()
 
-            Log.d(TAG, "✅ Download completed: $mergedCount items merged")
+            Log.d(TAG, "✅ Download completed: $mergedCount merged, $deletedCount deleted")
             Log.d(TAG, "========== DOWNLOAD END ==========")
-            Result.success(mergedCount)
+            Result.success(mergedCount + deletedCount)
 
         } catch (e: Exception) {
             Log.e(TAG, "❌ Download failed", e)
