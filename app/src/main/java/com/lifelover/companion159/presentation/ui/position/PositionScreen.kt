@@ -94,70 +94,15 @@ fun PositionScreen(
                 fontWeight = FontWeight.Medium
             )
 
-            Text(
-                text = "Позиція буде використовуватись для ідентифікації ваших даних",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-
             Spacer(modifier = Modifier.height(8.dp))
 
-            // Position input field
-            OutlinedTextField(
-                value = positionInput,
-                onValueChange = { positionInput = it },
-                label = { Text(stringResource(R.string.position_label)) },
-                placeholder = { Text(stringResource(R.string.position_placeholder)) },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
+            // Position selector component (handles input + suggestions + predefined list)
+            PositionSelector(
+                positionInput = positionInput,
+                onPositionChange = { positionInput = it },
+                suggestions = suggestions,
                 isError = state.error != null
             )
-
-            // Show suggestions when there's input
-            if (positionInput.isNotBlank() && suggestions.isNotEmpty()) {
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-                ) {
-                    LazyColumn {
-                        items(suggestions) { suggestion ->
-                            Text(
-                                text = suggestion,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clickable {
-                                        positionInput = suggestion
-                                    }
-                                    .padding(16.dp),
-                                style = MaterialTheme.typography.bodyLarge
-                            )
-                            if (suggestion != suggestions.last()) {
-                                HorizontalDivider()
-                            }
-                        }
-                    }
-                }
-            }
-
-            // Show predefined options when input is empty
-            if (positionInput.isBlank()) {
-                Text(
-                    text = stringResource(R.string.position_select_list),
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.Medium
-                )
-
-                Column(
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    suggestions.forEach { position ->
-                        SecondaryButton(
-                            text = position,
-                            onClick = { positionInput = position }
-                        )
-                    }
-                }
-            }
 
             Spacer(modifier = Modifier.weight(1f))
 
