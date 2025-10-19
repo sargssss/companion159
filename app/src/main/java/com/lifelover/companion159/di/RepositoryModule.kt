@@ -1,5 +1,6 @@
 package com.lifelover.companion159.di
 
+import com.lifelover.companion159.data.local.UserPreferences
 import com.lifelover.companion159.data.local.dao.InventoryDao
 import com.lifelover.companion159.data.local.dao.PreferencesDao
 import com.lifelover.companion159.data.remote.auth.SupabaseAuthService
@@ -19,9 +20,10 @@ object RepositoryModule {
     @Singleton
     fun providePositionRepository(
         preferencesDao: PreferencesDao,
-        authService: SupabaseAuthService
+        authService: SupabaseAuthService,
+        userPreferences: UserPreferences
     ): PositionRepository {
-        return PositionRepository(preferencesDao, authService)
+        return PositionRepository(preferencesDao, authService, userPreferences)
     }
 
     @Provides

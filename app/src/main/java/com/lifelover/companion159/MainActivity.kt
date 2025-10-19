@@ -48,9 +48,6 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         WindowCompat.setDecorFitsSystemWindows(window, false)
 
-        // ✅ Setup sync callback
-        //syncManager.setupSyncCallback(inventoryRepository)
-
         syncOrchestrator.setupRepositoryCallback(inventoryRepository)
 
         setContent {
@@ -78,7 +75,8 @@ class MainActivity : ComponentActivity() {
                     AppNavigation(
                         navController = navController,
                         currentPosition = currentPosition,
-                        isAuthenticated = authState.isAuthenticated
+                        isAuthenticated = authState.isAuthenticated,
+                        positionRepository = positionRepository
                     )
 
                     LaunchedEffect(authState.isAuthenticated, currentPosition) {

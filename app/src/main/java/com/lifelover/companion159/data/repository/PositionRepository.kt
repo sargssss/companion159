@@ -6,6 +6,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import com.lifelover.companion159.data.local.dao.PreferencesDao
 import com.lifelover.companion159.data.local.entities.PreferencesEntity
+import com.lifelover.companion159.data.local.UserPreferences  // ✅ Додали
 import com.lifelover.companion159.data.remote.auth.SupabaseAuthService
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -17,7 +18,8 @@ import kotlinx.coroutines.withContext
 @Singleton
 class PositionRepository @Inject constructor(
     private val preferencesDao: PreferencesDao,
-    private val authService: SupabaseAuthService
+    private val authService: SupabaseAuthService,
+    private val userPreferences: UserPreferences
 ) {
     companion object {
         const val TAG = "PositionRepository"
@@ -39,6 +41,26 @@ class PositionRepository @Inject constructor(
     fun getPosition(): String? = currentPosition.value
 
     /**
+     * Check if position selection should be shown
+     *
+     * Returns true if:
+     * - Position not set yet
+     * - More than 3 days passed since last login
+     *
+     * @return true if should show position selection
+     */
+    fun shouldShowPositionSelection(): Boolean {
+        val hasPosition = !currentPosition.value.isNullOrBlank()
+        val needsReselection = userPreferences.shouldShowPositionSelection()
+
+        Log.d(TAG, "shouldShowPositionSelection:")
+        Log.d(TAG, "  hasPosition: $hasPosition")
+        Log.d(TAG, "  needsReselection: $needsReselection")
+
+        return !hasPosition || needsReselection
+    }
+
+    /**
      * Save selected position
      * Also updates Supabase user metadata with crew_name
      */
@@ -58,7 +80,6 @@ class PositionRepository @Inject constructor(
                         Log.d(TAG, "✅ Position saved: $position (local + Supabase)")
                     },
                     onFailure = { error ->
-                        // Don't fail if Supabase update fails - local save is more important
                         Log.e(TAG, "⚠️ Position saved locally but Supabase update failed", error)
                     }
                 )

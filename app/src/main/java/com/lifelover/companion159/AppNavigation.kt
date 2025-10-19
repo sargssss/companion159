@@ -1,15 +1,19 @@
 package com.lifelover.companion159
 
+import android.util.Log
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.remember
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.toRoute
 import com.lifelover.companion159.data.remote.SupabaseConfig
+import com.lifelover.companion159.data.repository.PositionRepository
 import com.lifelover.companion159.domain.models.DisplayCategory
 import com.lifelover.companion159.presentation.ui.auth.LoginScreen
 import com.lifelover.companion159.presentation.ui.inventory.AddEditItemScreen
@@ -47,13 +51,22 @@ data class EditItem(
 fun AppNavigation(
     navController: NavHostController,
     currentPosition: String?,
-    isAuthenticated: Boolean
+    isAuthenticated: Boolean,
+    positionRepository: PositionRepository
 ) {
+    val TAG = "AppNavigation"
+
     val startDestination = when {
         !SupabaseConfig.isConfigured -> MainMenu
         !isAuthenticated -> Login
-        else -> Position
+        positionRepository.shouldShowPositionSelection() -> Position
+        else -> MainMenu
     }
+
+    Log.d(TAG, "🚀 Starting at: ${startDestination::class.simpleName}")
+    Log.d(TAG, "   authenticated: $isAuthenticated")
+    Log.d(TAG, "   currentPosition: $currentPosition")
+    Log.d(TAG, "   shouldShowPosition: ${positionRepository.shouldShowPositionSelection()}")
 
     NavHost(
         navController = navController,
@@ -71,7 +84,7 @@ fun AppNavigation(
                         popUpTo(Position) { inclusive = true }
                     }
                 },
-                showBackButton = false
+                showBackButton = isAuthenticated
             )
         }
 
@@ -86,14 +99,6 @@ fun AppNavigation(
         }
 
         composable<MainMenu> {
-            LaunchedEffect(currentPosition) {
-                if (currentPosition.isNullOrBlank()) {
-                    navController.navigate(Position) {
-                        popUpTo(MainMenu) { inclusive = true }
-                    }
-                }
-            }
-
             MainMenuScreen(
                 onDisplayCategorySelected = { displayCategory ->
                     navController.navigate(InventoryDetail(displayCategory.name))
