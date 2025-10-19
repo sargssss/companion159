@@ -85,18 +85,12 @@ fun MainMenuScreen(
                         if (syncState.isSyncing) {
                             CircularProgressIndicator(
                                 modifier = Modifier.size(24.dp),
-                                strokeWidth = 2.dp,
-                                color = MaterialTheme.colorScheme.primary
+                                strokeWidth = 2.dp
                             )
                         } else {
                             Icon(
                                 painter = painterResource(R.drawable.sync_check),
-                                contentDescription = stringResource(R.string.sync),
-                                tint = if (syncState.lastSyncTime != null) {
-                                    MaterialTheme.colorScheme.primary
-                                } else {
-                                    MaterialTheme.colorScheme.onSurfaceVariant
-                                }
+                                contentDescription = stringResource(R.string.sync)
                             )
                         }
                     }
